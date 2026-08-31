@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
+import { DonutChart } from '../../../shared/charts/donut-chart/donut-chart';
 import { CollectionEntry, CollectionService } from '../collection.service';
 
 type ColorCategory = 'W' | 'U' | 'B' | 'R' | 'G' | 'M' | 'C';
@@ -31,7 +32,7 @@ function manaCurveBucketFor(cmc: number): string {
 
 @Component({
   selector: 'app-collection-overview',
-  imports: [BarChart],
+  imports: [BarChart, DonutChart],
   templateUrl: './collection-overview.html',
   styleUrl: './collection-overview.scss',
 })

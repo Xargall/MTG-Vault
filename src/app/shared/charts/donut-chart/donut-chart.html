@@ -1,0 +1,54 @@
+<div class="donut-chart">
+  <svg class="ring" viewBox="0 0 170 170" role="img">
+    <circle
+      class="track"
+      cx="85"
+      cy="85"
+      [attr.r]="radius"
+      fill="none"
+      [attr.stroke-width]="strokeWidth"
+    />
+
+    @for (segment of segments(); track segment.label) {
+      <circle
+        class="segment"
+        [class.is-hovered]="hoveredLabel() === segment.label"
+        cx="85"
+        cy="85"
+        [attr.r]="radius"
+        fill="none"
+        [attr.stroke]="segment.color"
+        [attr.stroke-width]="strokeWidth"
+        stroke-linecap="butt"
+        [attr.stroke-dasharray]="segment.dasharray"
+        [attr.stroke-dashoffset]="segment.dashoffset"
+        transform="rotate(-90 85 85)"
+        tabindex="0"
+        (mouseenter)="hoveredLabel.set(segment.label)"
+        (mouseleave)="hoveredLabel.set(null)"
+        (focus)="hoveredLabel.set(segment.label)"
+        (blur)="hoveredLabel.set(null)"
+      >
+        <title>{{ segment.label }}: {{ segment.value }} ({{ segment.percent }}%)</title>
+      </circle>
+    }
+
+    <text class="total-value" x="85" y="80" text-anchor="middle">{{ total() }}</text>
+    <text class="total-label" x="85" y="100" text-anchor="middle">Karten</text>
+  </svg>
+
+  <ul class="legend">
+    @for (item of legend(); track item.label) {
+      <li
+        class="legend-row"
+        [class.is-hovered]="hoveredLabel() === item.label"
+        (mouseenter)="hoveredLabel.set(item.label)"
+        (mouseleave)="hoveredLabel.set(null)"
+      >
+        <span class="swatch" [style.background]="item.color"></span>
+        <span class="legend-label">{{ item.label }}</span>
+        <span class="legend-value">{{ item.value }} · {{ item.percent }}%</span>
+      </li>
+    }
+  </ul>
+</div>
