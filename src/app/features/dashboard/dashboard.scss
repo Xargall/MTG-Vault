@@ -1,4 +1,4 @@
-.overview {
+.dashboard {
   padding: var(--spacing-lg);
 }
 
@@ -14,11 +14,14 @@ h1 {
   }
 }
 
-.chart-card {
+.overview-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: var(--spacing-lg);
+  margin: 0 auto;
+  width: fit-content;
+  max-width: 100%;
 
   h2 {
     margin: 0 0 var(--spacing-md);
@@ -26,9 +29,4 @@ h1 {
     color: var(--color-text);
     text-align: center;
   }
-}
-
-.mana-curve-card {
-  margin: 0 auto;
-  max-width: 420px;
 }

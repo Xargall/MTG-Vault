@@ -8,16 +8,9 @@
   } @else if (isEmpty()) {
     <p class="state-message">Noch keine Karten in deiner Sammlung.</p>
   } @else {
-    <div class="chart-grid">
-      <section class="chart-card">
-        <h2>Farbverteilung</h2>
-        <app-donut-chart [data]="colorDistribution()" />
-      </section>
-
-      <section class="chart-card">
-        <h2>Mana-Kurve</h2>
-        <app-bar-chart [data]="manaCurve()" />
-      </section>
-    </div>
+    <section class="chart-card mana-curve-card">
+      <h2>Mana-Kurve</h2>
+      <app-bar-chart [data]="manaCurve()" />
+    </section>
   }
 </div>
