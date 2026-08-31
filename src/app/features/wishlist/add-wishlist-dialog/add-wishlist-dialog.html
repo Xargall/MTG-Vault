@@ -1,0 +1,89 @@
+<div class="backdrop" (click)="close.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <header class="dialog-header">
+      <h2>Zur Wunschliste hinzufügen</h2>
+      <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
+    </header>
+
+    @if (!selectedName()) {
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Kartenname suchen…"
+        [ngModel]="query()"
+        (ngModelChange)="onQueryChange($event)"
+        autofocus
+      />
+
+      @if (searching()) {
+        <p class="state-message">Suche…</p>
+      } @else if (searchError()) {
+        <p class="state-message error">{{ searchError() }}</p>
+      } @else if (query().trim() && results().length === 0) {
+        <p class="state-message">Keine Karten gefunden.</p>
+      } @else {
+        <div class="results-grid">
+          @for (card of results(); track card.id) {
+            <button type="button" class="result-item" (click)="selectName(card)">
+              <app-card-tile [card]="card" />
+            </button>
+          }
+        </div>
+      }
+    } @else if (!selectedCard()) {
+      <div class="prints-view">
+        <button type="button" class="back-link" (click)="backToSearch()">← Zurück zur Suche</button>
+        <h3>{{ selectedName() }} – Druck wählen</h3>
+
+        @if (loadingPrints()) {
+          <p class="state-message">Lade Drucke…</p>
+        } @else if (printsError()) {
+          <p class="state-message error">{{ printsError() }}</p>
+        } @else {
+          <div class="results-grid">
+            @for (print of prints(); track print.id) {
+              <button type="button" class="result-item" (click)="selectPrint(print)">
+                <app-card-tile [card]="print" />
+                <span class="print-meta">{{ print.set_name }} · {{ print.released_at.slice(0, 4) }}</span>
+              </button>
+            }
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="detail-view">
+        <button type="button" class="back-link" (click)="backToPrints()">← Andere Version wählen</button>
+
+        <div class="detail-body">
+          <app-card-tile [card]="selectedCard()!" />
+
+          <div class="detail-form">
+            <label for="priority">Priorität</label>
+            <select id="priority" [value]="priority()" (change)="priority.set(+$any($event.target).value)">
+              <option value="1">Niedrig</option>
+              <option value="2">Mittel</option>
+              <option value="3">Hoch</option>
+            </select>
+
+            <label for="notes">Notizen</label>
+            <textarea
+              id="notes"
+              rows="3"
+              placeholder="Optional…"
+              [ngModel]="notes()"
+              (ngModelChange)="notes.set($event)"
+            ></textarea>
+
+            @if (submitError()) {
+              <p class="state-message error">{{ submitError() }}</p>
+            }
+
+            <button type="button" class="submit-button" [disabled]="submitting()" (click)="submit()">
+              Zur Wunschliste hinzufügen
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

@@ -37,6 +37,10 @@ export const routes: Routes = [
         path: 'decks',
         loadComponent: () => import('./features/decks/decks').then((m) => m.Decks),
       },
+      {
+        path: 'wishlist',
+        loadComponent: () => import('./features/wishlist/wishlist').then((m) => m.Wishlist),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

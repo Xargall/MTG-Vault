@@ -1,0 +1,70 @@
+<div class="wishlist">
+  <header class="page-header">
+    <h1>Wunschliste</h1>
+    <button type="button" class="add-button" (click)="showAddDialog.set(true)" aria-label="Karte hinzufügen">
+      +
+    </button>
+  </header>
+
+  @if (loading()) {
+    <p class="state-message">Lade Wunschliste…</p>
+  } @else if (errorMessage()) {
+    <p class="state-message error">{{ errorMessage() }}</p>
+  } @else if (!hasEntries()) {
+    <p class="state-message">Noch keine Karten auf der Wunschliste.</p>
+  } @else {
+    <p class="total-value">Gesamtwert: {{ totalValue() | number: '1.2-2' }} €</p>
+
+    <ul class="entry-list">
+      @for (entry of entries(); track entry.row.id) {
+        <li class="entry-row">
+          @if (getCardImageUrl(entry.card); as imageUrl) {
+            <img class="entry-image" [src]="imageUrl" [alt]="entry.card.name" />
+          } @else {
+            <div class="entry-placeholder">{{ entry.card.name }}</div>
+          }
+
+          <div class="entry-info">
+            <p class="entry-name">{{ entry.card.name }}</p>
+            <p class="entry-price">{{ getEntryPrice(entry) | number: '1.2-2' }} €</p>
+            @if (entry.card.purchase_uris?.cardmarket; as url) {
+              <a class="cardmarket-link" [href]="url" target="_blank" rel="noopener">
+                Auf Cardmarket ansehen
+              </a>
+            }
+          </div>
+
+          <select
+            class="priority-select"
+            [class.priority-1]="entry.row.priority === 1"
+            [class.priority-2]="entry.row.priority === 2"
+            [class.priority-3]="entry.row.priority === 3"
+            [value]="entry.row.priority"
+            (change)="updatePriority(entry, +$any($event.target).value)"
+          >
+            <option [value]="1">Niedrig</option>
+            <option [value]="2">Mittel</option>
+            <option [value]="3">Hoch</option>
+          </select>
+
+          <input
+            #notesInput
+            type="text"
+            class="notes-input"
+            placeholder="Notiz…"
+            [value]="entry.row.notes ?? ''"
+            (blur)="updateNotes(entry, notesInput.value)"
+          />
+
+          <button type="button" class="remove-button" (click)="remove(entry)" aria-label="Entfernen">
+            ✕
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</div>
+
+@if (showAddDialog()) {
+  <app-add-wishlist-dialog (close)="showAddDialog.set(false)" (added)="onAdded()" />
+}
