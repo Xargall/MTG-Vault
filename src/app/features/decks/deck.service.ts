@@ -112,13 +112,19 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    const collectionInputs: AddCardInput[] = detail.cards.map((card) => ({
-      scryfallId: card.scryfallId,
-      quantity: card.quantity,
-      foil: false,
-      condition: 'NM',
-    }));
-    await this.collectionService.addCards(collectionInputs);
+    const owned = await this.collectionService.getQuantitiesByScryfallId();
+    const collectionInputs: AddCardInput[] = detail.cards
+      .map((card) => ({
+        scryfallId: card.scryfallId,
+        quantity: card.quantity - (owned.get(card.scryfallId) ?? 0),
+        foil: false,
+        condition: 'NM',
+      }))
+      .filter((input) => input.quantity > 0);
+
+    if (collectionInputs.length > 0) {
+      await this.collectionService.addCards(collectionInputs);
+    }
   }
 
   async deleteDeck(deckId: string): Promise<void> {

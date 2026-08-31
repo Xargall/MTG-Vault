@@ -50,6 +50,21 @@ export class CollectionService {
       .filter((entry): entry is CollectionEntry => entry !== null);
   }
 
+  async getQuantitiesByScryfallId(): Promise<Map<string, number>> {
+    const { data, error } = await this.supabase.client
+      .from('collection_cards')
+      .select('scryfall_id, quantity')
+      .returns<Array<{ scryfall_id: string; quantity: number }>>();
+
+    if (error) throw error;
+
+    const totals = new Map<string, number>();
+    for (const row of data ?? []) {
+      totals.set(row.scryfall_id, (totals.get(row.scryfall_id) ?? 0) + row.quantity);
+    }
+    return totals;
+  }
+
   async addCard(input: AddCardInput): Promise<void> {
     return this.upsertOne(input);
   }
