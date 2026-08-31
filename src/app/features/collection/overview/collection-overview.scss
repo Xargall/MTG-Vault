@@ -118,3 +118,15 @@ h1 {
   gap: var(--spacing-md);
   margin-top: var(--spacing-lg);
 }
+
+.card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius);
+  transition: transform 0.1s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+}

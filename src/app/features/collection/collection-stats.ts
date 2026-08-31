@@ -35,9 +35,11 @@ function manaCurveBucketFor(cmc: number): string {
   return rounded >= 7 ? '7+' : String(rounded);
 }
 
-function entryPrice(entry: CollectionEntry): number {
+export function getEntryPrice(entry: CollectionEntry, currency: 'usd' | 'eur' = 'usd'): number {
   const { row, card } = entry;
-  const priceStr = (row.foil ? card.prices?.usd_foil : card.prices?.usd) ?? card.prices?.usd ?? card.prices?.usd_foil;
+  const regular = currency === 'usd' ? card.prices?.usd : card.prices?.eur;
+  const foilPrice = currency === 'usd' ? card.prices?.usd_foil : card.prices?.eur_foil;
+  const priceStr = (row.foil ? foilPrice : regular) ?? regular ?? foilPrice;
   const parsed = priceStr ? parseFloat(priceStr) : 0;
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -71,7 +73,7 @@ export function getColorCategorySummaries(entries: CollectionEntry[]): ColorCate
     const categoryEntries = grouped.get(key) ?? [];
     const count = categoryEntries.reduce((sum, e) => sum + e.row.quantity, 0);
     const showcase = categoryEntries.reduce<CollectionEntry | null>(
-      (best, e) => (best === null || entryPrice(e) > entryPrice(best) ? e : best),
+      (best, e) => (best === null || getEntryPrice(e) > getEntryPrice(best) ? e : best),
       null,
     );
     return { key, label, color, count, showcase };

@@ -50,6 +50,20 @@ export class CollectionService {
       .filter((entry): entry is CollectionEntry => entry !== null);
   }
 
+  async getEntryById(id: string): Promise<CollectionEntry | null> {
+    const { data: row, error } = await this.supabase.client
+      .from('collection_cards')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle<CollectionCardRow>();
+
+    if (error) throw error;
+    if (!row) return null;
+
+    const [card] = await this.scryfall.getCardsByIds([row.scryfall_id]);
+    return card ? { row, card } : null;
+  }
+
   async addCard({ scryfallId, quantity, foil, condition }: AddCardInput): Promise<void> {
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Nicht eingeloggt.');

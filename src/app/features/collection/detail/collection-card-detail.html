@@ -1,0 +1,53 @@
+<div class="detail-page">
+  <a class="back-link" routerLink="/collection">← Zurück zur Sammlung</a>
+
+  @if (loading()) {
+    <p class="state-message">Lade Karte…</p>
+  } @else if (errorMessage()) {
+    <p class="state-message error">{{ errorMessage() }}</p>
+  } @else if (!entry()) {
+    <p class="state-message">Karte nicht gefunden.</p>
+  } @else {
+    <div class="detail-layout">
+      <div class="image-column">
+        @if (imageUrl(); as url) {
+          <img class="card-image" [src]="url" [alt]="entry()!.card.name" />
+        } @else {
+          <div class="card-placeholder">{{ entry()!.card.name }}</div>
+        }
+      </div>
+
+      <div class="info-column">
+        <h1>{{ entry()!.card.name }}</h1>
+
+        @if (manaSymbols().length > 0) {
+          <div class="mana-cost">
+            @for (symbol of manaSymbols(); track $index) {
+              <span class="mana-symbol" [style.background]="symbol.color">{{ symbol.symbol }}</span>
+            }
+          </div>
+        }
+
+        <dl class="info-list">
+          <dt>Set</dt>
+          <dd>{{ entry()!.card.set_name }}</dd>
+
+          <dt>Seltenheit</dt>
+          <dd>{{ rarityLabel() }}</dd>
+
+          <dt>Foil</dt>
+          <dd>{{ entry()!.row.foil ? 'Ja' : 'Nein' }}</dd>
+
+          <dt>Preis</dt>
+          <dd>{{ price() > 0 ? (price() | number: '1.2-2') + ' €' : 'Unbekannt' }}</dd>
+        </dl>
+
+        @if (cardmarketUrl(); as url) {
+          <a class="cardmarket-link" [href]="url" target="_blank" rel="noopener">
+            Auf Cardmarket ansehen
+          </a>
+        }
+      </div>
+    </div>
+  }
+</div>

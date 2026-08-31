@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
@@ -14,7 +14,7 @@ import { CollectionEntry, CollectionService } from '../collection.service';
 
 @Component({
   selector: 'app-collection-overview',
-  imports: [BarChart, CardTile, AddCardDialog],
+  imports: [BarChart, CardTile, AddCardDialog, RouterLink],
   templateUrl: './collection-overview.html',
   styleUrl: './collection-overview.scss',
 })

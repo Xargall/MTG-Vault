@@ -1,0 +1,118 @@
+.detail-page {
+  padding: var(--spacing-lg);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: var(--spacing-lg);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+
+  &:hover {
+    color: var(--color-accent);
+  }
+}
+
+.state-message {
+  color: var(--color-text-muted);
+
+  &.error {
+    color: var(--color-danger);
+  }
+}
+
+.detail-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  align-items: flex-start;
+}
+
+.image-column {
+  flex: 0 0 320px;
+  max-width: 100%;
+}
+
+.card-image {
+  width: 100%;
+  border-radius: 12px;
+  display: block;
+}
+
+.card-placeholder {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: 12px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-md);
+}
+
+.info-column {
+  flex: 1 1 280px;
+  min-width: 260px;
+
+  h1 {
+    margin: 0 0 var(--spacing-md);
+    font-size: 1.6rem;
+  }
+}
+
+.mana-cost {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: var(--spacing-lg);
+}
+
+.mana-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-bg);
+}
+
+.info-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--spacing-sm) var(--spacing-lg);
+  margin: 0 0 var(--spacing-lg);
+
+  dt {
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+  }
+
+  dd {
+    margin: 0;
+    color: var(--color-text);
+    font-weight: 600;
+  }
+}
+
+.cardmarket-link {
+  display: inline-block;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  text-decoration: none;
+  font-weight: 600;
+
+  &:hover {
+    background: var(--color-accent-hover);
+  }
+}

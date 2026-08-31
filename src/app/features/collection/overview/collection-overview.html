@@ -62,7 +62,9 @@
     } @else {
       <div class="card-grid">
         @for (entry of filteredEntries(); track entry.row.id) {
-          <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" />
+          <a class="card-link" [routerLink]="['/collection', entry.row.id]">
+            <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" />
+          </a>
         }
       </div>
     }

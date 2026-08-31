@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 
 export interface ScryfallCardFace {
   image_uris?: { normal: string; small: string; art_crop: string };
+  mana_cost?: string;
 }
 
 export interface ScryfallCard {
@@ -9,9 +10,13 @@ export interface ScryfallCard {
   name: string;
   cmc: number;
   color_identity: string[];
+  mana_cost?: string;
+  set_name: string;
+  rarity: string;
   image_uris?: { normal: string; small: string; art_crop: string };
   card_faces?: ScryfallCardFace[];
-  prices: { usd: string | null; usd_foil: string | null };
+  prices: { usd: string | null; usd_foil: string | null; eur: string | null; eur_foil: string | null };
+  purchase_uris?: { cardmarket?: string };
 }
 
 export function getCardImageUrl(card: ScryfallCard): string | null {
