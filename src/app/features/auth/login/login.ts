@@ -53,4 +53,18 @@ export class Login {
       this.errorMessage.set(error instanceof Error ? error.message : 'Google-Login fehlgeschlagen.');
     }
   }
+
+  async signInAsGuest() {
+    this.errorMessage.set(null);
+    this.isSubmitting.set(true);
+    try {
+      await this.authService.signInAsGuest();
+      const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo') ?? '/';
+      await this.router.navigateByUrl(redirectTo);
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : 'Demo-Login fehlgeschlagen.');
+    } finally {
+      this.isSubmitting.set(false);
+    }
+  }
 }

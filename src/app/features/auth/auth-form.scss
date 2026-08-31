@@ -85,4 +85,42 @@
     color: var(--color-text-muted);
     text-align: center;
   }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    margin: var(--spacing-sm) 0;
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--color-border);
+    }
+
+    span {
+      padding: 0 var(--spacing-sm);
+    }
+  }
+
+  .guest-button {
+    background: transparent;
+    color: var(--color-text-muted);
+    border: 1px dashed var(--color-border);
+
+    &:hover:not(:disabled) {
+      color: var(--color-text);
+      border-color: var(--color-accent);
+    }
+  }
+
+  .guest-hint {
+    margin: var(--spacing-sm) 0 0;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    text-align: center;
+  }
 }

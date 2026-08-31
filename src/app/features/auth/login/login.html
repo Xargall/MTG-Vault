@@ -22,5 +22,12 @@
     <button type="button" class="google-button" (click)="signInWithGoogle()">Mit Google anmelden</button>
 
     <p class="switch-link">Noch kein Konto? <a routerLink="/register">Registrieren</a></p>
+
+    <div class="divider"><span>oder</span></div>
+
+    <button type="button" class="guest-button" [disabled]="isSubmitting()" (click)="signInAsGuest()">
+      Demo ausprobieren
+    </button>
+    <p class="guest-hint">Ohne Registrierung testen — kein eigenes Konto nötig.</p>
   </form>
 </div>

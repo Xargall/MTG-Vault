@@ -27,6 +27,11 @@ export class AuthService {
     if (error) throw error;
   }
 
+  async signInAsGuest() {
+    const { error } = await this.supabase.client.auth.signInAnonymously();
+    if (error) throw error;
+  }
+
   async signOut() {
     const { error } = await this.supabase.client.auth.signOut();
     if (error) throw error;
