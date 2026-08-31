@@ -1,14 +1,21 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { BarChart } from '../../shared/charts/bar-chart/bar-chart';
 import { DonutChart } from '../../shared/charts/donut-chart/donut-chart';
 import { getCardImageUrl } from '../../core/services/scryfall.service';
-import { getColorCategorySummaries, getColorDistribution } from '../collection/collection-stats';
+import {
+  getColorCategorySummaries,
+  getColorDistribution,
+  getPriceDistribution,
+  getTotalValue,
+} from '../collection/collection-stats';
 import { CollectionEntry, CollectionService } from '../collection/collection.service';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [DonutChart, RouterLink],
+  imports: [DonutChart, BarChart, RouterLink, DecimalPipe],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -22,6 +29,8 @@ export class Dashboard {
   protected readonly hasCards = computed(() => this.entries().length > 0);
   protected readonly colorDistribution = computed(() => getColorDistribution(this.entries()));
   protected readonly colorCategories = computed(() => getColorCategorySummaries(this.entries()));
+  protected readonly priceDistribution = computed(() => getPriceDistribution(this.entries()));
+  protected readonly totalValue = computed(() => getTotalValue(this.entries()));
   protected readonly getCardImageUrl = getCardImageUrl;
 
   constructor() {

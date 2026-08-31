@@ -6,10 +6,18 @@
   } @else if (errorMessage()) {
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else if (hasCards()) {
-    <section class="overview-card">
-      <h2>Farbverteilung</h2>
-      <app-donut-chart [data]="colorDistribution()" />
-    </section>
+    <div class="top-row">
+      <section class="overview-card">
+        <h2>Farbverteilung</h2>
+        <app-donut-chart [data]="colorDistribution()" />
+      </section>
+
+      <section class="overview-card price-card">
+        <h2>Preisverteilung</h2>
+        <p class="total-value">{{ totalValue() | number: '1.2-2' }} €</p>
+        <app-bar-chart [data]="priceDistribution()" />
+      </section>
+    </div>
 
     <section class="color-categories">
       <h2>Farbkategorien</h2>

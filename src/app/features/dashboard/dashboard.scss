@@ -101,6 +101,14 @@ h1 {
   color: var(--color-text-muted);
 }
 
+.top-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: var(--spacing-lg);
+}
+
 .overview-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -116,4 +124,18 @@ h1 {
     color: var(--color-text);
     text-align: center;
   }
+}
+
+.price-card {
+  width: 460px;
+  display: flex;
+  flex-direction: column;
+}
+
+.total-value {
+  margin: 0 0 var(--spacing-md);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
 }
