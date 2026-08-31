@@ -33,13 +33,6 @@ export const routes: Routes = [
             (m) => m.CollectionOverview,
           ),
       },
-      {
-        path: 'collection/:id',
-        loadComponent: () =>
-          import('./features/collection/detail/collection-card-detail').then(
-            (m) => m.CollectionCardDetail,
-          ),
-      },
     ],
   },
   { path: '**', redirectTo: '' },

@@ -62,9 +62,9 @@
     } @else {
       <div class="card-grid">
         @for (entry of filteredEntries(); track entry.row.id) {
-          <a class="card-link" [routerLink]="['/collection', entry.row.id]">
+          <button type="button" class="card-link" (click)="selectedEntry.set(entry)">
             <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" />
-          </a>
+          </button>
         }
       </div>
     }
@@ -73,4 +73,8 @@
 
 @if (showAddDialog()) {
   <app-add-card-dialog (close)="showAddDialog.set(false)" (added)="load()" />
+}
+
+@if (selectedEntry(); as entry) {
+  <app-card-detail-dialog [entry]="entry" (close)="selectedEntry.set(null)" />
 }

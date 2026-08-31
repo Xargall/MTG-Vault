@@ -1,9 +1,10 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AddCardDialog } from '../add-card/add-card-dialog';
+import { CardDetailDialog } from '../card-detail/card-detail-dialog';
 import {
   COLOR_CATEGORIES,
   ColorCategory,
@@ -14,7 +15,7 @@ import { CollectionEntry, CollectionService } from '../collection.service';
 
 @Component({
   selector: 'app-collection-overview',
-  imports: [BarChart, CardTile, AddCardDialog, RouterLink],
+  imports: [BarChart, CardTile, AddCardDialog, CardDetailDialog],
   templateUrl: './collection-overview.html',
   styleUrl: './collection-overview.scss',
 })
@@ -31,6 +32,7 @@ export class CollectionOverview {
   protected readonly searchQuery = signal('');
   protected readonly selectedCategory = signal<ColorCategory | null>(null);
   protected readonly showAddDialog = signal(false);
+  protected readonly selectedEntry = signal<CollectionEntry | null>(null);
 
   protected readonly hasAnyCards = computed(() => this.entries().length > 0);
   protected readonly manaCurve = computed<BarChartDatum[]>(() => getManaCurve(this.entries()));
