@@ -26,6 +26,13 @@ export const routes: Routes = [
         path: '',
         loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
       },
+      {
+        path: 'collection',
+        loadComponent: () =>
+          import('./features/collection/overview/collection-overview').then(
+            (m) => m.CollectionOverview,
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

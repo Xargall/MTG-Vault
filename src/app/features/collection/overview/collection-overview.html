@@ -1,0 +1,23 @@
+<div class="overview">
+  <h1>Sammlung</h1>
+
+  @if (loading()) {
+    <p class="state-message">Lade Sammlung…</p>
+  } @else if (errorMessage()) {
+    <p class="state-message error">{{ errorMessage() }}</p>
+  } @else if (isEmpty()) {
+    <p class="state-message">Noch keine Karten in deiner Sammlung.</p>
+  } @else {
+    <div class="chart-grid">
+      <section class="chart-card">
+        <h2>Farbverteilung</h2>
+        <app-bar-chart [data]="colorDistribution()" />
+      </section>
+
+      <section class="chart-card">
+        <h2>Mana-Kurve</h2>
+        <app-bar-chart [data]="manaCurve()" />
+      </section>
+    </div>
+  }
+</div>

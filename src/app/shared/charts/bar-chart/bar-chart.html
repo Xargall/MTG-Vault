@@ -1,0 +1,57 @@
+<svg
+  class="bar-chart"
+  [attr.viewBox]="'0 0 ' + viewBoxWidth() + ' ' + viewBoxHeight"
+  preserveAspectRatio="xMidYMid meet"
+  role="img"
+>
+  <line
+    class="baseline"
+    x1="0"
+    [attr.y1]="baselineY"
+    [attr.x2]="viewBoxWidth()"
+    [attr.y2]="baselineY"
+  />
+
+  @for (bar of bars(); track bar.label; let i = $index) {
+    <g
+      class="bar-group"
+      tabindex="0"
+      (mouseenter)="hoveredIndex.set(i)"
+      (mouseleave)="hoveredIndex.set(null)"
+      (focus)="hoveredIndex.set(i)"
+      (blur)="hoveredIndex.set(null)"
+    >
+      <title>{{ bar.label }}: {{ bar.value }}</title>
+
+      <rect
+        class="bar"
+        [class.is-hovered]="hoveredIndex() === i"
+        [attr.x]="bar.x"
+        [attr.y]="bar.barY"
+        width="24"
+        [attr.height]="bar.barHeight"
+        [attr.rx]="barRadius"
+        [attr.fill]="bar.color"
+      />
+      @if (bar.barHeight > barRadius) {
+        <rect
+          [attr.x]="bar.x"
+          [attr.y]="baselineY - barRadius"
+          width="24"
+          [attr.height]="barRadius"
+          [attr.fill]="bar.color"
+        />
+      }
+
+      @if (bar.value > 0) {
+        <text class="value-label" [attr.x]="bandCenter(i)" [attr.y]="bar.barY - 6">
+          {{ bar.value }}
+        </text>
+      }
+
+      <text class="category-label" [attr.x]="bandCenter(i)" [attr.y]="baselineY + 18">
+        {{ bar.label }}
+      </text>
+    </g>
+  }
+</svg>

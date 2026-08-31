@@ -1,0 +1,44 @@
+:host {
+  display: block;
+}
+
+.bar-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.baseline {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.bar-group {
+  outline: none;
+  cursor: default;
+}
+
+.bar {
+  transition: filter 0.15s ease;
+
+  &.is-hovered {
+    filter: brightness(1.2);
+  }
+}
+
+.bar-group:focus-visible .bar {
+  filter: brightness(1.2);
+}
+
+.value-label {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  text-anchor: middle;
+}
+
+.category-label {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+  text-anchor: middle;
+}
