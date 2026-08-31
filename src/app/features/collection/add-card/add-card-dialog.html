@@ -1,0 +1,78 @@
+<div class="backdrop" (click)="close.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <header class="dialog-header">
+      <h2>Karte hinzufügen</h2>
+      <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
+    </header>
+
+    @if (!selectedCard()) {
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Kartenname suchen…"
+        [ngModel]="query()"
+        (ngModelChange)="onQueryChange($event)"
+        autofocus
+      />
+
+      @if (searching()) {
+        <p class="state-message">Suche…</p>
+      } @else if (searchError()) {
+        <p class="state-message error">{{ searchError() }}</p>
+      } @else if (query().trim() && results().length === 0) {
+        <p class="state-message">Keine Karten gefunden.</p>
+      } @else {
+        <div class="results-grid">
+          @for (card of results(); track card.id) {
+            <button type="button" class="result-item" (click)="selectCard(card)">
+              <app-card-tile [card]="card" />
+            </button>
+          }
+        </div>
+      }
+    } @else {
+      <div class="detail-view">
+        <button type="button" class="back-link" (click)="backToSearch()">← Zurück zur Suche</button>
+
+        <div class="detail-body">
+          <app-card-tile [card]="selectedCard()!" />
+
+          <div class="detail-form">
+            <label for="quantity">Menge</label>
+            <input
+              id="quantity"
+              type="number"
+              min="1"
+              [ngModel]="quantity()"
+              (ngModelChange)="quantity.set($event)"
+            />
+
+            <label class="checkbox-label">
+              <input type="checkbox" [ngModel]="foil()" (ngModelChange)="foil.set($event)" />
+              Foil
+            </label>
+
+            <label for="condition">Zustand</label>
+            <select
+              id="condition"
+              [ngModel]="condition()"
+              (ngModelChange)="condition.set($event)"
+            >
+              @for (c of conditions; track c) {
+                <option [value]="c">{{ c }}</option>
+              }
+            </select>
+
+            @if (submitError()) {
+              <p class="state-message error">{{ submitError() }}</p>
+            }
+
+            <button type="button" class="submit-button" [disabled]="submitting()" (click)="submit()">
+              Hinzufügen
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

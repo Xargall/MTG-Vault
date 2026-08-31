@@ -15,7 +15,7 @@
       <h2>Farbkategorien</h2>
       <div class="category-grid">
         @for (category of colorCategories(); track category.label) {
-          <article class="category-card">
+          <a class="category-card" routerLink="/collection" [queryParams]="{ color: category.key }">
             <span class="category-bar" [style.background]="category.color"></span>
             @if (category.showcase; as entry) {
               @if (getCardImageUrl(entry.card); as imageUrl) {
@@ -29,7 +29,7 @@
             }
             <p class="category-label">{{ category.label }}</p>
             <p class="category-count">{{ category.count }} {{ category.count === 1 ? 'Karte' : 'Karten' }}</p>
-          </article>
+          </a>
         }
       </div>
     </section>

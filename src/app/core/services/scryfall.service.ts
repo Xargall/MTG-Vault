@@ -19,6 +19,7 @@ export function getCardImageUrl(card: ScryfallCard): string | null {
 }
 
 const COLLECTION_ENDPOINT = 'https://api.scryfall.com/cards/collection';
+const SEARCH_ENDPOINT = 'https://api.scryfall.com/cards/search';
 const BATCH_SIZE = 75;
 
 @Injectable({ providedIn: 'root' })
@@ -29,6 +30,21 @@ export class ScryfallService {
 
   async getCardsByNames(names: string[]): Promise<ScryfallCard[]> {
     return this.fetchCollection(names.map((name) => ({ name })));
+  }
+
+  async searchCards(query: string): Promise<ScryfallCard[]> {
+    const url = `${SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}&order=name`;
+    const response = await fetch(url);
+
+    if (response.status === 404) {
+      return [];
+    }
+    if (!response.ok) {
+      throw new Error(`Scryfall-Suche fehlgeschlagen (${response.status})`);
+    }
+
+    const body: { data: ScryfallCard[] } = await response.json();
+    return body.data;
   }
 
   private async fetchCollection(

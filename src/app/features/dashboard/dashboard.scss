@@ -43,6 +43,13 @@ h1 {
   align-items: center;
   text-align: center;
   overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
 }
 
 .category-bar {

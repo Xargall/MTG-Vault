@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { DonutChart } from '../../shared/charts/donut-chart/donut-chart';
 import { getCardImageUrl } from '../../core/services/scryfall.service';
@@ -7,7 +8,7 @@ import { CollectionEntry, CollectionService } from '../collection/collection.ser
 
 @Component({
   selector: 'app-dashboard',
-  imports: [DonutChart],
+  imports: [DonutChart, RouterLink],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })

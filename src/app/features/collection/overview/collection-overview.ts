@@ -1,30 +1,64 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
-import { getManaCurve } from '../collection-stats';
+import { CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { AddCardDialog } from '../add-card/add-card-dialog';
+import {
+  COLOR_CATEGORIES,
+  ColorCategory,
+  colorCategoryFor,
+  getManaCurve,
+} from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
 
 @Component({
   selector: 'app-collection-overview',
-  imports: [BarChart],
+  imports: [BarChart, CardTile, AddCardDialog],
   templateUrl: './collection-overview.html',
   styleUrl: './collection-overview.scss',
 })
 export class CollectionOverview {
   private readonly collectionService = inject(CollectionService);
+  private readonly route = inject(ActivatedRoute);
+
+  protected readonly colorCategories = COLOR_CATEGORIES;
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
   private readonly entries = signal<CollectionEntry[]>([]);
 
-  protected readonly isEmpty = computed(() => !this.loading() && this.entries().length === 0);
+  protected readonly searchQuery = signal('');
+  protected readonly selectedCategory = signal<ColorCategory | null>(null);
+  protected readonly showAddDialog = signal(false);
+
+  protected readonly hasAnyCards = computed(() => this.entries().length > 0);
   protected readonly manaCurve = computed<BarChartDatum[]>(() => getManaCurve(this.entries()));
 
+  protected readonly filteredEntries = computed(() => {
+    const query = this.searchQuery().trim().toLowerCase();
+    const category = this.selectedCategory();
+
+    return this.entries().filter(({ card }) => {
+      const matchesQuery = !query || card.name.toLowerCase().includes(query);
+      const matchesCategory = !category || colorCategoryFor(card.color_identity) === category;
+      return matchesQuery && matchesCategory;
+    });
+  });
+
   constructor() {
+    const colorParam = this.route.snapshot.queryParamMap.get('color') as ColorCategory | null;
+    if (colorParam && this.colorCategories.some((c) => c.key === colorParam)) {
+      this.selectedCategory.set(colorParam);
+    }
     this.load();
   }
 
-  private async load() {
+  toggleCategory(key: ColorCategory) {
+    this.selectedCategory.set(this.selectedCategory() === key ? null : key);
+  }
+
+  protected async load() {
     this.loading.set(true);
     this.errorMessage.set(null);
     try {

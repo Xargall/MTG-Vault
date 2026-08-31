@@ -18,6 +18,13 @@ export interface CollectionEntry {
   card: ScryfallCard;
 }
 
+export interface AddCardInput {
+  scryfallId: string;
+  quantity: number;
+  foil: boolean;
+  condition: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CollectionService {
   private readonly supabase = inject(SupabaseService);
@@ -41,5 +48,33 @@ export class CollectionService {
         return card ? { row, card } : null;
       })
       .filter((entry): entry is CollectionEntry => entry !== null);
+  }
+
+  async addCard({ scryfallId, quantity, foil, condition }: AddCardInput): Promise<void> {
+    const userId = this.supabase.session()?.user.id;
+    if (!userId) throw new Error('Nicht eingeloggt.');
+
+    const { data: existing, error: selectError } = await this.supabase.client
+      .from('collection_cards')
+      .select('id, quantity')
+      .eq('scryfall_id', scryfallId)
+      .eq('foil', foil)
+      .maybeSingle<{ id: string; quantity: number }>();
+
+    if (selectError) throw selectError;
+
+    if (existing) {
+      const { error } = await this.supabase.client
+        .from('collection_cards')
+        .update({ quantity: existing.quantity + quantity })
+        .eq('id', existing.id);
+      if (error) throw error;
+      return;
+    }
+
+    const { error } = await this.supabase.client
+      .from('collection_cards')
+      .insert({ user_id: userId, scryfall_id: scryfallId, quantity, foil, condition });
+    if (error) throw error;
   }
 }

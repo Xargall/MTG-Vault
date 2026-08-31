@@ -2,15 +2,16 @@ import { BarChartDatum } from '../../shared/charts/bar-chart/bar-chart';
 import { CollectionEntry } from './collection.service';
 
 export interface ColorCategorySummary {
+  key: ColorCategory;
   label: string;
   color: string;
   count: number;
   showcase: CollectionEntry | null;
 }
 
-type ColorCategory = 'W' | 'U' | 'B' | 'R' | 'G' | 'M' | 'C';
+export type ColorCategory = 'W' | 'U' | 'B' | 'R' | 'G' | 'M' | 'C';
 
-const COLOR_CATEGORIES: Array<{ key: ColorCategory; label: string; color: string }> = [
+export const COLOR_CATEGORIES: Array<{ key: ColorCategory; label: string; color: string }> = [
   { key: 'U', label: 'Blau', color: '#3987e5' },
   { key: 'M', label: 'Mehrfarbig', color: '#d95926' },
   { key: 'C', label: 'Farblos', color: '#199e70' },
@@ -23,7 +24,7 @@ const COLOR_CATEGORIES: Array<{ key: ColorCategory; label: string; color: string
 const MANA_CURVE_COLOR = '#3987e5';
 const MANA_CURVE_BUCKETS = ['0', '1', '2', '3', '4', '5', '6', '7+'];
 
-function colorCategoryFor(colorIdentity: string[]): ColorCategory {
+export function colorCategoryFor(colorIdentity: string[]): ColorCategory {
   if (colorIdentity.length === 0) return 'C';
   if (colorIdentity.length > 1) return 'M';
   return colorIdentity[0] as ColorCategory;
@@ -73,7 +74,7 @@ export function getColorCategorySummaries(entries: CollectionEntry[]): ColorCate
       (best, e) => (best === null || entryPrice(e) > entryPrice(best) ? e : best),
       null,
     );
-    return { label, color, count, showcase };
+    return { key, label, color, count, showcase };
   });
 }
 

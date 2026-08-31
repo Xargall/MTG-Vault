@@ -1,0 +1,13 @@
+<div class="card-tile">
+  @if (quantity() !== null) {
+    <span class="quantity-badge">×{{ quantity() }}</span>
+  }
+
+  @if (imageUrl(); as url) {
+    <img class="card-image" [src]="url" [alt]="card().name" />
+  } @else {
+    <div class="card-placeholder">{{ card().name }}</div>
+  }
+
+  <p class="card-name">{{ card().name }}</p>
+</div>
