@@ -28,6 +28,11 @@ export class AddCardDialog {
   protected readonly searching = signal(false);
   protected readonly searchError = signal<string | null>(null);
 
+  protected readonly selectedName = signal<string | null>(null);
+  protected readonly prints = signal<ScryfallCard[]>([]);
+  protected readonly loadingPrints = signal(false);
+  protected readonly printsError = signal<string | null>(null);
+
   protected readonly selectedCard = signal<ScryfallCard | null>(null);
   protected readonly quantity = signal(1);
   protected readonly foil = signal(false);
@@ -64,7 +69,27 @@ export class AddCardDialog {
     }
   }
 
-  selectCard(card: ScryfallCard) {
+  async selectName(card: ScryfallCard) {
+    this.selectedName.set(card.name);
+    this.loadingPrints.set(true);
+    this.printsError.set(null);
+    try {
+      this.prints.set(await this.scryfall.getPrintsByName(card.name));
+    } catch (error) {
+      this.printsError.set(
+        error instanceof Error ? error.message : 'Drucke konnten nicht geladen werden.',
+      );
+    } finally {
+      this.loadingPrints.set(false);
+    }
+  }
+
+  backToSearch() {
+    this.selectedName.set(null);
+    this.prints.set([]);
+  }
+
+  selectPrint(card: ScryfallCard) {
     this.selectedCard.set(card);
     this.quantity.set(1);
     this.foil.set(false);
@@ -72,7 +97,7 @@ export class AddCardDialog {
     this.submitError.set(null);
   }
 
-  backToSearch() {
+  backToPrints() {
     this.selectedCard.set(null);
   }
 

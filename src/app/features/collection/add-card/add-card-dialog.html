@@ -5,7 +5,7 @@
       <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
     </header>
 
-    @if (!selectedCard()) {
+    @if (!selectedName()) {
       <input
         type="text"
         class="search-input"
@@ -24,15 +24,35 @@
       } @else {
         <div class="results-grid">
           @for (card of results(); track card.id) {
-            <button type="button" class="result-item" (click)="selectCard(card)">
+            <button type="button" class="result-item" (click)="selectName(card)">
               <app-card-tile [card]="card" />
             </button>
           }
         </div>
       }
+    } @else if (!selectedCard()) {
+      <div class="prints-view">
+        <button type="button" class="back-link" (click)="backToSearch()">← Zurück zur Suche</button>
+        <h3>{{ selectedName() }} – Druck wählen</h3>
+
+        @if (loadingPrints()) {
+          <p class="state-message">Lade Drucke…</p>
+        } @else if (printsError()) {
+          <p class="state-message error">{{ printsError() }}</p>
+        } @else {
+          <div class="results-grid">
+            @for (print of prints(); track print.id) {
+              <button type="button" class="result-item" (click)="selectPrint(print)">
+                <app-card-tile [card]="print" />
+                <span class="print-meta">{{ print.set_name }} · {{ print.released_at.slice(0, 4) }}</span>
+              </button>
+            }
+          </div>
+        }
+      </div>
     } @else {
       <div class="detail-view">
-        <button type="button" class="back-link" (click)="backToSearch()">← Zurück zur Suche</button>
+        <button type="button" class="back-link" (click)="backToPrints()">← Andere Version wählen</button>
 
         <div class="detail-body">
           <app-card-tile [card]="selectedCard()!" />

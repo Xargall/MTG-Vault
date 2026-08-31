@@ -13,6 +13,7 @@ export interface ScryfallCard {
   mana_cost?: string;
   set_name: string;
   rarity: string;
+  released_at: string;
   image_uris?: { normal: string; small: string; art_crop: string };
   card_faces?: ScryfallCardFace[];
   prices: { usd: string | null; usd_foil: string | null; eur: string | null; eur_foil: string | null };
@@ -21,6 +22,10 @@ export interface ScryfallCard {
 
 export function getCardImageUrl(card: ScryfallCard): string | null {
   return card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? null;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 const COLLECTION_ENDPOINT = 'https://api.scryfall.com/cards/collection';
@@ -38,7 +43,34 @@ export class ScryfallService {
   }
 
   async searchCards(query: string): Promise<ScryfallCard[]> {
-    const url = `${SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}&order=name`;
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    const pattern = escapeRegExp(trimmed).replace(/\//g, '\\/');
+
+    // Two passes, one card per name (unique=cards) so an exact-ish match
+    // (name starts with the query, e.g. "Sol" -> "Sol Ring") always ranks
+    // first - a plain word-boundary search alone sorts alphabetically across
+    // ALL word-start matches ("Sol" also matches "Agrus Kos, Eternal
+    // Soldier"), which can bury the obvious card behind less relevant ones.
+    const params = 'order=name&unique=cards';
+    const [prefixMatches, wordMatches] = await Promise.all([
+      this.runSearch(`name:/^${pattern}/`, params),
+      this.runSearch(`name:/\\b${pattern}/`, params),
+    ]);
+
+    const seen = new Set(prefixMatches.map((card) => card.id));
+    const rest = wordMatches.filter((card) => !seen.has(card.id));
+    return [...prefixMatches, ...rest];
+  }
+
+  async getPrintsByName(name: string): Promise<ScryfallCard[]> {
+    const escaped = name.replace(/"/g, '\\"');
+    return this.runSearch(`!"${escaped}"`, 'order=released&dir=desc&unique=prints');
+  }
+
+  private async runSearch(scryfallQuery: string, params: string): Promise<ScryfallCard[]> {
+    const url = `${SEARCH_ENDPOINT}?q=${encodeURIComponent(scryfallQuery)}&${params}`;
     const response = await fetch(url);
 
     if (response.status === 404) {
