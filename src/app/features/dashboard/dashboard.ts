@@ -1,7 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
 import { DonutChart } from '../../shared/charts/donut-chart/donut-chart';
-import { getColorDistribution } from '../collection/collection-stats';
+import { getCardImageUrl } from '../../core/services/scryfall.service';
+import { getColorCategorySummaries, getColorDistribution } from '../collection/collection-stats';
 import { CollectionEntry, CollectionService } from '../collection/collection.service';
 
 @Component({
@@ -19,6 +20,8 @@ export class Dashboard {
 
   protected readonly hasCards = computed(() => this.entries().length > 0);
   protected readonly colorDistribution = computed(() => getColorDistribution(this.entries()));
+  protected readonly colorCategories = computed(() => getColorCategorySummaries(this.entries()));
+  protected readonly getCardImageUrl = getCardImageUrl;
 
   constructor() {
     this.load();

@@ -10,6 +10,29 @@
       <h2>Farbverteilung</h2>
       <app-donut-chart [data]="colorDistribution()" />
     </section>
+
+    <section class="color-categories">
+      <h2>Farbkategorien</h2>
+      <div class="category-grid">
+        @for (category of colorCategories(); track category.label) {
+          <article class="category-card">
+            <span class="category-bar" [style.background]="category.color"></span>
+            @if (category.showcase; as entry) {
+              @if (getCardImageUrl(entry.card); as imageUrl) {
+                <img class="showcase-image" [src]="imageUrl" [alt]="entry.card.name" />
+              } @else {
+                <div class="showcase-placeholder">{{ entry.card.name }}</div>
+              }
+              <p class="showcase-name">{{ entry.card.name }}</p>
+            } @else {
+              <div class="showcase-placeholder">Keine Karten</div>
+            }
+            <p class="category-label">{{ category.label }}</p>
+            <p class="category-count">{{ category.count }} {{ category.count === 1 ? 'Karte' : 'Karten' }}</p>
+          </article>
+        }
+      </div>
+    </section>
   } @else {
     <p class="state-message">Noch keine Karten in deiner Sammlung.</p>
   }

@@ -1,6 +1,13 @@
 import { BarChartDatum } from '../../shared/charts/bar-chart/bar-chart';
 import { CollectionEntry } from './collection.service';
 
+export interface ColorCategorySummary {
+  label: string;
+  color: string;
+  count: number;
+  showcase: CollectionEntry | null;
+}
+
 type ColorCategory = 'W' | 'U' | 'B' | 'R' | 'G' | 'M' | 'C';
 
 const COLOR_CATEGORIES: Array<{ key: ColorCategory; label: string; color: string }> = [
@@ -27,6 +34,13 @@ function manaCurveBucketFor(cmc: number): string {
   return rounded >= 7 ? '7+' : String(rounded);
 }
 
+function entryPrice(entry: CollectionEntry): number {
+  const { row, card } = entry;
+  const priceStr = (row.foil ? card.prices?.usd_foil : card.prices?.usd) ?? card.prices?.usd ?? card.prices?.usd_foil;
+  const parsed = priceStr ? parseFloat(priceStr) : 0;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function getColorDistribution(entries: CollectionEntry[]): BarChartDatum[] {
   const counts = new Map<ColorCategory, number>();
   for (const { row, card } of entries) {
@@ -38,6 +52,29 @@ export function getColorDistribution(entries: CollectionEntry[]): BarChartDatum[
     color,
     value: counts.get(key) ?? 0,
   }));
+}
+
+export function getColorCategorySummaries(entries: CollectionEntry[]): ColorCategorySummary[] {
+  const grouped = new Map<ColorCategory, CollectionEntry[]>();
+  for (const entry of entries) {
+    const category = colorCategoryFor(entry.card.color_identity);
+    const list = grouped.get(category);
+    if (list) {
+      list.push(entry);
+    } else {
+      grouped.set(category, [entry]);
+    }
+  }
+
+  return COLOR_CATEGORIES.map(({ key, label, color }) => {
+    const categoryEntries = grouped.get(key) ?? [];
+    const count = categoryEntries.reduce((sum, e) => sum + e.row.quantity, 0);
+    const showcase = categoryEntries.reduce<CollectionEntry | null>(
+      (best, e) => (best === null || entryPrice(e) > entryPrice(best) ? e : best),
+      null,
+    );
+    return { label, color, count, showcase };
+  });
 }
 
 export function getManaCurve(entries: CollectionEntry[]): BarChartDatum[] {
