@@ -15,7 +15,7 @@
   border-radius: var(--radius);
   padding: var(--spacing-lg);
   width: 100%;
-  max-width: 760px;
+  max-width: 580px;
   max-height: 85vh;
   overflow-y: auto;
   display: flex;
@@ -58,7 +58,7 @@
 }
 
 .image-column {
-  flex: 0 0 300px;
+  flex: 0 0 240px;
   max-width: 100%;
 }
 
@@ -82,8 +82,8 @@
 }
 
 .info-column {
-  flex: 1 1 260px;
-  min-width: 240px;
+  flex: 1 1 220px;
+  min-width: 200px;
 
   h1 {
     margin: 0 0 var(--spacing-md);
