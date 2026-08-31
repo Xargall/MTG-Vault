@@ -2,10 +2,11 @@ import { Component, inject } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 
 import { AuthService } from '../../../core/services/auth.service';
+import { AppFooter } from '../app-footer/app-footer';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterLink, RouterOutlet],
+  imports: [RouterLink, RouterOutlet, AppFooter],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.scss',
 })
