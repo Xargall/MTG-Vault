@@ -33,6 +33,10 @@ export const routes: Routes = [
             (m) => m.CollectionOverview,
           ),
       },
+      {
+        path: 'decks',
+        loadComponent: () => import('./features/decks/decks').then((m) => m.Decks),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

@@ -50,7 +50,15 @@ export class CollectionService {
       .filter((entry): entry is CollectionEntry => entry !== null);
   }
 
-  async addCard({ scryfallId, quantity, foil, condition }: AddCardInput): Promise<void> {
+  async addCard(input: AddCardInput): Promise<void> {
+    return this.upsertOne(input);
+  }
+
+  async addCards(inputs: AddCardInput[]): Promise<void> {
+    await Promise.all(inputs.map((input) => this.upsertOne(input)));
+  }
+
+  private async upsertOne({ scryfallId, quantity, foil, condition }: AddCardInput): Promise<void> {
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Nicht eingeloggt.');
 

@@ -1,0 +1,10 @@
+<button type="button" class="banner" (click)="bannerClick.emit()" aria-label="Precon-Decks durchsuchen">
+  <div class="track">
+    @for (image of loopImages(); track $index) {
+      <img class="banner-image" [src]="image" alt="" />
+    }
+  </div>
+  <div class="overlay">
+    <span class="overlay-text">Precon-Decks durchsuchen &amp; hinzufügen</span>
+  </div>
+</button>

@@ -1,0 +1,68 @@
+<div class="backdrop" (click)="close.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <header class="dialog-header">
+      <h2>Precon-Deck hinzufügen</h2>
+      <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
+    </header>
+
+    @if (!selectedDeck()) {
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Deck-Name suchen…"
+        [ngModel]="query()"
+        (ngModelChange)="onQueryChange($event)"
+        autofocus
+      />
+
+      @if (loadingList()) {
+        <p class="state-message">Lade Deck-Liste…</p>
+      } @else if (listError()) {
+        <p class="state-message error">{{ listError() }}</p>
+      } @else if (query().trim() && results().length === 0) {
+        <p class="state-message">Keine Decks gefunden.</p>
+      } @else if (!query().trim()) {
+        <p class="state-message">Nach einem Precon-Deck suchen, z. B. „Commander“ oder ein Deck-Name.</p>
+      } @else {
+        <ul class="results-list">
+          @for (deck of results(); track deck.fileName) {
+            <li>
+              <button type="button" class="result-row" (click)="selectDeck(deck)">
+                <span class="result-name">{{ deck.name }}</span>
+                <span class="result-meta">{{ deck.type }} · {{ deck.releaseDate.slice(0, 4) }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    } @else {
+      <div class="detail-view">
+        <button type="button" class="back-link" (click)="backToSearch()">← Zurück zur Suche</button>
+
+        <h3>{{ selectedDeck()!.name }}</h3>
+        <p class="deck-meta">{{ selectedDeck()!.type }} · {{ selectedDeck()!.releaseDate.slice(0, 4) }}</p>
+
+        @if (loadingDetail()) {
+          <p class="state-message">Lade Kartenliste…</p>
+        } @else if (detailError()) {
+          <p class="state-message error">{{ detailError() }}</p>
+        } @else if (detail(); as d) {
+          <p class="card-count">{{ d.cards.length }} verschiedene Karten</p>
+          @if (d.skippedCount > 0) {
+            <p class="state-message">
+              {{ d.skippedCount }} {{ d.skippedCount === 1 ? 'Karte konnte' : 'Karten konnten' }} nicht zugeordnet werden.
+            </p>
+          }
+
+          @if (submitError()) {
+            <p class="state-message error">{{ submitError() }}</p>
+          }
+
+          <button type="button" class="submit-button" [disabled]="submitting()" (click)="submit()">
+            Zu meinen Decks hinzufügen
+          </button>
+        }
+      </div>
+    }
+  </div>
+</div>

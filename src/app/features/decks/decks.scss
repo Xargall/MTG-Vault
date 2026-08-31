@@ -1,0 +1,85 @@
+.decks {
+  padding: var(--spacing-lg);
+}
+
+h1 {
+  margin: 0 0 var(--spacing-lg);
+}
+
+app-deck-banner {
+  display: block;
+  margin-bottom: var(--spacing-lg);
+}
+
+.state-message {
+  color: var(--color-text-muted);
+
+  &.error {
+    color: var(--color-danger);
+  }
+}
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.deck-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.showcase-image {
+  width: 100%;
+  border-radius: 8px;
+  aspect-ratio: 5 / 7;
+  object-fit: cover;
+}
+
+.showcase-placeholder {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: 8px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md);
+}
+
+.deck-name {
+  margin: var(--spacing-sm) 0 0;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.deck-format,
+.deck-count {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.match-badge {
+  margin-top: var(--spacing-sm);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+
+  &.is-complete {
+    background: #1f7a4d;
+    color: #eafff3;
+  }
+}

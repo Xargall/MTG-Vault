@@ -1,0 +1,41 @@
+<div class="decks">
+  <h1>Decks</h1>
+
+  <app-deck-banner [images]="bannerImages()" (bannerClick)="showBrowseDialog.set(true)" />
+
+  @if (loading()) {
+    <p class="state-message">Lade Decks…</p>
+  } @else if (errorMessage()) {
+    <p class="state-message error">{{ errorMessage() }}</p>
+  } @else if (!hasDecks()) {
+    <p class="state-message">Noch keine Decks. Über das Banner ein Precon-Deck hinzufügen!</p>
+  } @else {
+    <div class="deck-grid">
+      @for (summary of deckSummaries(); track summary.entry.deck.id) {
+        <div class="deck-card">
+          @if (summary.showcase; as showcase) {
+            @if (getCardImageUrl(showcase.card); as imageUrl) {
+              <img class="showcase-image" [src]="imageUrl" [alt]="showcase.card.name" />
+            } @else {
+              <div class="showcase-placeholder">{{ showcase.card.name }}</div>
+            }
+          } @else {
+            <div class="showcase-placeholder">Keine Karten</div>
+          }
+
+          <p class="deck-name">{{ summary.entry.deck.name }}</p>
+          <p class="deck-format">{{ summary.entry.deck.format }}</p>
+          <p class="deck-count">{{ summary.entry.cards.length }} Karten</p>
+
+          <span class="match-badge" [class.is-complete]="summary.matchPercent === 100">
+            {{ summary.matchPercent }}% in Sammlung
+          </span>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (showBrowseDialog()) {
+  <app-browse-decks-dialog (close)="showBrowseDialog.set(false)" (added)="onDeckAdded()" />
+}
