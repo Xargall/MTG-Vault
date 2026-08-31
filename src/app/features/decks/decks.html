@@ -12,7 +12,7 @@
   } @else {
     <div class="deck-grid">
       @for (summary of deckSummaries(); track summary.entry.deck.id) {
-        <div class="deck-card">
+        <button type="button" class="deck-card" (click)="selectedDeck.set(summary.entry)">
           @if (summary.showcase; as showcase) {
             @if (getCardImageUrl(showcase.card); as imageUrl) {
               <img class="showcase-image" [src]="imageUrl" [alt]="showcase.card.name" />
@@ -25,12 +25,12 @@
 
           <p class="deck-name">{{ summary.entry.deck.name }}</p>
           <p class="deck-format">{{ summary.entry.deck.format }}</p>
-          <p class="deck-count">{{ summary.entry.cards.length }} Karten</p>
+          <p class="deck-count">{{ summary.cardCount }} Karten</p>
 
           <span class="match-badge" [class.is-complete]="summary.matchPercent === 100">
             {{ summary.matchPercent }}% in Sammlung
           </span>
-        </div>
+        </button>
       }
     </div>
   }
@@ -38,4 +38,12 @@
 
 @if (showBrowseDialog()) {
   <app-browse-decks-dialog (close)="showBrowseDialog.set(false)" (added)="onDeckAdded()" />
+}
+
+@if (selectedDeck(); as deck) {
+  <app-deck-detail-dialog
+    [entry]="deck"
+    (close)="selectedDeck.set(null)"
+    (deleted)="onDeckDeleted()"
+  />
 }

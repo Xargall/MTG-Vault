@@ -5,7 +5,8 @@ import { MtgjsonDeckListEntry, MtgjsonService } from '../../core/services/mtgjso
 import { CollectionEntry, CollectionService } from '../collection/collection.service';
 import { DeckBanner } from './deck-banner/deck-banner';
 import { BrowseDecksDialog } from './browse-decks-dialog/browse-decks-dialog';
-import { getDeckMatch, getDeckShowcase } from './deck-stats';
+import { DeckDetailDialog } from './deck-detail-dialog/deck-detail-dialog';
+import { getDeckCardCount, getDeckMatch, getDeckShowcase } from './deck-stats';
 import { DeckEntry, DeckService } from './deck.service';
 
 const BANNER_SAMPLE_SIZE = 16;
@@ -51,7 +52,7 @@ function pickBannerSample(list: MtgjsonDeckListEntry[], count: number): MtgjsonD
 
 @Component({
   selector: 'app-decks',
-  imports: [DeckBanner, BrowseDecksDialog],
+  imports: [DeckBanner, BrowseDecksDialog, DeckDetailDialog],
   templateUrl: './decks.html',
   styleUrl: './decks.scss',
 })
@@ -67,6 +68,7 @@ export class Decks {
   private readonly collectionEntries = signal<CollectionEntry[]>([]);
   protected readonly bannerImages = signal<string[]>([]);
   protected readonly showBrowseDialog = signal(false);
+  protected readonly selectedDeck = signal<DeckEntry | null>(null);
 
   protected readonly hasDecks = computed(() => this.decks().length > 0);
 
@@ -74,6 +76,7 @@ export class Decks {
     this.decks().map((entry) => ({
       entry,
       showcase: getDeckShowcase(entry),
+      cardCount: getDeckCardCount(entry),
       matchPercent: getDeckMatch(entry, this.collectionEntries()),
     })),
   );
@@ -124,6 +127,11 @@ export class Decks {
   }
 
   protected onDeckAdded() {
+    this.loadDecks();
+  }
+
+  protected onDeckDeleted() {
+    this.selectedDeck.set(null);
     this.loadDecks();
   }
 }

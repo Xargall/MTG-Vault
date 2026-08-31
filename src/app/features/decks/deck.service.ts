@@ -11,6 +11,7 @@ export interface DeckRow {
   name: string;
   format: string | null;
   is_precon: boolean;
+  release_date: string | null;
   created_at: string;
 }
 
@@ -79,13 +80,24 @@ export class DeckService {
     return decks.map((deck) => ({ deck, cards: cardsByDeck.get(deck.id) ?? [] }));
   }
 
-  async addPreconDeck(name: string, mtgjsonType: string, detail: MtgjsonDeckDetail): Promise<void> {
+  async addPreconDeck(
+    name: string,
+    mtgjsonType: string,
+    releaseDate: string,
+    detail: MtgjsonDeckDetail,
+  ): Promise<void> {
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Nicht eingeloggt.');
 
     const { data: deck, error: deckError } = await this.supabase.client
       .from('decks')
-      .insert({ user_id: userId, name, format: mtgjsonType, is_precon: true })
+      .insert({
+        user_id: userId,
+        name,
+        format: mtgjsonType,
+        is_precon: true,
+        release_date: releaseDate,
+      })
       .select('id')
       .single<{ id: string }>();
 
@@ -107,5 +119,10 @@ export class DeckService {
       condition: 'NM',
     }));
     await this.collectionService.addCards(collectionInputs);
+  }
+
+  async deleteDeck(deckId: string): Promise<void> {
+    const { error } = await this.supabase.client.from('decks').delete().eq('id', deckId);
+    if (error) throw error;
   }
 }

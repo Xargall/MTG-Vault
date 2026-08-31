@@ -26,3 +26,14 @@ export function getDeckShowcase(deckEntry: DeckEntry): DeckCardEntry | null {
     return price > bestPrice ? entry : best;
   }, null);
 }
+
+export function getDeckCardCount(deckEntry: DeckEntry): number {
+  return deckEntry.cards.reduce((sum, { row }) => sum + row.quantity, 0);
+}
+
+export function getDeckTotalValue(deckEntry: DeckEntry): number {
+  return deckEntry.cards.reduce((sum, { row, card }) => {
+    const price = parseFloat(card.prices?.eur ?? card.prices?.usd ?? '0') || 0;
+    return sum + price * row.quantity;
+  }, 0);
+}

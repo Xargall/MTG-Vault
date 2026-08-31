@@ -1,0 +1,54 @@
+<div class="backdrop" (click)="close.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <div class="hero" [style.background-image]="showcaseImageUrl() ? 'url(' + showcaseImageUrl() + ')' : null">
+      <div class="hero-overlay">
+        <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
+
+        <div class="hero-info">
+          <h2>{{ entry().deck.name }}</h2>
+          <div class="hero-meta">
+            @if (entry().deck.format) {
+              <span class="meta-badge">{{ entry().deck.format }}</span>
+            }
+            @if (year(); as y) {
+              <span class="meta-badge">{{ y }}</span>
+            }
+            <span class="meta-badge">{{ cardCount() }} Karten</span>
+            @if (totalValue() > 0) {
+              <span class="meta-badge">{{ totalValue() | number: '1.2-2' }} €</span>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-list">
+      <h3>Enthaltene Karten</h3>
+      <div class="results-grid">
+        @for (cardEntry of sortedCards(); track cardEntry.row.id) {
+          <app-card-tile [card]="cardEntry.card" [quantity]="cardEntry.row.quantity" />
+        }
+      </div>
+
+      <div class="danger-zone">
+        @if (deleteError()) {
+          <p class="state-message error">{{ deleteError() }}</p>
+        }
+
+        @if (!confirmingDelete()) {
+          <button type="button" class="delete-link" (click)="confirmingDelete.set(true)">
+            Deck entfernen
+          </button>
+        } @else {
+          <div class="confirm-row">
+            <span>Deck wirklich entfernen? Die Karten bleiben in deiner Sammlung.</span>
+            <button type="button" class="delete-button" [disabled]="deleting()" (click)="confirmDelete()">
+              Ja, entfernen
+            </button>
+            <button type="button" class="cancel-link" (click)="confirmingDelete.set(false)">Abbrechen</button>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

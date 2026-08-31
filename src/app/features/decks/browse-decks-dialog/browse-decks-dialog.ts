@@ -115,7 +115,7 @@ export class BrowseDecksDialog {
     this.submitting.set(true);
     this.submitError.set(null);
     try {
-      await this.deckService.addPreconDeck(deck.name, deck.type, detail);
+      await this.deckService.addPreconDeck(deck.name, deck.type, deck.releaseDate, detail);
       this.added.emit();
       this.close.emit();
     } catch (error) {
