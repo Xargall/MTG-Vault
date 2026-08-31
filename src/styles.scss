@@ -1,1 +1,44 @@
 /* You can add global styles to this file, and also import other style files */
+
+:root {
+  --color-bg: #14141c;
+  --color-surface: #1e1e2a;
+  --color-surface-alt: #262636;
+  --color-border: #383850;
+  --color-text: #f2f1f6;
+  --color-text-muted: #a3a3b8;
+  --color-accent: #c9a227;
+  --color-accent-hover: #e0b830;
+  --color-danger: #d9534f;
+
+  --font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --radius: 8px;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-family);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: var(--color-accent);
+}
