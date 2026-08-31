@@ -28,26 +28,40 @@ h1 {
   }
 }
 
-.mana-curve-card {
-  margin: 0 auto;
-  max-width: 420px;
-}
-
-.toolbar {
+.top-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  justify-content: center;
+  align-items: stretch;
+  gap: var(--spacing-lg);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.toolbar-card,
+.mana-curve-card {
+  flex: 1 1 460px;
+  max-width: 520px;
+}
+
+.toolbar-card {
+  display: flex;
+  flex-direction: column;
   gap: var(--spacing-md);
-  margin-top: var(--spacing-lg);
+}
+
+.search-row {
+  display: flex;
+  gap: var(--spacing-sm);
 }
 
 .search-input {
   flex: 1;
-  min-width: 200px;
+  min-width: 0;
   padding: var(--spacing-sm);
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-bg);
   color: var(--color-text);
   font-size: 0.95rem;
 }

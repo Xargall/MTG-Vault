@@ -6,49 +6,54 @@
   } @else if (errorMessage()) {
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else {
-    @if (hasAnyCards()) {
-      <section class="chart-card mana-curve-card">
-        <h2>Mana-Kurve</h2>
-        <app-bar-chart [data]="manaCurve()" />
-      </section>
-    }
+    <div class="top-row">
+      <section class="chart-card toolbar-card">
+        <h2>Suche &amp; Filter</h2>
 
-    <section class="toolbar">
-      <input
-        type="text"
-        class="search-input"
-        placeholder="Karte in der Sammlung suchen…"
-        [value]="searchQuery()"
-        (input)="searchQuery.set($any($event.target).value)"
-      />
+        <div class="search-row">
+          <input
+            type="text"
+            class="search-input"
+            placeholder="Karte in der Sammlung suchen…"
+            [value]="searchQuery()"
+            (input)="searchQuery.set($any($event.target).value)"
+          />
+          <button type="button" class="add-button" (click)="showAddDialog.set(true)" aria-label="Karte hinzufügen">
+            +
+          </button>
+        </div>
 
-      <div class="filter-buttons">
-        <button
-          type="button"
-          class="filter-button"
-          [class.is-active]="selectedCategory() === null"
-          style="--filter-color: var(--color-accent)"
-          (click)="selectedCategory.set(null)"
-        >
-          Alle
-        </button>
-        @for (category of colorCategories; track category.key) {
+        <div class="filter-buttons">
           <button
             type="button"
             class="filter-button"
-            [class.is-active]="selectedCategory() === category.key"
-            [style.--filter-color]="category.color"
-            (click)="toggleCategory(category.key)"
+            [class.is-active]="selectedCategory() === null"
+            style="--filter-color: var(--color-accent)"
+            (click)="selectedCategory.set(null)"
           >
-            {{ category.label }}
+            Alle
           </button>
-        }
-      </div>
+          @for (category of colorCategories; track category.key) {
+            <button
+              type="button"
+              class="filter-button"
+              [class.is-active]="selectedCategory() === category.key"
+              [style.--filter-color]="category.color"
+              (click)="toggleCategory(category.key)"
+            >
+              {{ category.label }}
+            </button>
+          }
+        </div>
+      </section>
 
-      <button type="button" class="add-button" (click)="showAddDialog.set(true)" aria-label="Karte hinzufügen">
-        +
-      </button>
-    </section>
+      @if (hasAnyCards()) {
+        <section class="chart-card mana-curve-card">
+          <h2>Mana-Kurve</h2>
+          <app-bar-chart [data]="manaCurve()" />
+        </section>
+      }
+    </div>
 
     @if (!hasAnyCards()) {
       <p class="state-message">Noch keine Karten in deiner Sammlung. Füge deine erste Karte hinzu!</p>

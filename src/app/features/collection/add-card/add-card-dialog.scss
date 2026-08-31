@@ -15,7 +15,7 @@
   border-radius: var(--radius);
   padding: var(--spacing-lg);
   width: 100%;
-  max-width: 560px;
+  max-width: 720px;
   max-height: 85vh;
   overflow-y: auto;
   display: flex;
@@ -69,10 +69,11 @@
 
 .results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: var(--spacing-sm);
-  max-height: 50vh;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--spacing-md);
+  max-height: 55vh;
   overflow-y: auto;
+  padding: 6px;
 }
 
 .result-item {
@@ -112,7 +113,7 @@
   gap: var(--spacing-lg);
 
   app-card-tile {
-    width: 140px;
+    width: 170px;
     flex-shrink: 0;
   }
 }
