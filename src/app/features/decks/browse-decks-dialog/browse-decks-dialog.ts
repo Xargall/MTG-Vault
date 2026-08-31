@@ -1,6 +1,7 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { DeckCardIndexService } from '../../../core/services/deck-card-index.service';
 import { MtgjsonDeckDetail, MtgjsonDeckListEntry, MtgjsonService } from '../../../core/services/mtgjson.service';
 import { DeckService } from '../deck.service';
 
@@ -15,12 +16,14 @@ const SEARCH_DEBOUNCE_MS = 300;
 export class BrowseDecksDialog {
   private readonly mtgjson = inject(MtgjsonService);
   private readonly deckService = inject(DeckService);
+  protected readonly deckCardIndex = inject(DeckCardIndexService);
 
   readonly close = output<void>();
   readonly added = output<void>();
 
   protected readonly query = signal('');
-  protected readonly results = signal<MtgjsonDeckListEntry[]>([]);
+  private readonly committedQuery = signal('');
+  protected readonly allDecks = signal<MtgjsonDeckListEntry[]>([]);
   protected readonly loadingList = signal(true);
   protected readonly listError = signal<string | null>(null);
 
@@ -32,18 +35,46 @@ export class BrowseDecksDialog {
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
 
-  private allDecks: MtgjsonDeckListEntry[] = [];
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
+
+  protected readonly results = computed(() => {
+    const trimmed = this.committedQuery().trim().toLowerCase();
+    if (!trimmed) return [];
+
+    this.deckCardIndex.indexedCount(); // re-run as the background index grows
+
+    const prefixMatches: MtgjsonDeckListEntry[] = [];
+    const containsMatches: MtgjsonDeckListEntry[] = [];
+    const cardMatches: MtgjsonDeckListEntry[] = [];
+    for (const deck of this.allDecks()) {
+      const name = deck.name.toLowerCase();
+      if (name.startsWith(trimmed)) {
+        prefixMatches.push(deck);
+      } else if (name.includes(trimmed)) {
+        containsMatches.push(deck);
+      } else if (this.deckCardIndex.matches(deck.fileName, trimmed)) {
+        cardMatches.push(deck);
+      }
+    }
+    return [...prefixMatches, ...containsMatches, ...cardMatches];
+  });
+
+  protected readonly indexHintText = computed(() => {
+    const indexed = this.deckCardIndex.indexedCount();
+    const total = this.deckCardIndex.totalCount();
+    return total > 0 ? `${indexed} / ${total}` : `${indexed}`;
+  });
 
   constructor() {
     this.loadList();
+    this.deckCardIndex.ensureBuilding();
   }
 
   private async loadList() {
     this.loadingList.set(true);
     this.listError.set(null);
     try {
-      this.allDecks = await this.mtgjson.getDeckList();
+      this.allDecks.set(await this.mtgjson.getDeckList());
     } catch (error) {
       this.listError.set(error instanceof Error ? error.message : 'Deck-Liste konnte nicht geladen werden.');
     } finally {
@@ -54,27 +85,7 @@ export class BrowseDecksDialog {
   onQueryChange(value: string) {
     this.query.set(value);
     if (this.debounceHandle) clearTimeout(this.debounceHandle);
-    this.debounceHandle = setTimeout(() => this.search(), SEARCH_DEBOUNCE_MS);
-  }
-
-  private search() {
-    const trimmed = this.query().trim().toLowerCase();
-    if (!trimmed) {
-      this.results.set([]);
-      return;
-    }
-
-    const prefixMatches: MtgjsonDeckListEntry[] = [];
-    const containsMatches: MtgjsonDeckListEntry[] = [];
-    for (const deck of this.allDecks) {
-      const name = deck.name.toLowerCase();
-      if (name.startsWith(trimmed)) {
-        prefixMatches.push(deck);
-      } else if (name.includes(trimmed)) {
-        containsMatches.push(deck);
-      }
-    }
-    this.results.set([...prefixMatches, ...containsMatches]);
+    this.debounceHandle = setTimeout(() => this.committedQuery.set(value), SEARCH_DEBOUNCE_MS);
   }
 
   async selectDeck(deck: MtgjsonDeckListEntry) {

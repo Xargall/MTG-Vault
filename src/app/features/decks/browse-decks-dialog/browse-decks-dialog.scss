@@ -65,6 +65,11 @@
   &.error {
     color: var(--color-danger);
   }
+
+  &.index-hint {
+    font-size: 0.8rem;
+    opacity: 0.7;
+  }
 }
 
 .results-list {

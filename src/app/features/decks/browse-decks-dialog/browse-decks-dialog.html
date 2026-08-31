@@ -22,7 +22,14 @@
       } @else if (query().trim() && results().length === 0) {
         <p class="state-message">Keine Decks gefunden.</p>
       } @else if (!query().trim()) {
-        <p class="state-message">Nach einem Precon-Deck suchen, z. B. „Commander“ oder ein Deck-Name.</p>
+        <p class="state-message">
+          Nach Deck-Name oder einer enthaltenen Karte/Charakter suchen, z. B. „Sephiroth“ oder „Commander“.
+        </p>
+        @if (!deckCardIndex.ready()) {
+          <p class="state-message index-hint">
+            Kartennamen werden im Hintergrund indiziert ({{ indexHintText() }})…
+          </p>
+        }
       } @else {
         <ul class="results-list">
           @for (deck of results(); track deck.fileName) {
