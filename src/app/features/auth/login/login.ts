@@ -25,6 +25,7 @@ export class Login {
 
   readonly errorMessage = signal<string | null>(null);
   readonly isSubmitting = signal(false);
+  readonly isSeedingDemo = signal(false);
 
   async submit() {
     if (this.form.invalid) {
@@ -59,6 +60,7 @@ export class Login {
   async signInAsGuest() {
     this.errorMessage.set(null);
     this.isSubmitting.set(true);
+    this.isSeedingDemo.set(true);
     try {
       await this.authService.signInAsGuest();
       const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo') ?? '/';
@@ -67,6 +69,7 @@ export class Login {
       this.errorMessage.set(error instanceof Error ? error.message : this.translate.instant('auth.demoFailed'));
     } finally {
       this.isSubmitting.set(false);
+      this.isSeedingDemo.set(false);
     }
   }
 }

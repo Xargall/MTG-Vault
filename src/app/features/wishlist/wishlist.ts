@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { GameService } from '../../core/services/game.service';
@@ -9,7 +10,7 @@ import { WishlistEntry, WishlistService } from './wishlist.service';
 
 @Component({
   selector: 'app-wishlist',
-  imports: [AddWishlistDialog, DecimalPipe, TranslatePipe],
+  imports: [AddWishlistDialog, DecimalPipe, TranslatePipe, FormsModule],
   templateUrl: './wishlist.html',
   styleUrl: './wishlist.scss',
 })

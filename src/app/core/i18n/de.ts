@@ -53,6 +53,8 @@ export const de = {
     or: 'oder',
     tryDemo: 'Demo ausprobieren',
     demoHint: 'Ohne Registrierung testen — kein eigenes Konto nötig.',
+    demoSeeding: 'Demo wird eingerichtet…',
+    demoSeedingHint: 'Sammlung, Decks und Wunschliste werden befüllt — das dauert einen Moment.',
     loginFailed: 'Login fehlgeschlagen.',
     googleFailed: 'Google-Login fehlgeschlagen.',
     demoFailed: 'Demo-Login fehlgeschlagen.',

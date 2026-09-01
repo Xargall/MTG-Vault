@@ -116,4 +116,17 @@ export class CollectionService {
       .insert({ user_id: userId, game_id: gameId, card_id: cardId, quantity, foil, condition });
     if (error) throw error;
   }
+
+  async removeCard(cardId: string): Promise<void> {
+    await this.gameService.ready;
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) return;
+
+    const { error } = await this.supabase.client
+      .from('collection_cards')
+      .delete()
+      .eq('game_id', gameId)
+      .eq('card_id', cardId);
+    if (error) throw error;
+  }
 }

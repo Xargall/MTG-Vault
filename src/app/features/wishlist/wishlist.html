@@ -46,12 +46,12 @@
             [class.priority-1]="entry.row.priority === 1"
             [class.priority-2]="entry.row.priority === 2"
             [class.priority-3]="entry.row.priority === 3"
-            [value]="entry.row.priority"
-            (change)="updatePriority(entry, +$any($event.target).value)"
+            [ngModel]="entry.row.priority"
+            (ngModelChange)="updatePriority(entry, $event)"
           >
-            <option [value]="1">{{ 'wishlist.priorityLow' | translate }}</option>
-            <option [value]="2">{{ 'wishlist.priorityMid' | translate }}</option>
-            <option [value]="3">{{ 'wishlist.priorityHigh' | translate }}</option>
+            <option [ngValue]="1">{{ 'wishlist.priorityLow' | translate }}</option>
+            <option [ngValue]="2">{{ 'wishlist.priorityMid' | translate }}</option>
+            <option [ngValue]="3">{{ 'wishlist.priorityHigh' | translate }}</option>
           </select>
 
           <input

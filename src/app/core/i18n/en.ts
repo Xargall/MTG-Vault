@@ -55,6 +55,8 @@ export const en: typeof de = {
     or: 'or',
     tryDemo: 'Try the demo',
     demoHint: 'Try it without registering — no account needed.',
+    demoSeeding: 'Setting up the demo…',
+    demoSeedingHint: 'Filling in a collection, decks, and wishlist — this takes a moment.',
     loginFailed: 'Sign-in failed.',
     googleFailed: 'Google sign-in failed.',
     demoFailed: 'Demo sign-in failed.',

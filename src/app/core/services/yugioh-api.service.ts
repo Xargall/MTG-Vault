@@ -62,6 +62,12 @@ export class YugiohApiService implements CardApiService {
     return raw.length > 0 ? [this.toCard(raw[0])] : [];
   }
 
+  async getCardsByNames(names: string[]): Promise<Card[]> {
+    if (names.length === 0) return [];
+    const raw = await this.fetchCardInfo({ name: names.join('|') });
+    return raw.map((card) => this.toCard(card));
+  }
+
   private archetypesCache: Promise<string[]> | null = null;
 
   /** All known archetype/theme names - used to power theme-based browsing (Yu-Gi-Oh has no community-decklist API to draw on). */
