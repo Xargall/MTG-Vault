@@ -26,6 +26,7 @@
 
 .shell-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-sm);
 }
@@ -95,8 +96,13 @@
   border-radius: var(--radius);
   color: var(--color-text);
   padding: var(--spacing-sm) 10px;
-  font-size: 0.8rem;
-  max-width: 160px;
+  font-size: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 100px;
+  max-width: 13rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   &:hover {
     border-color: var(--color-accent);

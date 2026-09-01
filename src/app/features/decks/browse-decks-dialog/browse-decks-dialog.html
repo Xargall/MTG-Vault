@@ -23,7 +23,7 @@
         <p class="state-message">{{ 'browseDecks.noDecksFound' | translate }}</p>
       } @else if (!query().trim()) {
         <p class="state-message">
-          {{ 'browseDecks.searchHint' | translate }}
+          {{ searchHintKey() | translate }}
         </p>
         @if (!deckCardIndexActive().ready()) {
           <p class="state-message index-hint">

@@ -143,6 +143,7 @@ export const en: typeof de = {
     listFailed: 'Deck list could not be loaded.',
     noDecksFound: 'No decks found.',
     searchHint: 'Search by deck name or a card/character it contains, e.g. "Sephiroth" or "Commander".',
+    searchHintYugioh: 'Search by deck name or a card it contains, e.g. "Dark Magician" or "Dragon".',
     indexing: 'Indexing card names in the background ({{progress}})…',
     backToSearch: '← Back to search',
     loadingDetail: 'Loading card list…',

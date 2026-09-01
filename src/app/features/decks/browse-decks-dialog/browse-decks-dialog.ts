@@ -27,6 +27,10 @@ export class BrowseDecksDialog {
     this.gameService.currentSlug() === 'yugioh' ? this.yugiohPreconIndex : this.deckCardIndex,
   );
 
+  protected readonly searchHintKey = computed(() =>
+    this.gameService.currentSlug() === 'yugioh' ? 'browseDecks.searchHintYugioh' : 'browseDecks.searchHint',
+  );
+
   readonly close = output<void>();
   readonly added = output<void>();
 

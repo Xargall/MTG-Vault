@@ -141,6 +141,7 @@ export const de = {
     listFailed: 'Deck-Liste konnte nicht geladen werden.',
     noDecksFound: 'Keine Decks gefunden.',
     searchHint: 'Nach Deck-Name oder einer enthaltenen Karte/Charakter suchen, z. B. „Sephiroth“ oder „Commander“.',
+    searchHintYugioh: 'Nach Deck-Name oder einer enthaltenen Karte suchen, z. B. „Dark Magician“ oder „Dragon“.',
     indexing: 'Kartennamen werden im Hintergrund indiziert ({{progress}})…',
     backToSearch: '← Zurück zur Suche',
     loadingDetail: 'Lade Kartenliste…',
