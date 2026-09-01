@@ -7,14 +7,27 @@
 .shell-header {
   position: relative;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--spacing-sm) var(--spacing-lg);
+  flex-direction: column;
+  gap: var(--spacing-sm);
   padding: var(--spacing-md) var(--spacing-lg);
   background: linear-gradient(180deg, #55231b 0%, #3c1712 100%);
   border-bottom: 2px solid var(--color-accent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   overflow: hidden;
+}
+
+.shell-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm) var(--spacing-lg);
+}
+
+.shell-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
 }
 
 .corner-flourish {
@@ -51,14 +64,8 @@
 .shell-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-sm) var(--spacing-md);
-  flex: 1 1 100%;
-  order: 3;
-
-  @media (min-width: 640px) {
-    flex: 1;
-    order: 0;
-  }
+  justify-content: center;
+  gap: var(--spacing-sm) var(--spacing-lg);
 
   a {
     color: var(--color-text);
