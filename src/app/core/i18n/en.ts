@@ -71,7 +71,7 @@ export const en: typeof de = {
     completing: 'Completing sign-in…',
   },
   dashboard: {
-    welcome: 'Welcome to MTG Vault',
+    welcome: 'Welcome to TCG Vault',
     loading: 'Loading collection…',
     loadError: 'Collection could not be loaded.',
     empty: 'No cards in your collection yet.',

@@ -1,7 +1,7 @@
 {
-  "name": "MTG Vault",
-  "short_name": "MTG Vault",
-  "description": "Verwalte deine Magic: The Gathering Sammlung, Decks und Wishlist.",
+  "name": "TCG Vault",
+  "short_name": "TCG Vault",
+  "description": "Verwalte deine Trading-Card-Game-Sammlung, Decks und Wishlist — Magic: The Gathering und Yu-Gi-Oh!.",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",

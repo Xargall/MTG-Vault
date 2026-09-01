@@ -69,7 +69,7 @@ export const de = {
     completing: 'Anmeldung wird abgeschlossen…',
   },
   dashboard: {
-    welcome: 'Willkommen bei MTG Vault',
+    welcome: 'Willkommen bei TCG Vault',
     loading: 'Lade Sammlung…',
     loadError: 'Sammlung konnte nicht geladen werden.',
     empty: 'Noch keine Karten in deiner Sammlung.',
