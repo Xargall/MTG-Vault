@@ -2,7 +2,7 @@ import { Component, computed, effect, inject, signal, untracked } from '@angular
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { DeckCardIndexService } from '../../core/services/deck-card-index.service';
-import { getCardImageUrl, ScryfallService } from '../../core/services/scryfall.service';
+import { MtgApiService } from '../../core/services/mtg-api.service';
 import { MtgjsonDeckListEntry, MtgjsonService } from '../../core/services/mtgjson.service';
 import { CollectionEntry, CollectionService } from '../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../wishlist/wishlist.service';
@@ -74,7 +74,7 @@ export class Decks {
   private readonly collectionService = inject(CollectionService);
   private readonly wishlistService = inject(WishlistService);
   private readonly mtgjson = inject(MtgjsonService);
-  private readonly scryfall = inject(ScryfallService);
+  private readonly mtgApi = inject(MtgApiService);
   private readonly deckCardIndex = inject(DeckCardIndexService);
   private readonly translate = inject(TranslateService);
 
@@ -136,7 +136,6 @@ export class Decks {
     return results.sort((a, b) => b.matchPercent - a.matchPercent).slice(0, RECOMMENDATION_LIMIT);
   });
 
-  protected readonly getCardImageUrl = getCardImageUrl;
   protected readonly heroImageUrl = (scryfallId: string | null) =>
     scryfallId ? (this.heroImages().get(scryfallId) ?? null) : null;
 
@@ -194,10 +193,8 @@ export class Decks {
         .map((detail) => detail?.heroScryfallId)
         .filter((id): id is string => !!id);
 
-      const cards = await this.scryfall.getCardsByIds(heroIds);
-      const images = cards
-        .map((card) => getCardImageUrl(card))
-        .filter((url): url is string => !!url);
+      const cards = await this.mtgApi.getCardsByIds(heroIds);
+      const images = cards.map((card) => card.imageUrl).filter((url): url is string => !!url);
       this.bannerImages.set(images);
     } catch {
       this.bannerImages.set([]);
@@ -206,12 +203,11 @@ export class Decks {
 
   private async loadHeroImages(scryfallIds: string[]) {
     try {
-      const cards = await this.scryfall.getCardsByIds(scryfallIds);
+      const cards = await this.mtgApi.getCardsByIds(scryfallIds);
       this.heroImages.update((map) => {
         const next = new Map(map);
         for (const card of cards) {
-          const url = getCardImageUrl(card);
-          if (url) next.set(card.id, url);
+          if (card.imageUrl) next.set(card.id, card.imageUrl);
         }
         return next;
       });
@@ -246,10 +242,10 @@ export class Decks {
     this.wishlistingFileName.set(rec.deck.fileName);
     this.recommendationError.set(null);
     try {
-      const existing = await this.wishlistService.getScryfallIds();
+      const existing = await this.wishlistService.getCardIds();
       const inputs: UpsertWishlistInput[] = rec.missingScryfallIds
         .filter((id) => !existing.has(id))
-        .map((scryfallId) => ({ scryfallId, priority: 2, notes: this.translate.instant('common.forDeck', { name: rec.deck.name }) }));
+        .map((cardId) => ({ cardId, priority: 2, notes: this.translate.instant('common.forDeck', { name: rec.deck.name }) }));
 
       if (inputs.length > 0) {
         await this.wishlistService.upsertMany(inputs);

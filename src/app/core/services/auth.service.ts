@@ -1,7 +1,8 @@
 import { Injectable, computed, inject } from '@angular/core';
 
 import { SupabaseService } from './supabase.service';
-import { ScryfallService } from './scryfall.service';
+import { GameService } from './game.service';
+import { MtgApiService } from './mtg-api.service';
 
 const DEMO_CARDS: Array<{ name: string; quantity: number }> = [
   { name: 'Lightning Bolt', quantity: 3 },
@@ -18,7 +19,8 @@ const DEMO_CARDS: Array<{ name: string; quantity: number }> = [
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly supabase = inject(SupabaseService);
-  private readonly scryfall = inject(ScryfallService);
+  private readonly mtgApi = inject(MtgApiService);
+  private readonly gameService = inject(GameService);
 
   readonly session = this.supabase.session;
   readonly isAuthenticated = computed(() => this.session() !== null);
@@ -53,14 +55,19 @@ export class AuthService {
 
   private async seedDemoCollection(userId: string) {
     try {
-      const cards = await this.scryfall.getCardsByNames(DEMO_CARDS.map((entry) => entry.name));
+      await this.gameService.ready;
+      const mtgGameId = this.gameService.games().find((g) => g.slug === 'mtg')?.id;
+      if (!mtgGameId) return;
+
+      const cards = await this.mtgApi.getCardsByNames(DEMO_CARDS.map((entry) => entry.name));
       const quantityByName = new Map(
         DEMO_CARDS.map((entry) => [entry.name.toLowerCase(), entry.quantity]),
       );
 
       const rows = cards.map((card) => ({
         user_id: userId,
-        scryfall_id: card.id,
+        game_id: mtgGameId,
+        card_id: card.id,
         quantity: quantityByName.get(card.name.toLowerCase()) ?? 1,
       }));
 

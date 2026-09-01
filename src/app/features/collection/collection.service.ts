@@ -1,12 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 
+import { Card } from '../../core/models/card.model';
+import { GameService } from '../../core/services/game.service';
 import { SupabaseService } from '../../core/services/supabase.service';
-import { ScryfallCard, ScryfallService } from '../../core/services/scryfall.service';
 
 export interface CollectionCardRow {
   id: string;
   user_id: string;
-  scryfall_id: string;
+  game_id: string;
+  card_id: string;
   quantity: number;
   foil: boolean;
   condition: string;
@@ -15,11 +17,11 @@ export interface CollectionCardRow {
 
 export interface CollectionEntry {
   row: CollectionCardRow;
-  card: ScryfallCard;
+  card: Card;
 }
 
 export interface AddCardInput {
-  scryfallId: string;
+  cardId: string;
   quantity: number;
   foil: boolean;
   condition: string;
@@ -28,39 +30,49 @@ export interface AddCardInput {
 @Injectable({ providedIn: 'root' })
 export class CollectionService {
   private readonly supabase = inject(SupabaseService);
-  private readonly scryfall = inject(ScryfallService);
+  private readonly gameService = inject(GameService);
 
   async getCollectionWithCardData(): Promise<CollectionEntry[]> {
+    await this.gameService.ready;
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) return [];
+
     const { data, error } = await this.supabase.client
       .from('collection_cards')
       .select('*')
+      .eq('game_id', gameId)
       .returns<CollectionCardRow[]>();
 
     if (error) throw error;
     if (!data || data.length === 0) return [];
 
-    const cards = await this.scryfall.getCardsByIds(data.map((row) => row.scryfall_id));
+    const cards = await this.gameService.cardApi().getCardsByIds(data.map((row) => row.card_id));
     const cardsById = new Map(cards.map((card) => [card.id, card]));
 
     return data
       .map((row) => {
-        const card = cardsById.get(row.scryfall_id);
+        const card = cardsById.get(row.card_id);
         return card ? { row, card } : null;
       })
       .filter((entry): entry is CollectionEntry => entry !== null);
   }
 
-  async getQuantitiesByScryfallId(): Promise<Map<string, number>> {
+  async getQuantitiesByCardId(): Promise<Map<string, number>> {
+    await this.gameService.ready;
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) return new Map();
+
     const { data, error } = await this.supabase.client
       .from('collection_cards')
-      .select('scryfall_id, quantity')
-      .returns<Array<{ scryfall_id: string; quantity: number }>>();
+      .select('card_id, quantity')
+      .eq('game_id', gameId)
+      .returns<Array<{ card_id: string; quantity: number }>>();
 
     if (error) throw error;
 
     const totals = new Map<string, number>();
     for (const row of data ?? []) {
-      totals.set(row.scryfall_id, (totals.get(row.scryfall_id) ?? 0) + row.quantity);
+      totals.set(row.card_id, (totals.get(row.card_id) ?? 0) + row.quantity);
     }
     return totals;
   }
@@ -73,14 +85,18 @@ export class CollectionService {
     await Promise.all(inputs.map((input) => this.upsertOne(input)));
   }
 
-  private async upsertOne({ scryfallId, quantity, foil, condition }: AddCardInput): Promise<void> {
+  private async upsertOne({ cardId, quantity, foil, condition }: AddCardInput): Promise<void> {
+    await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Nicht eingeloggt.');
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) throw new Error('Kein aktives Spiel.');
 
     const { data: existing, error: selectError } = await this.supabase.client
       .from('collection_cards')
       .select('id, quantity')
-      .eq('scryfall_id', scryfallId)
+      .eq('game_id', gameId)
+      .eq('card_id', cardId)
       .eq('foil', foil)
       .maybeSingle<{ id: string; quantity: number }>();
 
@@ -97,7 +113,7 @@ export class CollectionService {
 
     const { error } = await this.supabase.client
       .from('collection_cards')
-      .insert({ user_id: userId, scryfall_id: scryfallId, quantity, foil, condition });
+      .insert({ user_id: userId, game_id: gameId, card_id: cardId, quantity, foil, condition });
     if (error) throw error;
   }
 }

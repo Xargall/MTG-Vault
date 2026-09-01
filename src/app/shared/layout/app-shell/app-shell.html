@@ -20,6 +20,18 @@
       </a>
 
       <div class="shell-controls">
+        <select
+          class="game-switch"
+          [value]="gameService.currentSlug()"
+          (change)="setGame($any($event.target).value)"
+        >
+          <option value="mtg">{{ 'games.mtg' | translate }}</option>
+          <option value="yugioh">{{ 'games.yugioh' | translate }}</option>
+          <option value="pokemon" disabled>
+            {{ 'games.pokemon' | translate }} ({{ 'games.comingSoon' | translate }})
+          </option>
+        </select>
+
         <div class="lang-switch">
           <button
             type="button"
@@ -44,7 +56,9 @@
     <nav class="shell-nav">
       <a routerLink="/">{{ 'nav.overview' | translate }}</a>
       <a routerLink="/collection">{{ 'nav.collection' | translate }}</a>
-      <a routerLink="/decks">{{ 'nav.decks' | translate }}</a>
+      @if (gameService.currentSlug() === 'mtg') {
+        <a routerLink="/decks">{{ 'nav.decks' | translate }}</a>
+      }
       <a routerLink="/wishlist">{{ 'nav.wishlist' | translate }}</a>
     </nav>
   </header>

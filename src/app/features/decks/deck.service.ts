@@ -1,13 +1,15 @@
 import { Injectable, inject } from '@angular/core';
 
+import { Card } from '../../core/models/card.model';
+import { GameService } from '../../core/services/game.service';
 import { SupabaseService } from '../../core/services/supabase.service';
-import { ScryfallCard, ScryfallService } from '../../core/services/scryfall.service';
 import { AddCardInput, CollectionService } from '../collection/collection.service';
 import { MtgjsonDeckDetail } from '../../core/services/mtgjson.service';
 
 export interface DeckRow {
   id: string;
   user_id: string;
+  game_id: string;
   name: string;
   format: string | null;
   is_precon: boolean;
@@ -19,13 +21,13 @@ export interface DeckRow {
 export interface DeckCardRow {
   id: string;
   deck_id: string;
-  scryfall_id: string;
+  card_id: string;
   quantity: number;
 }
 
 export interface DeckCardEntry {
   row: DeckCardRow;
-  card: ScryfallCard;
+  card: Card;
 }
 
 export interface DeckEntry {
@@ -36,13 +38,18 @@ export interface DeckEntry {
 @Injectable({ providedIn: 'root' })
 export class DeckService {
   private readonly supabase = inject(SupabaseService);
-  private readonly scryfall = inject(ScryfallService);
+  private readonly gameService = inject(GameService);
   private readonly collectionService = inject(CollectionService);
 
   async getMyDecks(): Promise<DeckEntry[]> {
+    await this.gameService.ready;
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) return [];
+
     const { data: decks, error: decksError } = await this.supabase.client
       .from('decks')
       .select('*')
+      .eq('game_id', gameId)
       .order('created_at', { ascending: false })
       .returns<DeckRow[]>();
 
@@ -60,14 +67,14 @@ export class DeckService {
 
     if (cardsError) throw cardsError;
 
-    const cards = await this.scryfall.getCardsByIds(
-      (deckCards ?? []).map((row) => row.scryfall_id),
-    );
+    const cards = await this.gameService
+      .cardApi()
+      .getCardsByIds((deckCards ?? []).map((row) => row.card_id));
     const cardsById = new Map(cards.map((card) => [card.id, card]));
 
     const cardsByDeck = new Map<string, DeckCardEntry[]>();
     for (const row of deckCards ?? []) {
-      const card = cardsById.get(row.scryfall_id);
+      const card = cardsById.get(row.card_id);
       if (!card) continue;
       const list = cardsByDeck.get(row.deck_id);
       const entry = { row, card };
@@ -88,13 +95,17 @@ export class DeckService {
     fileName: string,
     detail: MtgjsonDeckDetail,
   ): Promise<void> {
+    await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Nicht eingeloggt.');
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) throw new Error('Kein aktives Spiel.');
 
     const { data: deck, error: deckError } = await this.supabase.client
       .from('decks')
       .insert({
         user_id: userId,
+        game_id: gameId,
         name,
         format: mtgjsonType,
         is_precon: true,
@@ -109,16 +120,16 @@ export class DeckService {
     const { error: cardsError } = await this.supabase.client.from('deck_cards').insert(
       detail.cards.map((card) => ({
         deck_id: deck.id,
-        scryfall_id: card.scryfallId,
+        card_id: card.scryfallId,
         quantity: card.quantity,
       })),
     );
     if (cardsError) throw cardsError;
 
-    const owned = await this.collectionService.getQuantitiesByScryfallId();
+    const owned = await this.collectionService.getQuantitiesByCardId();
     const collectionInputs: AddCardInput[] = detail.cards
       .map((card) => ({
-        scryfallId: card.scryfallId,
+        cardId: card.scryfallId,
         quantity: card.quantity - (owned.get(card.scryfallId) ?? 0),
         foil: false,
         condition: 'NM',

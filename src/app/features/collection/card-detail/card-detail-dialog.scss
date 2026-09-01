@@ -112,6 +112,16 @@
   color: var(--color-bg);
 }
 
+.attribute-symbol {
+  border-radius: 6px;
+  padding: 0 10px;
+  letter-spacing: 0.5px;
+}
+
+.banlist-badge {
+  color: var(--color-danger) !important;
+}
+
 .info-list {
   display: grid;
   grid-template-columns: auto 1fr;

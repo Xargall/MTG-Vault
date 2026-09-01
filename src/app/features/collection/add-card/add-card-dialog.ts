@@ -2,7 +2,8 @@ import { Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { ScryfallCard, ScryfallService } from '../../../core/services/scryfall.service';
+import { Card } from '../../../core/models/card.model';
+import { GameService } from '../../../core/services/game.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { CollectionService } from '../collection.service';
 
@@ -16,7 +17,7 @@ const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
   styleUrl: './add-card-dialog.scss',
 })
 export class AddCardDialog {
-  private readonly scryfall = inject(ScryfallService);
+  protected readonly gameService = inject(GameService);
   private readonly collectionService = inject(CollectionService);
   private readonly translate = inject(TranslateService);
 
@@ -26,16 +27,16 @@ export class AddCardDialog {
   protected readonly conditions = CONDITIONS;
 
   protected readonly query = signal('');
-  protected readonly results = signal<ScryfallCard[]>([]);
+  protected readonly results = signal<Card[]>([]);
   protected readonly searching = signal(false);
   protected readonly searchError = signal<string | null>(null);
 
   protected readonly selectedName = signal<string | null>(null);
-  protected readonly prints = signal<ScryfallCard[]>([]);
+  protected readonly prints = signal<Card[]>([]);
   protected readonly loadingPrints = signal(false);
   protected readonly printsError = signal<string | null>(null);
 
-  protected readonly selectedCard = signal<ScryfallCard | null>(null);
+  protected readonly selectedCard = signal<Card | null>(null);
   protected readonly quantity = signal(1);
   protected readonly foil = signal(false);
   protected readonly condition = signal('NM');
@@ -63,7 +64,7 @@ export class AddCardDialog {
   private async search(query: string) {
     this.searchError.set(null);
     try {
-      this.results.set(await this.scryfall.searchCards(query));
+      this.results.set(await this.gameService.cardApi().searchCards(query));
     } catch (error) {
       this.searchError.set(error instanceof Error ? error.message : this.translate.instant('addCard.searchFailed'));
     } finally {
@@ -71,12 +72,12 @@ export class AddCardDialog {
     }
   }
 
-  async selectName(card: ScryfallCard) {
+  async selectName(card: Card) {
     this.selectedName.set(card.name);
     this.loadingPrints.set(true);
     this.printsError.set(null);
     try {
-      this.prints.set(await this.scryfall.getPrintsByName(card.name));
+      this.prints.set(await this.gameService.cardApi().getPrints(card.name));
     } catch (error) {
       this.printsError.set(
         error instanceof Error ? error.message : this.translate.instant('addCard.printsFailed'),
@@ -91,7 +92,7 @@ export class AddCardDialog {
     this.prints.set([]);
   }
 
-  selectPrint(card: ScryfallCard) {
+  selectPrint(card: Card) {
     this.selectedCard.set(card);
     this.quantity.set(1);
     this.foil.set(false);
@@ -111,7 +112,7 @@ export class AddCardDialog {
     this.submitError.set(null);
     try {
       await this.collectionService.addCard({
-        scryfallId: card.id,
+        cardId: card.id,
         quantity: this.quantity(),
         foil: this.foil(),
         condition: this.condition(),

@@ -70,7 +70,7 @@
       @for (summary of deckSummaries(); track summary.entry.deck.id) {
         <button type="button" class="deck-card" (click)="selectedDeck.set(summary.entry)">
           @if (summary.showcase; as showcase) {
-            @if (getCardImageUrl(showcase.card); as imageUrl) {
+            @if (showcase.card.imageUrl; as imageUrl) {
               <img class="showcase-image" [src]="imageUrl" [alt]="showcase.card.name" />
             } @else {
               <div class="showcase-placeholder">{{ showcase.card.name }}</div>

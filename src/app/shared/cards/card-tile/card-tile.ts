@@ -1,6 +1,6 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, input } from '@angular/core';
 
-import { getCardImageUrl, ScryfallCard } from '../../../core/services/scryfall.service';
+import { Card } from '../../../core/models/card.model';
 
 @Component({
   selector: 'app-card-tile',
@@ -8,8 +8,6 @@ import { getCardImageUrl, ScryfallCard } from '../../../core/services/scryfall.s
   styleUrl: './card-tile.scss',
 })
 export class CardTile {
-  readonly card = input.required<ScryfallCard>();
+  readonly card = input.required<Card>();
   readonly quantity = input<number | null>(null);
-
-  protected readonly imageUrl = computed(() => getCardImageUrl(this.card()));
 }

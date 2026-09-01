@@ -38,7 +38,7 @@
           >
             {{ 'collection.all' | translate }}
           </button>
-          @for (category of colorCategories; track category.key) {
+          @for (category of categories(); track category.key) {
             <button
               type="button"
               class="filter-button"
@@ -52,7 +52,7 @@
         </div>
       </section>
 
-      @if (hasAnyCards()) {
+      @if (hasAnyCards() && gameService.currentSlug() === 'mtg') {
         <section class="chart-card mana-curve-card">
           <h2>{{ 'collection.manaCurve' | translate }}</h2>
           <app-bar-chart [data]="manaCurve()" />

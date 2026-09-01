@@ -1,17 +1,14 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { GameService } from '../../../core/services/game.service';
 import { AddCardDialog } from '../add-card/add-card-dialog';
 import { CardDetailDialog } from '../card-detail/card-detail-dialog';
-import {
-  COLOR_CATEGORIES,
-  ColorCategory,
-  colorCategoryFor,
-  getManaCurve,
-} from '../collection-stats';
+import { categoryKeyFor, getCategoriesForGame } from '../card-category-stats';
+import { getManaCurve } from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
 
 @Component({
@@ -24,15 +21,16 @@ export class CollectionOverview {
   private readonly collectionService = inject(CollectionService);
   private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
+  protected readonly gameService = inject(GameService);
 
-  protected readonly colorCategories = COLOR_CATEGORIES;
+  protected readonly categories = computed(() => getCategoriesForGame(this.gameService.currentSlug()));
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
   private readonly entries = signal<CollectionEntry[]>([]);
 
   protected readonly searchQuery = signal('');
-  protected readonly selectedCategory = signal<ColorCategory | null>(null);
+  protected readonly selectedCategory = signal<string | null>(null);
   protected readonly showAddDialog = signal(false);
   protected readonly selectedEntry = signal<CollectionEntry | null>(null);
 
@@ -44,7 +42,7 @@ export class CollectionOverview {
 
     return this.entries().filter(({ card }) => {
       const matchesQuery = !query || card.name.toLowerCase().includes(query);
-      const matchesCategory = !category || colorCategoryFor(card.color_identity) === category;
+      const matchesCategory = !category || categoryKeyFor(card) === category;
       return matchesQuery && matchesCategory;
     });
   });
@@ -52,14 +50,18 @@ export class CollectionOverview {
   protected readonly manaCurve = computed<BarChartDatum[]>(() => getManaCurve(this.filteredEntries()));
 
   constructor() {
-    const colorParam = this.route.snapshot.queryParamMap.get('color') as ColorCategory | null;
-    if (colorParam && this.colorCategories.some((c) => c.key === colorParam)) {
+    const colorParam = this.route.snapshot.queryParamMap.get('color');
+    if (colorParam) {
       this.selectedCategory.set(colorParam);
     }
-    this.load();
+
+    effect(() => {
+      this.gameService.currentSlug();
+      untracked(() => this.load());
+    });
   }
 
-  toggleCategory(key: ColorCategory) {
+  toggleCategory(key: string) {
     this.selectedCategory.set(this.selectedCategory() === key ? null : key);
   }
 

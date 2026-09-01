@@ -1,17 +1,15 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { BarChart } from '../../shared/charts/bar-chart/bar-chart';
 import { DonutChart } from '../../shared/charts/donut-chart/donut-chart';
-import { getCardImageUrl, ScryfallCard, ScryfallService } from '../../core/services/scryfall.service';
-import {
-  getColorCategorySummaries,
-  getColorDistribution,
-  getPriceDistribution,
-  getTotalValue,
-} from '../collection/collection-stats';
+import { Card } from '../../core/models/card.model';
+import { GameService } from '../../core/services/game.service';
+import { MtgApiService } from '../../core/services/mtg-api.service';
+import { getCategoryDistribution, getCategorySummaries } from '../collection/card-category-stats';
+import { getPriceDistribution, getTotalValue } from '../collection/card-price-stats';
 import { CollectionEntry, CollectionService } from '../collection/collection.service';
 
 const POPULAR_CARD_COUNT = 12;
@@ -25,7 +23,8 @@ const POPULAR_CARD_ROTATION_MS = 15000;
 })
 export class Dashboard {
   private readonly collectionService = inject(CollectionService);
-  private readonly scryfall = inject(ScryfallService);
+  private readonly mtgApi = inject(MtgApiService);
+  protected readonly gameService = inject(GameService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly translate = inject(TranslateService);
 
@@ -34,20 +33,35 @@ export class Dashboard {
   private readonly entries = signal<CollectionEntry[]>([]);
 
   protected readonly hasCards = computed(() => this.entries().length > 0);
-  protected readonly colorDistribution = computed(() => getColorDistribution(this.entries()));
-  protected readonly colorCategories = computed(() => getColorCategorySummaries(this.entries()));
+  protected readonly colorDistribution = computed(() =>
+    getCategoryDistribution(this.entries(), this.gameService.currentSlug()),
+  );
+  protected readonly colorCategories = computed(() =>
+    getCategorySummaries(this.entries(), this.gameService.currentSlug()),
+  );
   protected readonly priceDistribution = computed(() => getPriceDistribution(this.entries()));
   protected readonly totalValue = computed(() => getTotalValue(this.entries()));
-  protected readonly getCardImageUrl = getCardImageUrl;
 
-  protected readonly popularCards = signal<ScryfallCard[]>([]);
+  protected readonly categoryHeading = computed(() =>
+    this.gameService.currentSlug() === 'yugioh'
+      ? 'dashboard.attributeDistribution'
+      : 'dashboard.colorDistribution',
+  );
+  protected readonly categoryListHeading = computed(() =>
+    this.gameService.currentSlug() === 'yugioh' ? 'dashboard.attributeCategories' : 'dashboard.colorCategories',
+  );
+
+  protected readonly popularCards = signal<Card[]>([]);
   private readonly popularIndex = signal(0);
   protected readonly currentPopularCard = computed(
     () => this.popularCards()[this.popularIndex()] ?? null,
   );
 
   constructor() {
-    this.load();
+    effect(() => {
+      this.gameService.currentSlug();
+      untracked(() => this.load());
+    });
     this.loadPopularCards();
   }
 
@@ -67,7 +81,7 @@ export class Dashboard {
 
   private async loadPopularCards() {
     try {
-      const cards = await this.scryfall.getPopularCards(POPULAR_CARD_COUNT);
+      const cards = await this.mtgApi.getPopularCards(POPULAR_CARD_COUNT);
       this.popularCards.set(cards);
       if (cards.length > 1) {
         const intervalId = setInterval(() => {

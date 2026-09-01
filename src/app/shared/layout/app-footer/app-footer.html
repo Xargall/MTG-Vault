@@ -1,8 +1,12 @@
 <footer class="app-footer">
   <span>© {{ year }} MTG Vault</span>
   <span class="divider">·</span>
-  <span
-    >{{ 'footer.cardDataFrom' | translate }}
-    <a href="https://scryfall.com" target="_blank" rel="noopener">Scryfall</a></span
-  >
+  <span>
+    {{ 'footer.cardDataFrom' | translate }}
+    @if (gameService.currentSlug() === 'yugioh') {
+      <a href="https://ygoprodeck.com" target="_blank" rel="noopener">YGOPRODeck</a>
+    } @else {
+      <a href="https://scryfall.com" target="_blank" rel="noopener">Scryfall</a>
+    }
+  </span>
 </footer>

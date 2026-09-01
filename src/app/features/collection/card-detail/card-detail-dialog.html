@@ -7,7 +7,7 @@
 
     <div class="detail-layout">
       <div class="image-column">
-        @if (imageUrl(); as url) {
+        @if (entry().card.imageUrl; as url) {
           <img class="card-image" [src]="url" [alt]="entry().card.name" />
         } @else {
           <div class="card-placeholder">{{ entry().card.name }}</div>
@@ -25,15 +25,42 @@
           </div>
         }
 
+        @if (asYugiohCard(entry().card); as ygoCard) {
+          @if (ygoCard.attribute) {
+            <div class="mana-cost">
+              <span class="mana-symbol attribute-symbol" [style.background]="attributeColor()">
+                {{ ygoCard.attribute }}
+              </span>
+            </div>
+          }
+        }
+
         <dl class="info-list">
           <dt>{{ 'cardDetail.set' | translate }}</dt>
-          <dd>{{ entry().card.set_name }}</dd>
+          <dd>{{ entry().card.setName ?? ('common.unknown' | translate) }}</dd>
 
           <dt>{{ 'cardDetail.rarity' | translate }}</dt>
-          <dd>{{ rarityLabel() | translate }}</dd>
+          <dd>{{ rarityLabel() ? (rarityLabel()! | translate) : ('common.unknown' | translate) }}</dd>
 
-          <dt>{{ 'cardDetail.foil' | translate }}</dt>
-          <dd>{{ (entry().row.foil ? 'common.yes' : 'common.no') | translate }}</dd>
+          @if (entry().card.game === 'mtg') {
+            <dt>{{ 'cardDetail.foil' | translate }}</dt>
+            <dd>{{ (entry().row.foil ? 'common.yes' : 'common.no') | translate }}</dd>
+          }
+
+          @if (asYugiohCard(entry().card); as ygoCard) {
+            <dt>{{ 'yugioh.cardType' | translate }}</dt>
+            <dd>{{ ygoCard.cardType }}</dd>
+
+            @if (ygoCard.atk !== null || ygoCard.def !== null) {
+              <dt>{{ 'yugioh.attack' | translate }} / {{ 'yugioh.defense' | translate }}</dt>
+              <dd>{{ ygoCard.atk ?? '?' }} / {{ ygoCard.def ?? '?' }}</dd>
+            }
+
+            @if (banlistLabel(); as label) {
+              <dt>{{ 'yugioh.banlistStatus' | translate }}</dt>
+              <dd class="banlist-badge">{{ label | translate }}</dd>
+            }
+          }
 
           <dt>{{ 'cardDetail.price' | translate }}</dt>
           <dd>{{ price() > 0 ? (price() | number: '1.2-2') + ' €' : ('common.unknown' | translate) }}</dd>

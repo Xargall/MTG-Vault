@@ -2,7 +2,7 @@ import { Component, computed, inject, output, signal } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { EdhrecService } from '../../../core/services/edhrec.service';
-import { getCardImageUrl, ScryfallService } from '../../../core/services/scryfall.service';
+import { MtgApiService } from '../../../core/services/mtg-api.service';
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
 import { buildOwnedByNameMap, getEdhrecMatch, isLand, isLegendaryCreature } from './commander-recommendations-stats';
 
@@ -44,7 +44,7 @@ function dedupeByCardName(entries: CollectionEntry[]): CollectionEntry[] {
 })
 export class CommanderRecommendationsDialog {
   private readonly collectionService = inject(CollectionService);
-  private readonly scryfall = inject(ScryfallService);
+  private readonly mtgApi = inject(MtgApiService);
   private readonly edhrec = inject(EdhrecService);
   private readonly translate = inject(TranslateService);
 
@@ -70,17 +70,21 @@ export class CommanderRecommendationsDialog {
     this.errorMessage.set(null);
     this.recommendations.set([]);
     try {
-      const collection = await this.collectionService.getCollectionWithCardData();
+      const collection = (await this.collectionService.getCollectionWithCardData()).filter(
+        (entry) => entry.card.game === 'mtg',
+      );
       const ownedByName = buildOwnedByNameMap(collection);
 
       const ownedCommanders = dedupeByCardName(
-        collection.filter(({ card }) => isLegendaryCreature(card.type_line)),
+        collection.filter(({ card }) => card.game === 'mtg' && isLegendaryCreature(card.typeLine)),
       );
       const ownedCommanderNames = new Set(ownedCommanders.map((entry) => entry.card.name.toLowerCase()));
 
       // Reverse scan: for every non-land card owned, ask EDHREC which
       // commanders most often run it, and tally candidates not already owned.
-      const signalCards = dedupeByCardName(collection.filter(({ card }) => !isLand(card.type_line)));
+      const signalCards = dedupeByCardName(
+        collection.filter(({ card }) => card.game === 'mtg' && !isLand(card.typeLine)),
+      );
 
       this.scanPhase.set('cards');
       this.checked.set(0);
@@ -107,17 +111,17 @@ export class CommanderRecommendationsDialog {
         .map(([name]) => name);
 
       const candidateCards = candidateNames.length
-        ? await this.scryfall.getCardsByNames(candidateNames).catch(() => [])
+        ? await this.mtgApi.getCardsByNames(candidateNames).catch(() => [])
         : [];
       const candidateImageByName = new Map(
-        candidateCards.map((card) => [card.name.toLowerCase(), getCardImageUrl(card)]),
+        candidateCards.map((card) => [card.name.toLowerCase(), card.imageUrl]),
       );
 
       const toVerify = [
         ...ownedCommanders.map((entry) => ({
           name: entry.card.name,
           owned: true,
-          imageUrl: getCardImageUrl(entry.card),
+          imageUrl: entry.card.imageUrl,
         })),
         ...candidateNames.map((name) => ({
           name,

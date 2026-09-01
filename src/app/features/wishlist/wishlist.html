@@ -25,7 +25,7 @@
     <ul class="entry-list">
       @for (entry of entries(); track entry.row.id) {
         <li class="entry-row">
-          @if (getCardImageUrl(entry.card); as imageUrl) {
+          @if (entry.card.imageUrl; as imageUrl) {
             <img class="entry-image" [src]="imageUrl" [alt]="entry.card.name" />
           } @else {
             <div class="entry-placeholder">{{ entry.card.name }}</div>
@@ -34,7 +34,7 @@
           <div class="entry-info">
             <p class="entry-name">{{ entry.card.name }}</p>
             <p class="entry-price">{{ getEntryPrice(entry) | number: '1.2-2' }} €</p>
-            @if (entry.card.purchase_uris?.cardmarket; as url) {
+            @if (entry.card.game === 'mtg' && entry.card.cardmarketUrl; as url) {
               <a class="cardmarket-link" [href]="url" target="_blank" rel="noopener">
                 {{ 'wishlist.cardmarketLink' | translate }}
               </a>

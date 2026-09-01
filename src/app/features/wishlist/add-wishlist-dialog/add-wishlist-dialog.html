@@ -46,7 +46,8 @@
             @for (print of prints(); track print.id) {
               <button type="button" class="result-item" (click)="selectPrint(print)">
                 <app-card-tile [card]="print" />
-                <span class="print-meta">{{ print.set_name }} · {{ print.released_at.slice(0, 4) }}</span>
+                <span class="print-meta">{{ print.setName }}<!--
+                  --> @if (print.rarity) { · {{ print.rarity }} }</span>
               </button>
             }
           </div>

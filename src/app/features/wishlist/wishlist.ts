@@ -1,8 +1,8 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { getCardImageUrl } from '../../core/services/scryfall.service';
+import { GameService } from '../../core/services/game.service';
 import { AddWishlistDialog } from './add-wishlist-dialog/add-wishlist-dialog';
 import { getEntryPrice, getWishlistTotalValue } from './wishlist-stats';
 import { WishlistEntry, WishlistService } from './wishlist.service';
@@ -16,6 +16,7 @@ import { WishlistEntry, WishlistService } from './wishlist.service';
 export class Wishlist {
   private readonly wishlistService = inject(WishlistService);
   private readonly translate = inject(TranslateService);
+  private readonly gameService = inject(GameService);
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
@@ -25,11 +26,13 @@ export class Wishlist {
   protected readonly hasEntries = computed(() => this.entries().length > 0);
   protected readonly totalValue = computed(() => getWishlistTotalValue(this.entries()));
 
-  protected readonly getCardImageUrl = getCardImageUrl;
   protected readonly getEntryPrice = getEntryPrice;
 
   constructor() {
-    this.load();
+    effect(() => {
+      this.gameService.currentSlug();
+      untracked(() => this.load());
+    });
   }
 
   protected async load() {
@@ -48,7 +51,7 @@ export class Wishlist {
 
   async updatePriority(entry: WishlistEntry, priority: number) {
     await this.wishlistService.upsertEntry({
-      scryfallId: entry.row.scryfall_id,
+      cardId: entry.row.card_id,
       priority,
       notes: entry.row.notes,
     });
@@ -61,7 +64,7 @@ export class Wishlist {
     const notes = notesValue.trim() || null;
     if (notes === entry.row.notes) return;
     await this.wishlistService.upsertEntry({
-      scryfallId: entry.row.scryfall_id,
+      cardId: entry.row.card_id,
       priority: entry.row.priority,
       notes,
     });

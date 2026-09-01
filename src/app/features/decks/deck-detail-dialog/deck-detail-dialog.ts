@@ -2,7 +2,6 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { getCardImageUrl } from '../../../core/services/scryfall.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { CollectionEntry } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
@@ -25,13 +24,8 @@ export class DeckDetailDialog {
   readonly close = output<void>();
   readonly deleted = output<void>();
 
-  protected readonly getCardImageUrl = getCardImageUrl;
-
   protected readonly showcase = computed(() => getDeckShowcase(this.entry()));
-  protected readonly showcaseImageUrl = computed(() => {
-    const showcase = this.showcase();
-    return showcase ? getCardImageUrl(showcase.card) : null;
-  });
+  protected readonly showcaseImageUrl = computed(() => this.showcase()?.card.imageUrl ?? null);
 
   protected readonly cardCount = computed(() => getDeckCardCount(this.entry()));
   protected readonly totalValue = computed(() => getDeckTotalValue(this.entry()));
@@ -44,7 +38,7 @@ export class DeckDetailDialog {
 
   protected readonly missingCards = computed<DeckCardEntry[]>(() => {
     const owned = buildOwnedMap(this.collectionEntries());
-    return this.entry().cards.filter(({ row }) => (owned.get(row.scryfall_id) ?? 0) < row.quantity);
+    return this.entry().cards.filter(({ row }) => (owned.get(row.card_id) ?? 0) < row.quantity);
   });
 
   protected readonly confirmingDelete = signal(false);
@@ -59,11 +53,11 @@ export class DeckDetailDialog {
     this.addingToWishlist.set(true);
     this.wishlistError.set(null);
     try {
-      const existing = await this.wishlistService.getScryfallIds();
+      const existing = await this.wishlistService.getCardIds();
       const deckName = this.entry().deck.name;
       const inputs: UpsertWishlistInput[] = this.missingCards()
-        .filter(({ row }) => !existing.has(row.scryfall_id))
-        .map(({ row }) => ({ scryfallId: row.scryfall_id, priority: 2, notes: this.translate.instant('common.forDeck', { name: deckName }) }));
+        .filter(({ row }) => !existing.has(row.card_id))
+        .map(({ row }) => ({ cardId: row.card_id, priority: 2, notes: this.translate.instant('common.forDeck', { name: deckName }) }));
 
       if (inputs.length > 0) {
         await this.wishlistService.upsertMany(inputs);

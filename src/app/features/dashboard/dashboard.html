@@ -12,18 +12,18 @@
         <span class="corner corner--tr"></span>
         <span class="corner corner--bl"></span>
         <span class="corner corner--br"></span>
-        <h2>{{ 'dashboard.colorDistribution' | translate }}</h2>
+        <h2>{{ categoryHeading() | translate }}</h2>
         <app-donut-chart [data]="colorDistribution()" />
       </section>
 
-      @if (currentPopularCard(); as card) {
+      @if (gameService.currentSlug() === 'mtg' && currentPopularCard(); as card) {
         <section class="overview-card popular-card">
           <span class="corner corner--tl"></span>
           <span class="corner corner--tr"></span>
           <span class="corner corner--bl"></span>
           <span class="corner corner--br"></span>
           <h2>{{ 'dashboard.popularCards' | translate }}</h2>
-          @if (getCardImageUrl(card); as imageUrl) {
+          @if (card.imageUrl; as imageUrl) {
             <img class="popular-image" [src]="imageUrl" [alt]="card.name" />
           } @else {
             <div class="popular-placeholder">{{ card.name }}</div>
@@ -44,13 +44,13 @@
     </div>
 
     <section class="color-categories">
-      <h2>{{ 'dashboard.colorCategories' | translate }}</h2>
+      <h2>{{ categoryListHeading() | translate }}</h2>
       <div class="category-grid">
         @for (category of colorCategories(); track category.label) {
           <a class="category-card" routerLink="/collection" [queryParams]="{ color: category.key }">
             <span class="category-bar" [style.background]="category.color"></span>
             @if (category.showcase; as entry) {
-              @if (getCardImageUrl(entry.card); as imageUrl) {
+              @if (entry.card.imageUrl; as imageUrl) {
                 <img class="showcase-image" [src]="imageUrl" [alt]="entry.card.name" />
               } @else {
                 <div class="showcase-placeholder">{{ entry.card.name }}</div>

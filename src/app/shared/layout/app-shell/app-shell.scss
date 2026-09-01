@@ -89,6 +89,25 @@
   }
 }
 
+.game-switch {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  padding: var(--spacing-sm) 10px;
+  font-size: 0.8rem;
+  max-width: 160px;
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+
+  option {
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+}
+
 .lang-switch {
   display: flex;
   border: 1px solid var(--color-border);
