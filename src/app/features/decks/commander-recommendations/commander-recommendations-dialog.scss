@@ -115,6 +115,17 @@
   color: var(--color-text-muted);
 }
 
+.missing-tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(217, 164, 6, 0.15);
+  color: #d9a406;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
 .match-badge {
   flex-shrink: 0;
   padding: 4px 12px;

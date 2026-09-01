@@ -5,6 +5,10 @@ export function isLegendaryCreature(typeLine: string): boolean {
   return typeLine.includes('Legendary') && typeLine.includes('Creature');
 }
 
+export function isLand(typeLine: string): boolean {
+  return typeLine.includes('Land');
+}
+
 export function buildOwnedByNameMap(entries: CollectionEntry[]): Map<string, number> {
   const owned = new Map<string, number>();
   for (const { row, card } of entries) {

@@ -6,31 +6,43 @@
     </header>
 
     <p class="hint">
-      Für jede Legendary Creature in deiner Sammlung wird das EDHREC-Durchschnittsdeck gegen deine
-      Sammlung abgeglichen.
+      Jede Legendary Creature in deiner Sammlung wird als Commander geprüft, plus Commander, die du
+      noch nicht besitzt, deren EDHREC-Durchschnittsdeck aber schon stark durch deine übrigen Karten
+      abgedeckt ist.
     </p>
 
     @if (errorMessage()) {
       <p class="state-message error">{{ errorMessage() }}</p>
-    } @else if (hasNoLegendaries()) {
-      <p class="state-message">Keine Legendary Creatures in deiner Sammlung gefunden.</p>
     } @else {
       @if (loading()) {
-        <p class="state-message">Prüfe Commander… ({{ checked() }} / {{ total() }})</p>
+        <p class="state-message">
+          @if (scanPhase() === 'cards') {
+            Durchsuche Sammlung nach möglichen Commandern… ({{ checked() }} / {{ total() }})
+          } @else {
+            Prüfe Commander… ({{ checked() }} / {{ total() }})
+          }
+        </p>
+      }
+
+      @if (hasNoResults()) {
+        <p class="state-message">Keine passenden Commander gefunden.</p>
       }
 
       <ul class="recommendation-list">
-        @for (rec of recommendations(); track rec.commander.row.id) {
+        @for (rec of recommendations(); track rec.name) {
           <li class="recommendation-row">
-            @if (getCardImageUrl(rec.commander.card); as imageUrl) {
-              <img class="commander-image" [src]="imageUrl" [alt]="rec.commander.card.name" />
+            @if (rec.imageUrl; as imageUrl) {
+              <img class="commander-image" [src]="imageUrl" [alt]="rec.name" />
             } @else {
               <div class="commander-placeholder"></div>
             }
 
             <div class="recommendation-info">
-              <p class="commander-name">{{ rec.commander.card.name }}</p>
+              <p class="commander-name">{{ rec.name }}</p>
               <p class="match-detail">{{ rec.matchedCount }} / {{ rec.totalCount }} Karten</p>
+              @if (!rec.owned) {
+                <span class="missing-tag">Commander fehlt in Sammlung</span>
+              }
             </div>
 
             <span class="match-badge" [class.is-complete]="rec.matchPercent === 100">

@@ -1,14 +1,23 @@
 import { Component, computed, inject, output, signal } from '@angular/core';
 
 import { EdhrecService } from '../../../core/services/edhrec.service';
-import { getCardImageUrl } from '../../../core/services/scryfall.service';
+import { getCardImageUrl, ScryfallService } from '../../../core/services/scryfall.service';
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
-import { buildOwnedByNameMap, getEdhrecMatch, isLegendaryCreature } from './commander-recommendations-stats';
+import { buildOwnedByNameMap, getEdhrecMatch, isLand, isLegendaryCreature } from './commander-recommendations-stats';
 
 const BATCH_SIZE = 5;
+// Bounds how many not-yet-owned candidate commanders get a full average-deck
+// verification after the reverse card scan - only the most-voted ones are
+// worth the extra request, long-tail single-vote candidates rarely reach a
+// useful match %.
+const CANDIDATE_LIMIT = 20;
+
+type ScanPhase = 'cards' | 'commanders';
 
 interface CommanderRecommendation {
-  commander: CollectionEntry;
+  name: string;
+  imageUrl: string | null;
+  owned: boolean;
   matchPercent: number;
   matchedCount: number;
   totalCount: number;
@@ -33,19 +42,20 @@ function dedupeByCardName(entries: CollectionEntry[]): CollectionEntry[] {
 })
 export class CommanderRecommendationsDialog {
   private readonly collectionService = inject(CollectionService);
+  private readonly scryfall = inject(ScryfallService);
   private readonly edhrec = inject(EdhrecService);
 
   readonly close = output<void>();
-  protected readonly getCardImageUrl = getCardImageUrl;
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
+  protected readonly scanPhase = signal<ScanPhase>('cards');
   protected readonly checked = signal(0);
   protected readonly total = signal(0);
   protected readonly recommendations = signal<CommanderRecommendation[]>([]);
 
-  protected readonly hasNoLegendaries = computed(
-    () => !this.loading() && !this.errorMessage() && this.total() === 0,
+  protected readonly hasNoResults = computed(
+    () => !this.loading() && !this.errorMessage() && this.recommendations().length === 0,
   );
 
   constructor() {
@@ -55,25 +65,78 @@ export class CommanderRecommendationsDialog {
   private async load() {
     this.loading.set(true);
     this.errorMessage.set(null);
+    this.recommendations.set([]);
     try {
       const collection = await this.collectionService.getCollectionWithCardData();
       const ownedByName = buildOwnedByNameMap(collection);
-      const commanders = dedupeByCardName(
+
+      const ownedCommanders = dedupeByCardName(
         collection.filter(({ card }) => isLegendaryCreature(card.type_line)),
       );
+      const ownedCommanderNames = new Set(ownedCommanders.map((entry) => entry.card.name.toLowerCase()));
 
-      this.total.set(commanders.length);
+      // Reverse scan: for every non-land card owned, ask EDHREC which
+      // commanders most often run it, and tally candidates not already owned.
+      const signalCards = dedupeByCardName(collection.filter(({ card }) => !isLand(card.type_line)));
+
+      this.scanPhase.set('cards');
       this.checked.set(0);
+      this.total.set(signalCards.length);
+
+      const tally = new Map<string, number>();
+      for (let i = 0; i < signalCards.length; i += BATCH_SIZE) {
+        const batch = signalCards.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          batch.map(async ({ card }) => {
+            const hits = await this.edhrec.getCommandersForCard(card.name).catch(() => []);
+            for (const hit of hits) {
+              if (ownedCommanderNames.has(hit.name.toLowerCase())) continue;
+              tally.set(hit.name, (tally.get(hit.name) ?? 0) + 1);
+            }
+          }),
+        );
+        this.checked.update((value) => value + batch.length);
+      }
+
+      const candidateNames = [...tally.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, CANDIDATE_LIMIT)
+        .map(([name]) => name);
+
+      const candidateCards = candidateNames.length
+        ? await this.scryfall.getCardsByNames(candidateNames).catch(() => [])
+        : [];
+      const candidateImageByName = new Map(
+        candidateCards.map((card) => [card.name.toLowerCase(), getCardImageUrl(card)]),
+      );
+
+      const toVerify = [
+        ...ownedCommanders.map((entry) => ({
+          name: entry.card.name,
+          owned: true,
+          imageUrl: getCardImageUrl(entry.card),
+        })),
+        ...candidateNames.map((name) => ({
+          name,
+          owned: false,
+          imageUrl: candidateImageByName.get(name.toLowerCase()) ?? null,
+        })),
+      ];
+
+      // Verify each candidate's real match % against the collection.
+      this.scanPhase.set('commanders');
+      this.checked.set(0);
+      this.total.set(toVerify.length);
 
       const results: CommanderRecommendation[] = [];
-      for (let i = 0; i < commanders.length; i += BATCH_SIZE) {
-        const batch = commanders.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < toVerify.length; i += BATCH_SIZE) {
+        const batch = toVerify.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.all(
-          batch.map(async (commander) => {
-            const deckCards = await this.edhrec.getAverageDeck(commander.card.name).catch(() => []);
+          batch.map(async (candidate) => {
+            const deckCards = await this.edhrec.getAverageDeck(candidate.name).catch(() => []);
             const { matchedCount, totalCount } = getEdhrecMatch(deckCards, ownedByName);
             const matchPercent = totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0;
-            return { commander, matchPercent, matchedCount, totalCount };
+            return { ...candidate, matchPercent, matchedCount, totalCount };
           }),
         );
         results.push(...batchResults.filter((result) => result.totalCount > 0));
