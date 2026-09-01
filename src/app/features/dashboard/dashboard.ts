@@ -1,10 +1,10 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { BarChart } from '../../shared/charts/bar-chart/bar-chart';
 import { DonutChart } from '../../shared/charts/donut-chart/donut-chart';
-import { getCardImageUrl } from '../../core/services/scryfall.service';
+import { getCardImageUrl, ScryfallCard, ScryfallService } from '../../core/services/scryfall.service';
 import {
   getColorCategorySummaries,
   getColorDistribution,
@@ -12,6 +12,9 @@ import {
   getTotalValue,
 } from '../collection/collection-stats';
 import { CollectionEntry, CollectionService } from '../collection/collection.service';
+
+const POPULAR_CARD_COUNT = 12;
+const POPULAR_CARD_ROTATION_MS = 15000;
 
 @Component({
   selector: 'app-dashboard',
@@ -21,6 +24,8 @@ import { CollectionEntry, CollectionService } from '../collection/collection.ser
 })
 export class Dashboard {
   private readonly collectionService = inject(CollectionService);
+  private readonly scryfall = inject(ScryfallService);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
@@ -33,8 +38,15 @@ export class Dashboard {
   protected readonly totalValue = computed(() => getTotalValue(this.entries()));
   protected readonly getCardImageUrl = getCardImageUrl;
 
+  protected readonly popularCards = signal<ScryfallCard[]>([]);
+  private readonly popularIndex = signal(0);
+  protected readonly currentPopularCard = computed(
+    () => this.popularCards()[this.popularIndex()] ?? null,
+  );
+
   constructor() {
     this.load();
+    this.loadPopularCards();
   }
 
   private async load() {
@@ -48,6 +60,21 @@ export class Dashboard {
       );
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  private async loadPopularCards() {
+    try {
+      const cards = await this.scryfall.getPopularCards(POPULAR_CARD_COUNT);
+      this.popularCards.set(cards);
+      if (cards.length > 1) {
+        const intervalId = setInterval(() => {
+          this.popularIndex.update((i) => (i + 1) % cards.length);
+        }, POPULAR_CARD_ROTATION_MS);
+        this.destroyRef.onDestroy(() => clearInterval(intervalId));
+      }
+    } catch {
+      // Purely decorative - the rest of the dashboard works fine without it.
     }
   }
 }

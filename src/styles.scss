@@ -2,7 +2,14 @@
 
 :root {
   --color-bg: #17110b;
-  --color-surface: #241a12;
+  // A subtle repeating seal motif (diamond + 4 compass ticks, matching the
+  // logo) baked into --color-surface itself so every existing
+  // `background: var(--color-surface)` declaration gets the texture for
+  // free, at no per-component cost. Opacity is baked into the SVG's own
+  // stroke color (0.11 here) rather than a separate `opacity`, so it never
+  // fades the panel's actual content that sits on top of it.
+  --color-surface: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(201,162,74,0.11)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E")
+    0 0 / 80px 80px repeat, #241a12;
   --color-surface-alt: #3c1712;
   --color-border: #55231b;
   --color-text: #ecdcb8;
@@ -10,6 +17,9 @@
   --color-accent: #c9a24a;
   --color-accent-hover: #e8cd7a;
   --color-danger: #a34a34;
+
+  // Same seal motif, fainter (0.06), for the page background itself.
+  --pattern-seal-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(201,162,74,0.06)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E");
 
   --font-body: 'EB Garamond', serif;
   --font-heading: 'Cinzel', serif;
@@ -31,7 +41,7 @@ body {
 
 body {
   font-family: var(--font-body);
-  background: var(--color-bg);
+  background: var(--pattern-seal-faint) 0 0 / 80px 80px repeat, var(--color-bg);
   color: var(--color-text);
 }
 

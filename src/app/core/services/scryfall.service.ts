@@ -70,6 +70,17 @@ export class ScryfallService {
     return this.runSearch(`!"${escaped}"`, 'order=released&dir=desc&unique=prints');
   }
 
+  private popularCardsCache: Promise<ScryfallCard[]> | null = null;
+
+  /** Most-played cards overall, via Scryfall's `edhrec_rank` sort (rank 1 = most popular). */
+  async getPopularCards(limit: number): Promise<ScryfallCard[]> {
+    if (!this.popularCardsCache) {
+      this.popularCardsCache = this.runSearch('game:paper -t:basic', 'order=edhrec&unique=cards');
+    }
+    const cards = await this.popularCardsCache;
+    return cards.slice(0, limit);
+  }
+
   private async runSearch(scryfallQuery: string, params: string): Promise<ScryfallCard[]> {
     const url = `${SEARCH_ENDPOINT}?q=${encodeURIComponent(scryfallQuery)}&${params}`;
     const response = await fetch(url);

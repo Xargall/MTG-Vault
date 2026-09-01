@@ -4,6 +4,7 @@
 
 h1 {
   margin: 0 0 var(--spacing-lg);
+  text-align: center;
 }
 
 .state-message {
@@ -174,4 +175,45 @@ h1 {
   font-weight: 700;
   color: var(--color-text);
   text-align: center;
+}
+
+.popular-card {
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.popular-image {
+  width: 100%;
+  border-radius: 8px;
+  border: 2px solid var(--color-accent);
+  aspect-ratio: 5 / 7;
+  object-fit: cover;
+}
+
+.popular-placeholder {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: 8px;
+  border: 2px solid var(--color-accent);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-md);
+}
+
+.popular-name {
+  margin: var(--spacing-sm) 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }

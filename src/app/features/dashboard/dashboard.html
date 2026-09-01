@@ -16,6 +16,22 @@
         <app-donut-chart [data]="colorDistribution()" />
       </section>
 
+      @if (currentPopularCard(); as card) {
+        <section class="overview-card popular-card">
+          <span class="corner corner--tl"></span>
+          <span class="corner corner--tr"></span>
+          <span class="corner corner--bl"></span>
+          <span class="corner corner--br"></span>
+          <h2>Beliebte Karten</h2>
+          @if (getCardImageUrl(card); as imageUrl) {
+            <img class="popular-image" [src]="imageUrl" [alt]="card.name" />
+          } @else {
+            <div class="popular-placeholder">{{ card.name }}</div>
+          }
+          <p class="popular-name">{{ card.name }}</p>
+        </section>
+      }
+
       <section class="overview-card price-card">
         <span class="corner corner--tl"></span>
         <span class="corner corner--tr"></span>

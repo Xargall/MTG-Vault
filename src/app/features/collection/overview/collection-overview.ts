@@ -35,7 +35,6 @@ export class CollectionOverview {
   protected readonly selectedEntry = signal<CollectionEntry | null>(null);
 
   protected readonly hasAnyCards = computed(() => this.entries().length > 0);
-  protected readonly manaCurve = computed<BarChartDatum[]>(() => getManaCurve(this.entries()));
 
   protected readonly filteredEntries = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
@@ -47,6 +46,8 @@ export class CollectionOverview {
       return matchesQuery && matchesCategory;
     });
   });
+
+  protected readonly manaCurve = computed<BarChartDatum[]>(() => getManaCurve(this.filteredEntries()));
 
   constructor() {
     const colorParam = this.route.snapshot.queryParamMap.get('color') as ColorCategory | null;
