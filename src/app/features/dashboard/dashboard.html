@@ -8,11 +8,19 @@
   } @else if (hasCards()) {
     <div class="top-row">
       <section class="overview-card">
+        <span class="corner corner--tl"></span>
+        <span class="corner corner--tr"></span>
+        <span class="corner corner--bl"></span>
+        <span class="corner corner--br"></span>
         <h2>Farbverteilung</h2>
         <app-donut-chart [data]="colorDistribution()" />
       </section>
 
       <section class="overview-card price-card">
+        <span class="corner corner--tl"></span>
+        <span class="corner corner--tr"></span>
+        <span class="corner corner--bl"></span>
+        <span class="corner corner--br"></span>
         <h2>Preisverteilung</h2>
         <p class="total-value">{{ totalValue() | number: '1.2-2' }} €</p>
         <app-bar-chart [data]="priceDistribution()" />

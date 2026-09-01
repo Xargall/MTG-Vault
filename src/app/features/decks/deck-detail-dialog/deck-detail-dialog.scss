@@ -28,7 +28,8 @@
   background-size: cover;
   background-position: center 20%;
   background-color: var(--color-surface-alt);
-  border-radius: var(--radius) var(--radius) 0 0;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 2px solid var(--color-accent);
 }
 
 .hero-overlay {
