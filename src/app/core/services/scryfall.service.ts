@@ -8,6 +8,7 @@ export interface ScryfallCardFace {
 export interface ScryfallCard {
   id: string;
   name: string;
+  type_line: string;
   cmc: number;
   color_identity: string[];
   mana_cost?: string;

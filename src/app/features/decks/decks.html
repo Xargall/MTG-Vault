@@ -3,6 +3,10 @@
 
   <app-deck-banner [images]="bannerImages()" (bannerClick)="showBrowseDialog.set(true)" />
 
+  <button type="button" class="commander-recs-button" (click)="showCommanderRecs.set(true)">
+    Commander-Empfehlungen aus deiner Sammlung
+  </button>
+
   @if (recommendations().length > 0) {
     <section class="recommendations">
       <h2>Fast komplett</h2>
@@ -99,4 +103,8 @@
     (close)="selectedDeck.set(null)"
     (deleted)="onDeckDeleted()"
   />
+}
+
+@if (showCommanderRecs()) {
+  <app-commander-recommendations-dialog (close)="showCommanderRecs.set(false)" />
 }

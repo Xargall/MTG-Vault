@@ -7,6 +7,7 @@ import { CollectionEntry, CollectionService } from '../collection/collection.ser
 import { UpsertWishlistInput, WishlistService } from '../wishlist/wishlist.service';
 import { DeckBanner } from './deck-banner/deck-banner';
 import { BrowseDecksDialog } from './browse-decks-dialog/browse-decks-dialog';
+import { CommanderRecommendationsDialog } from './commander-recommendations/commander-recommendations-dialog';
 import { DeckDetailDialog } from './deck-detail-dialog/deck-detail-dialog';
 import { buildOwnedMap, getDeckCardCount, getDeckMatch, getDeckShowcase, getPreconMatch } from './deck-stats';
 import { DeckEntry, DeckService } from './deck.service';
@@ -63,7 +64,7 @@ function pickBannerSample(list: MtgjsonDeckListEntry[], count: number): MtgjsonD
 
 @Component({
   selector: 'app-decks',
-  imports: [DeckBanner, BrowseDecksDialog, DeckDetailDialog],
+  imports: [DeckBanner, BrowseDecksDialog, DeckDetailDialog, CommanderRecommendationsDialog],
   templateUrl: './decks.html',
   styleUrl: './decks.scss',
 })
@@ -81,6 +82,7 @@ export class Decks {
   protected readonly collectionEntries = signal<CollectionEntry[]>([]);
   protected readonly bannerImages = signal<string[]>([]);
   protected readonly showBrowseDialog = signal(false);
+  protected readonly showCommanderRecs = signal(false);
   protected readonly selectedDeck = signal<DeckEntry | null>(null);
 
   private readonly allPreconDecks = signal<MtgjsonDeckListEntry[]>([]);
