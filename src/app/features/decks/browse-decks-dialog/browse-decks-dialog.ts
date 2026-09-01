@@ -90,9 +90,20 @@ export class BrowseDecksDialog {
 
   async selectDeck(deck: MtgjsonDeckListEntry) {
     this.selectedDeck.set(deck);
-    this.loadingDetail.set(true);
     this.detailError.set(null);
     this.submitError.set(null);
+
+    const indexed = this.deckCardIndex.getEntry(deck.fileName);
+    if (indexed) {
+      this.detail.set({
+        heroScryfallId: indexed.heroScryfallId,
+        cards: indexed.cards,
+        skippedCount: indexed.skippedCount,
+      });
+      return;
+    }
+
+    this.loadingDetail.set(true);
     try {
       this.detail.set(await this.mtgjson.getDeckDetail(deck.fileName));
     } catch (error) {
@@ -115,7 +126,7 @@ export class BrowseDecksDialog {
     this.submitting.set(true);
     this.submitError.set(null);
     try {
-      await this.deckService.addPreconDeck(deck.name, deck.type, deck.releaseDate, detail);
+      await this.deckService.addPreconDeck(deck.name, deck.type, deck.releaseDate, deck.fileName, detail);
       this.added.emit();
       this.close.emit();
     } catch (error) {

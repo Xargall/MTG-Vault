@@ -19,6 +19,10 @@ export interface MtgjsonDeckDetail {
   skippedCount: number;
 }
 
+export interface MtgjsonDeckIndexData extends MtgjsonDeckDetail {
+  names: string[];
+}
+
 interface MtgjsonDeckCard {
   name: string;
   count: number;
@@ -98,12 +102,28 @@ export class MtgjsonService {
   }
 
   async getDeckDetail(fileName: string): Promise<MtgjsonDeckDetail> {
+    const { heroScryfallId, cards, skippedCount } = await this.getDeckIndexData(fileName);
+    return { heroScryfallId, cards, skippedCount };
+  }
+
+  /**
+   * One pass over a deck's full JSON that produces everything a caller might
+   * need from it: every card name (for text search), the resolved
+   * scryfallId+quantity list (for collection/wishlist sync and match %), and
+   * the hero card (commander, or the first mainboard card where there is
+   * none). Used both for on-demand single-deck lookups and for
+   * `DeckCardIndexService`'s background index, so the same downloaded file is
+   * never parsed twice for different subsets of this data.
+   */
+  async getDeckIndexData(fileName: string): Promise<MtgjsonDeckIndexData> {
     const deck = await this.getDeckJson(fileName);
 
+    const names = new Set<string>();
     const quantities = new Map<string, number>();
     let skippedCount = 0;
 
     for (const entry of [...deck.commander, ...deck.mainBoard]) {
+      names.add(entry.name);
       const scryfallId = entry.identifiers?.scryfallId;
       if (!scryfallId) {
         skippedCount += 1;
@@ -120,15 +140,6 @@ export class MtgjsonService {
       quantity,
     }));
 
-    return { heroScryfallId, cards, skippedCount };
-  }
-
-  async getDeckCardNames(fileName: string): Promise<string[]> {
-    const deck = await this.getDeckJson(fileName);
-    const names = new Set<string>();
-    for (const card of [...deck.commander, ...deck.mainBoard]) {
-      names.add(card.name);
-    }
-    return [...names];
+    return { names: [...names], heroScryfallId, cards, skippedCount };
   }
 }

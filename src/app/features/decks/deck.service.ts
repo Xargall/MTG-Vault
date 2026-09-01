@@ -12,6 +12,7 @@ export interface DeckRow {
   format: string | null;
   is_precon: boolean;
   release_date: string | null;
+  mtgjson_file_name: string | null;
   created_at: string;
 }
 
@@ -84,6 +85,7 @@ export class DeckService {
     name: string,
     mtgjsonType: string,
     releaseDate: string,
+    fileName: string,
     detail: MtgjsonDeckDetail,
   ): Promise<void> {
     const userId = this.supabase.session()?.user.id;
@@ -97,6 +99,7 @@ export class DeckService {
         format: mtgjsonType,
         is_precon: true,
         release_date: releaseDate,
+        mtgjson_file_name: fileName,
       })
       .select('id')
       .single<{ id: string }>();

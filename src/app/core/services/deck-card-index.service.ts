@@ -1,11 +1,18 @@
 import { Injectable, inject, signal } from '@angular/core';
 
-import { MtgjsonService } from './mtgjson.service';
+import { MtgjsonResolvedCard, MtgjsonService } from './mtgjson.service';
+
+export interface IndexedDeck {
+  names: string[];
+  heroScryfallId: string | null;
+  cards: MtgjsonResolvedCard[];
+  skippedCount: number;
+}
 
 const DB_NAME = 'mtg-vault';
-const DB_VERSION = 2;
-const STORE_NAMES = 'deck-card-names';
-const STORE_META = 'deck-card-names-meta';
+const DB_VERSION = 3;
+const STORE_DECKS = 'deck-index';
+const STORE_META = 'deck-index-meta';
 const BATCH_SIZE = 8;
 
 // Only types where the fetch cost (one full deck JSON per entry) stays small
@@ -19,7 +26,7 @@ function openDb(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAMES)) db.createObjectStore(STORE_NAMES);
+      if (!db.objectStoreNames.contains(STORE_DECKS)) db.createObjectStore(STORE_DECKS);
       if (!db.objectStoreNames.contains(STORE_META)) db.createObjectStore(STORE_META);
     };
     request.onsuccess = () => resolve(request.result);
@@ -62,21 +69,21 @@ function idbPut(db: IDBDatabase, store: string, key: IDBValidKey, value: unknown
 }
 
 /**
- * Indexes every card name (commander + mainboard) in each Commander Deck /
- * Starter Kit precon, so the deck browser can be searched by any character or
- * card it contains, not just the retail product title (deck product names -
- * "Limit Break (FINAL FANTASY VII)" - rarely match what a player actually
- * remembers, e.g. "Sephiroth"). Building the index means downloading one full
- * deck JSON per entry anyway (~200 requests) to know its contents, so
- * indexing every card name in that same file costs no extra network bytes.
- * It happens once in the background and the result is cached permanently in
- * IndexedDB - later sessions load instantly.
+ * Indexes every card name and the resolved scryfallId+quantity list
+ * (commander + mainboard) for each Commander Deck / Starter Kit precon, so
+ * the deck browser can be searched by any character or card it contains
+ * (not just the retail product title), and so a "which precons am I already
+ * mostly done with" scan can run entirely offline against this cache -
+ * building it means downloading one full deck JSON per entry anyway
+ * (~200 requests), so extracting everything from that same file costs no
+ * extra network bytes. It happens once in the background and the result is
+ * cached permanently in IndexedDB - later sessions load instantly.
  */
 @Injectable({ providedIn: 'root' })
 export class DeckCardIndexService {
   private readonly mtgjson = inject(MtgjsonService);
 
-  private readonly entries = new Map<string, string[]>();
+  private readonly entries = new Map<string, IndexedDeck>();
   readonly ready = signal(false);
   readonly indexedCount = signal(0);
   readonly totalCount = signal(0);
@@ -84,8 +91,12 @@ export class DeckCardIndexService {
   private buildPromise: Promise<void> | null = null;
 
   matches(fileName: string, queryLower: string): boolean {
-    const names = this.entries.get(fileName);
-    return names ? names.some((name) => name.includes(queryLower)) : false;
+    const entry = this.entries.get(fileName);
+    return entry ? entry.names.some((name) => name.includes(queryLower)) : false;
+  }
+
+  getEntry(fileName: string): IndexedDeck | undefined {
+    return this.entries.get(fileName);
   }
 
   ensureBuilding(): void {
@@ -104,9 +115,9 @@ export class DeckCardIndexService {
     }
 
     if (db) {
-      const cached = await idbGetAll(db, STORE_NAMES);
+      const cached = await idbGetAll(db, STORE_DECKS);
       for (const [key, value] of cached) {
-        this.entries.set(String(key), value as string[]);
+        this.entries.set(String(key), value as IndexedDeck);
       }
       this.indexedCount.set(this.entries.size);
 
@@ -128,10 +139,10 @@ export class DeckCardIndexService {
       await Promise.all(
         batch.map(async (deck) => {
           try {
-            const names = await this.mtgjson.getDeckCardNames(deck.fileName);
-            const lower = names.map((name) => name.toLowerCase());
-            this.entries.set(deck.fileName, lower);
-            if (db) await idbPut(db, STORE_NAMES, deck.fileName, lower);
+            const data = await this.mtgjson.getDeckIndexData(deck.fileName);
+            const indexed: IndexedDeck = { ...data, names: data.names.map((name) => name.toLowerCase()) };
+            this.entries.set(deck.fileName, indexed);
+            if (db) await idbPut(db, STORE_DECKS, deck.fileName, indexed);
           } catch {
             // Skip decks that fail to load - don't block the rest of the index.
           }

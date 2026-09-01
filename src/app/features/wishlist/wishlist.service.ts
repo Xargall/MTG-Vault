@@ -48,6 +48,16 @@ export class WishlistService {
       .filter((entry): entry is WishlistEntry => entry !== null);
   }
 
+  async getScryfallIds(): Promise<Set<string>> {
+    const { data, error } = await this.supabase.client
+      .from('wishlist')
+      .select('scryfall_id')
+      .returns<Array<{ scryfall_id: string }>>();
+
+    if (error) throw error;
+    return new Set((data ?? []).map((row) => row.scryfall_id));
+  }
+
   async upsertEntry({ scryfallId, priority, notes }: UpsertWishlistInput): Promise<void> {
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Nicht eingeloggt.');
@@ -59,6 +69,10 @@ export class WishlistService {
         { onConflict: 'user_id,scryfall_id' },
       );
     if (error) throw error;
+  }
+
+  async upsertMany(inputs: UpsertWishlistInput[]): Promise<void> {
+    await Promise.all(inputs.map((input) => this.upsertEntry(input)));
   }
 
   async removeEntry(id: string): Promise<void> {

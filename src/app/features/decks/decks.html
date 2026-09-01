@@ -3,6 +3,58 @@
 
   <app-deck-banner [images]="bannerImages()" (bannerClick)="showBrowseDialog.set(true)" />
 
+  @if (recommendations().length > 0) {
+    <section class="recommendations">
+      <h2>Fast komplett</h2>
+      <p class="section-hint">Precon-Decks, von denen du bereits mindestens 75&nbsp;% der Karten besitzt.</p>
+
+      @if (recommendationError()) {
+        <p class="state-message error">{{ recommendationError() }}</p>
+      }
+
+      <div class="recommendation-row">
+        @for (rec of recommendations(); track rec.deck.fileName) {
+          <div class="recommendation-card">
+            @if (heroImageUrl(rec.heroScryfallId); as imageUrl) {
+              <img class="showcase-image" [src]="imageUrl" [alt]="rec.deck.name" />
+            } @else {
+              <div class="showcase-placeholder">{{ rec.deck.name }}</div>
+            }
+
+            <p class="deck-name">{{ rec.deck.name }}</p>
+            <p class="deck-format">{{ rec.deck.type }} · {{ rec.deck.releaseDate.slice(0, 4) }}</p>
+
+            <span class="match-badge" [class.is-complete]="rec.matchPercent === 100">
+              {{ rec.matchPercent }}% in Sammlung
+            </span>
+
+            <div class="recommendation-actions">
+              <button
+                type="button"
+                class="add-recommendation-button"
+                [disabled]="addingFileName() === rec.deck.fileName"
+                (click)="addRecommendation(rec)"
+              >
+                Zu meinen Decks hinzufügen
+              </button>
+
+              @if (rec.missingScryfallIds.length > 0) {
+                <button
+                  type="button"
+                  class="wishlist-link"
+                  [disabled]="wishlistingFileName() === rec.deck.fileName"
+                  (click)="addRecommendationMissingToWishlist(rec)"
+                >
+                  {{ rec.missingScryfallIds.length }} fehlende Karten auf Wunschliste
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  }
+
   @if (loading()) {
     <p class="state-message">Lade Decks…</p>
   } @else if (errorMessage()) {
@@ -43,6 +95,7 @@
 @if (selectedDeck(); as deck) {
   <app-deck-detail-dialog
     [entry]="deck"
+    [collectionEntries]="collectionEntries()"
     (close)="selectedDeck.set(null)"
     (deleted)="onDeckDeleted()"
   />

@@ -3,7 +3,9 @@ import { Component, computed, inject, input, output, signal } from '@angular/cor
 
 import { getCardImageUrl } from '../../../core/services/scryfall.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
-import { getDeckCardCount, getDeckShowcase, getDeckTotalValue } from '../deck-stats';
+import { CollectionEntry } from '../../collection/collection.service';
+import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
+import { buildOwnedMap, getDeckCardCount, getDeckShowcase, getDeckTotalValue } from '../deck-stats';
 import { DeckCardEntry, DeckEntry, DeckService } from '../deck.service';
 
 @Component({
@@ -14,8 +16,10 @@ import { DeckCardEntry, DeckEntry, DeckService } from '../deck.service';
 })
 export class DeckDetailDialog {
   private readonly deckService = inject(DeckService);
+  private readonly wishlistService = inject(WishlistService);
 
   readonly entry = input.required<DeckEntry>();
+  readonly collectionEntries = input.required<CollectionEntry[]>();
   readonly close = output<void>();
   readonly deleted = output<void>();
 
@@ -36,9 +40,41 @@ export class DeckDetailDialog {
     [...this.entry().cards].sort((a, b) => a.card.name.localeCompare(b.card.name)),
   );
 
+  protected readonly missingCards = computed<DeckCardEntry[]>(() => {
+    const owned = buildOwnedMap(this.collectionEntries());
+    return this.entry().cards.filter(({ row }) => (owned.get(row.scryfall_id) ?? 0) < row.quantity);
+  });
+
   protected readonly confirmingDelete = signal(false);
   protected readonly deleting = signal(false);
   protected readonly deleteError = signal<string | null>(null);
+
+  protected readonly addingToWishlist = signal(false);
+  protected readonly wishlistAdded = signal(false);
+  protected readonly wishlistError = signal<string | null>(null);
+
+  async addMissingToWishlist() {
+    this.addingToWishlist.set(true);
+    this.wishlistError.set(null);
+    try {
+      const existing = await this.wishlistService.getScryfallIds();
+      const deckName = this.entry().deck.name;
+      const inputs: UpsertWishlistInput[] = this.missingCards()
+        .filter(({ row }) => !existing.has(row.scryfall_id))
+        .map(({ row }) => ({ scryfallId: row.scryfall_id, priority: 2, notes: `Für ${deckName}` }));
+
+      if (inputs.length > 0) {
+        await this.wishlistService.upsertMany(inputs);
+      }
+      this.wishlistAdded.set(true);
+    } catch (error) {
+      this.wishlistError.set(
+        error instanceof Error ? error.message : 'Wunschliste konnte nicht aktualisiert werden.',
+      );
+    } finally {
+      this.addingToWishlist.set(false);
+    }
+  }
 
   async confirmDelete() {
     this.deleting.set(true);

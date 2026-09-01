@@ -19,6 +19,87 @@ app-deck-banner {
   }
 }
 
+.recommendations {
+  margin-bottom: var(--spacing-lg);
+
+  h2 {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+  }
+}
+
+.section-hint {
+  margin: 0 0 var(--spacing-md);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.recommendation-row {
+  display: flex;
+  gap: var(--spacing-md);
+  overflow-x: auto;
+  padding-bottom: var(--spacing-sm);
+}
+
+.recommendation-card {
+  flex: 0 0 200px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.recommendation-actions {
+  margin-top: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.add-recommendation-button {
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: none;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--color-accent-hover);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.wishlist-link {
+  padding: 4px;
+  border-radius: var(--radius);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--color-accent);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
 .deck-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

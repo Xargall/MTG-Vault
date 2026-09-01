@@ -23,6 +23,26 @@
     </div>
 
     <div class="card-list">
+      @if (missingCards().length > 0) {
+        <div class="wishlist-row">
+          <span>{{ missingCards().length }} Karten fehlen noch in der Sammlung.</span>
+          @if (wishlistError()) {
+            <span class="state-message error">{{ wishlistError() }}</span>
+          } @else if (wishlistAdded()) {
+            <span class="wishlist-confirm">Auf der Wunschliste ✓</span>
+          } @else {
+            <button
+              type="button"
+              class="wishlist-button"
+              [disabled]="addingToWishlist()"
+              (click)="addMissingToWishlist()"
+            >
+              Fehlende Karten auf Wunschliste
+            </button>
+          }
+        </div>
+      }
+
       <h3>Enthaltene Karten</h3>
       <div class="results-grid">
         @for (cardEntry of sortedCards(); track cardEntry.row.id) {
