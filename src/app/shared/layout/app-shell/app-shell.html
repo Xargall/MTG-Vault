@@ -56,7 +56,7 @@
     <nav class="shell-nav">
       <a routerLink="/">{{ 'nav.overview' | translate }}</a>
       <a routerLink="/collection">{{ 'nav.collection' | translate }}</a>
-      @if (gameService.currentSlug() === 'mtg') {
+      @if (gameService.decksSupported()) {
         <a routerLink="/decks">{{ 'nav.decks' | translate }}</a>
       }
       <a routerLink="/wishlist">{{ 'nav.wishlist' | translate }}</a>

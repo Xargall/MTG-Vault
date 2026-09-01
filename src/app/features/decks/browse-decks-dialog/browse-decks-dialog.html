@@ -25,7 +25,7 @@
         <p class="state-message">
           {{ 'browseDecks.searchHint' | translate }}
         </p>
-        @if (!deckCardIndex.ready()) {
+        @if (!deckCardIndexActive().ready()) {
           <p class="state-message index-hint">
             {{ 'browseDecks.indexing' | translate: { progress: indexHintText() } }}
           </p>

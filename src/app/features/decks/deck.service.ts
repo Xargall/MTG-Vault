@@ -1,10 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 
 import { Card } from '../../core/models/card.model';
+import { PreconDetail } from '../../core/models/precon.model';
 import { GameService } from '../../core/services/game.service';
 import { SupabaseService } from '../../core/services/supabase.service';
 import { AddCardInput, CollectionService } from '../collection/collection.service';
-import { MtgjsonDeckDetail } from '../../core/services/mtgjson.service';
 
 export interface DeckRow {
   id: string;
@@ -90,10 +90,10 @@ export class DeckService {
 
   async addPreconDeck(
     name: string,
-    mtgjsonType: string,
+    type: string,
     releaseDate: string,
     fileName: string,
-    detail: MtgjsonDeckDetail,
+    detail: PreconDetail,
   ): Promise<void> {
     await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;
@@ -107,7 +107,7 @@ export class DeckService {
         user_id: userId,
         game_id: gameId,
         name,
-        format: mtgjsonType,
+        format: type,
         is_precon: true,
         release_date: releaseDate,
         mtgjson_file_name: fileName,
@@ -120,7 +120,7 @@ export class DeckService {
     const { error: cardsError } = await this.supabase.client.from('deck_cards').insert(
       detail.cards.map((card) => ({
         deck_id: deck.id,
-        card_id: card.scryfallId,
+        card_id: card.cardId,
         quantity: card.quantity,
       })),
     );
@@ -129,8 +129,8 @@ export class DeckService {
     const owned = await this.collectionService.getQuantitiesByCardId();
     const collectionInputs: AddCardInput[] = detail.cards
       .map((card) => ({
-        cardId: card.scryfallId,
-        quantity: card.quantity - (owned.get(card.scryfallId) ?? 0),
+        cardId: card.cardId,
+        quantity: card.quantity - (owned.get(card.cardId) ?? 0),
         foil: false,
         condition: 'NM',
       }))

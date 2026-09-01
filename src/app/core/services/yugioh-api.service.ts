@@ -32,6 +32,7 @@ interface YgoRawCard {
 }
 
 const CARD_INFO_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
+const ARCHETYPES_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/archetypes.php';
 
 @Injectable({ providedIn: 'root' })
 export class YugiohApiService implements CardApiService {
@@ -59,6 +60,30 @@ export class YugiohApiService implements CardApiService {
     // one canonical entry, so there's nothing meaningful to pick between.
     const raw = await this.fetchCardInfo({ name });
     return raw.length > 0 ? [this.toCard(raw[0])] : [];
+  }
+
+  private archetypesCache: Promise<string[]> | null = null;
+
+  /** All known archetype/theme names - used to power theme-based browsing (Yu-Gi-Oh has no community-decklist API to draw on). */
+  getArchetypes(): Promise<string[]> {
+    if (!this.archetypesCache) {
+      this.archetypesCache = this.fetchArchetypes();
+    }
+    return this.archetypesCache;
+  }
+
+  private async fetchArchetypes(): Promise<string[]> {
+    const response = await fetch(ARCHETYPES_ENDPOINT);
+    if (!response.ok) {
+      throw new Error(`Archetyp-Liste konnte nicht geladen werden (${response.status})`);
+    }
+    const body: Array<{ archetype_name: string }> = await response.json();
+    return body.map((entry) => entry.archetype_name).sort((a, b) => a.localeCompare(b));
+  }
+
+  async getCardsByArchetype(archetype: string): Promise<Card[]> {
+    const raw = await this.fetchCardInfo({ archetype });
+    return raw.map((card) => this.toCard(card));
   }
 
   private async fetchCardInfo(params: Record<string, string>): Promise<YgoRawCard[]> {

@@ -2,34 +2,25 @@ import { Injectable, inject, signal } from '@angular/core';
 
 import { PreconIndexData } from '../models/precon.model';
 import { idbGet, idbGetAll, idbPut, openIndexedDb } from './indexed-db.util';
-import { MtgPreconService } from './mtg-precon.service';
+import { YugiohPreconService } from './yugioh-precon.service';
 
-const DB_NAME = 'mtg-vault';
-const DB_VERSION = 3;
+const DB_NAME = 'tcg-collector-yugioh-precons';
+const DB_VERSION = 1;
 const STORE_DECKS = 'deck-index';
 const STORE_META = 'deck-index-meta';
 const BATCH_SIZE = 8;
 
-// Only types where the fetch cost (one full deck JSON per entry) stays small
-// enough to index eagerly in the background. Bigger buckets (Theme Deck, Intro
-// Pack, ...) are also less commonly searched for by a contained card/character
-// name, so they're left out to keep the one-time download bounded.
-const INDEXED_TYPES = ['Commander Deck', 'Starter Kit'];
-
 /**
- * Indexes every card name and the resolved card+quantity list (commander +
- * mainboard) for each Commander Deck / Starter Kit precon, so the deck
- * browser can be searched by any character or card it contains (not just
- * the retail product title), and so a "which precons am I already mostly
- * done with" scan can run entirely offline against this cache - building it
- * means downloading one full deck JSON per entry anyway (~200 requests), so
- * extracting everything from that same file costs no extra network bytes.
- * It happens once in the background and the result is cached permanently in
- * IndexedDB - later sessions load instantly.
+ * Same purpose as DeckCardIndexService (background full-text index over
+ * precon deck contents, cached in IndexedDB), but for Yu-Gi-Oh structure/
+ * starter decks. Kept as a separate small service rather than a shared
+ * parametrized one because the indexing policy genuinely differs: MTG only
+ * eagerly indexes 2 of its many precon types to bound cost; the whole
+ * Yu-Gi-Oh precon catalog (~85 decks) is cheap enough to index in full.
  */
 @Injectable({ providedIn: 'root' })
-export class DeckCardIndexService {
-  private readonly mtgPrecon = inject(MtgPreconService);
+export class YugiohPreconIndexService {
+  private readonly precon = inject(YugiohPreconService);
 
   private readonly entries = new Map<string, PreconIndexData>();
   readonly ready = signal(false);
@@ -76,10 +67,8 @@ export class DeckCardIndexService {
       }
     }
 
-    const list = await this.mtgPrecon.getDeckList();
-    const targets = list.filter(
-      (deck) => INDEXED_TYPES.includes(deck.type) && !this.entries.has(deck.fileName),
-    );
+    const list = await this.precon.getDeckList();
+    const targets = list.filter((deck) => !this.entries.has(deck.fileName));
     this.totalCount.set(this.entries.size + targets.length);
 
     for (let i = 0; i < targets.length; i += BATCH_SIZE) {
@@ -87,8 +76,11 @@ export class DeckCardIndexService {
       await Promise.all(
         batch.map(async (deck) => {
           try {
-            const data = await this.mtgPrecon.getDeckIndexData(deck.fileName);
-            const indexed: PreconIndexData = { ...data, names: data.names.map((name) => name.toLowerCase()) };
+            const data = await this.precon.getDeckIndexData(deck.fileName);
+            const indexed: PreconIndexData = {
+              ...data,
+              names: data.names.map((name) => name.toLowerCase()),
+            };
             this.entries.set(deck.fileName, indexed);
             if (db) await idbPut(db, STORE_DECKS, deck.fileName, indexed);
           } catch {

@@ -1,4 +1,4 @@
-import { MtgjsonResolvedCard } from '../../core/services/mtgjson.service';
+import { PreconResolvedCard } from '../../core/models/precon.model';
 import { CollectionEntry } from '../collection/collection.service';
 import { DeckCardEntry, DeckEntry } from './deck.service';
 
@@ -10,23 +10,23 @@ export function buildOwnedMap(collectionEntries: CollectionEntry[]): Map<string,
   return owned;
 }
 
-function matchPercent(required: Array<{ scryfallId: string; quantity: number }>, owned: Map<string, number>): number {
+function matchPercent(required: Array<{ cardId: string; quantity: number }>, owned: Map<string, number>): number {
   let needed = 0;
   let matched = 0;
-  for (const { scryfallId, quantity } of required) {
+  for (const { cardId, quantity } of required) {
     needed += quantity;
-    matched += Math.min(quantity, owned.get(scryfallId) ?? 0);
+    matched += Math.min(quantity, owned.get(cardId) ?? 0);
   }
   return needed > 0 ? Math.round((matched / needed) * 100) : 0;
 }
 
 export function getDeckMatch(deckEntry: DeckEntry, collectionEntries: CollectionEntry[]): number {
   const owned = buildOwnedMap(collectionEntries);
-  const required = deckEntry.cards.map(({ row }) => ({ scryfallId: row.card_id, quantity: row.quantity }));
+  const required = deckEntry.cards.map(({ row }) => ({ cardId: row.card_id, quantity: row.quantity }));
   return matchPercent(required, owned);
 }
 
-export function getPreconMatch(cards: MtgjsonResolvedCard[], owned: Map<string, number>): number {
+export function getPreconMatch(cards: PreconResolvedCard[], owned: Map<string, number>): number {
   return matchPercent(cards, owned);
 }
 

@@ -1,0 +1,83 @@
+<div class="backdrop" (click)="close.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <header class="dialog-header">
+      <h2>{{ 'archetypeBrowser.title' | translate }}</h2>
+      <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
+    </header>
+
+    <p class="hint">{{ 'archetypeBrowser.hint' | translate }}</p>
+
+    @if (!selectedArchetype()) {
+      <input
+        type="text"
+        class="search-input"
+        [placeholder]="'archetypeBrowser.searchPlaceholder' | translate"
+        [ngModel]="query()"
+        (ngModelChange)="query.set($event)"
+        autofocus
+      />
+
+      @if (loadingArchetypes()) {
+        <p class="state-message">{{ 'archetypeBrowser.loadingList' | translate }}</p>
+      } @else if (archetypesError()) {
+        <p class="state-message error">{{ archetypesError() }}</p>
+      } @else if (query().trim() && suggestions().length === 0) {
+        <p class="state-message">{{ 'archetypeBrowser.noArchetypesFound' | translate }}</p>
+      } @else {
+        <ul class="results-list">
+          @for (name of suggestions(); track name) {
+            <li>
+              <button type="button" class="result-row" (click)="selectArchetype(name)">
+                <span class="result-name">{{ name }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    } @else {
+      <div class="detail-view">
+        <button type="button" class="back-link" (click)="backToSearch()">
+          {{ 'archetypeBrowser.backToSearch' | translate }}
+        </button>
+
+        <h3>{{ selectedArchetype() }}</h3>
+
+        @if (loadingCards()) {
+          <p class="state-message">{{ 'archetypeBrowser.loadingCards' | translate }}</p>
+        } @else if (cardsError()) {
+          <p class="state-message error">{{ cardsError() }}</p>
+        } @else {
+          <p class="card-count">{{ 'archetypeBrowser.cardsCount' | translate: { count: cards().length } }}</p>
+
+          <div class="card-grid">
+            @for (card of cards(); track card.id) {
+              <div class="card-item" [class.is-owned]="ownedIds().has(card.id)">
+                <app-card-tile [card]="card" />
+                @if (ownedIds().has(card.id)) {
+                  <span class="owned-badge">{{ 'archetypeBrowser.ownedTag' | translate }}</span>
+                }
+              </div>
+            }
+          </div>
+
+          @if (wishlistError()) {
+            <p class="state-message error">{{ wishlistError() }}</p>
+          } @else if (wishlistAdded()) {
+            <p class="state-message">{{ 'archetypeBrowser.wishlistAdded' | translate }}</p>
+          }
+
+          @if (missingCount() > 0) {
+            <button
+              type="button"
+              class="submit-button"
+              [disabled]="wishlisting()"
+              (click)="addMissingToWishlist()"
+            >
+              {{ 'archetypeBrowser.addMissingButton' | translate: { count: missingCount() } }}
+            </button>
+          }
+        }
+      </div>
+    }
+  </div>
+</div>

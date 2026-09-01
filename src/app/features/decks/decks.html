@@ -3,9 +3,15 @@
 
   <app-deck-banner [images]="bannerImages()" (bannerClick)="showBrowseDialog.set(true)" />
 
-  <button type="button" class="commander-recs-button" (click)="showCommanderRecs.set(true)">
-    {{ 'decks.commanderRecsButton' | translate }}
-  </button>
+  @if (gameService.currentSlug() === 'mtg') {
+    <button type="button" class="commander-recs-button" (click)="showCommanderRecs.set(true)">
+      {{ 'decks.commanderRecsButton' | translate }}
+    </button>
+  } @else if (gameService.currentSlug() === 'yugioh') {
+    <button type="button" class="commander-recs-button" (click)="showArchetypeBrowser.set(true)">
+      {{ 'archetypeBrowser.openButton' | translate }}
+    </button>
+  }
 
   @if (recommendations().length > 0) {
     <section class="recommendations">
@@ -19,7 +25,7 @@
       <div class="recommendation-row">
         @for (rec of recommendations(); track rec.deck.fileName) {
           <div class="recommendation-card">
-            @if (heroImageUrl(rec.heroScryfallId); as imageUrl) {
+            @if (rec.deck.bannerImageUrl ?? heroImageUrl(rec.heroCardId); as imageUrl) {
               <img class="showcase-image" [src]="imageUrl" [alt]="rec.deck.name" />
             } @else {
               <div class="showcase-placeholder">{{ rec.deck.name }}</div>
@@ -42,14 +48,14 @@
                 {{ 'decks.addToMyDecks' | translate }}
               </button>
 
-              @if (rec.missingScryfallIds.length > 0) {
+              @if (rec.missingCardIds.length > 0) {
                 <button
                   type="button"
                   class="wishlist-link"
                   [disabled]="wishlistingFileName() === rec.deck.fileName"
                   (click)="addRecommendationMissingToWishlist(rec)"
                 >
-                  {{ 'decks.missingCardsToWishlist' | translate: { count: rec.missingScryfallIds.length } }}
+                  {{ 'decks.missingCardsToWishlist' | translate: { count: rec.missingCardIds.length } }}
                 </button>
               }
             </div>
@@ -107,4 +113,8 @@
 
 @if (showCommanderRecs()) {
   <app-commander-recommendations-dialog (close)="showCommanderRecs.set(false)" />
+}
+
+@if (showArchetypeBrowser()) {
+  <app-archetype-browser-dialog (close)="showArchetypeBrowser.set(false)" />
 }

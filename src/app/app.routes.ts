@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
-import { mtgOnlyGuard } from './core/guards/mtg-only.guard';
+import { decksSupportedGuard } from './core/guards/decks-supported.guard';
 
 export const routes: Routes = [
   {
@@ -36,7 +36,7 @@ export const routes: Routes = [
       },
       {
         path: 'decks',
-        canActivate: [mtgOnlyGuard],
+        canActivate: [decksSupportedGuard],
         loadComponent: () => import('./features/decks/decks').then((m) => m.Decks),
       },
       {

@@ -2,8 +2,10 @@ import { Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { PreconDetail, PreconListEntry } from '../../../core/models/precon.model';
 import { DeckCardIndexService } from '../../../core/services/deck-card-index.service';
-import { MtgjsonDeckDetail, MtgjsonDeckListEntry, MtgjsonService } from '../../../core/services/mtgjson.service';
+import { GameService } from '../../../core/services/game.service';
+import { YugiohPreconIndexService } from '../../../core/services/yugioh-precon-index.service';
 import { DeckService } from '../deck.service';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -15,22 +17,27 @@ const SEARCH_DEBOUNCE_MS = 300;
   styleUrl: './browse-decks-dialog.scss',
 })
 export class BrowseDecksDialog {
-  private readonly mtgjson = inject(MtgjsonService);
   private readonly deckService = inject(DeckService);
-  protected readonly deckCardIndex = inject(DeckCardIndexService);
+  private readonly gameService = inject(GameService);
+  private readonly deckCardIndex = inject(DeckCardIndexService);
+  private readonly yugiohPreconIndex = inject(YugiohPreconIndexService);
   private readonly translate = inject(TranslateService);
+
+  protected readonly deckCardIndexActive = computed(() =>
+    this.gameService.currentSlug() === 'yugioh' ? this.yugiohPreconIndex : this.deckCardIndex,
+  );
 
   readonly close = output<void>();
   readonly added = output<void>();
 
   protected readonly query = signal('');
   private readonly committedQuery = signal('');
-  protected readonly allDecks = signal<MtgjsonDeckListEntry[]>([]);
+  protected readonly allDecks = signal<PreconListEntry[]>([]);
   protected readonly loadingList = signal(true);
   protected readonly listError = signal<string | null>(null);
 
-  protected readonly selectedDeck = signal<MtgjsonDeckListEntry | null>(null);
-  protected readonly detail = signal<MtgjsonDeckDetail | null>(null);
+  protected readonly selectedDeck = signal<PreconListEntry | null>(null);
+  protected readonly detail = signal<PreconDetail | null>(null);
   protected readonly loadingDetail = signal(false);
   protected readonly detailError = signal<string | null>(null);
 
@@ -43,18 +50,19 @@ export class BrowseDecksDialog {
     const trimmed = this.committedQuery().trim().toLowerCase();
     if (!trimmed) return [];
 
-    this.deckCardIndex.indexedCount(); // re-run as the background index grows
+    const index = this.deckCardIndexActive();
+    index.indexedCount(); // re-run as the background index grows
 
-    const prefixMatches: MtgjsonDeckListEntry[] = [];
-    const containsMatches: MtgjsonDeckListEntry[] = [];
-    const cardMatches: MtgjsonDeckListEntry[] = [];
+    const prefixMatches: PreconListEntry[] = [];
+    const containsMatches: PreconListEntry[] = [];
+    const cardMatches: PreconListEntry[] = [];
     for (const deck of this.allDecks()) {
       const name = deck.name.toLowerCase();
       if (name.startsWith(trimmed)) {
         prefixMatches.push(deck);
       } else if (name.includes(trimmed)) {
         containsMatches.push(deck);
-      } else if (this.deckCardIndex.matches(deck.fileName, trimmed)) {
+      } else if (index.matches(deck.fileName, trimmed)) {
         cardMatches.push(deck);
       }
     }
@@ -62,21 +70,28 @@ export class BrowseDecksDialog {
   });
 
   protected readonly indexHintText = computed(() => {
-    const indexed = this.deckCardIndex.indexedCount();
-    const total = this.deckCardIndex.totalCount();
+    const index = this.deckCardIndexActive();
+    const indexed = index.indexedCount();
+    const total = index.totalCount();
     return total > 0 ? `${indexed} / ${total}` : `${indexed}`;
   });
 
   constructor() {
     this.loadList();
-    this.deckCardIndex.ensureBuilding();
+    this.deckCardIndexActive().ensureBuilding();
   }
 
   private async loadList() {
+    const precon = this.gameService.precon();
+    if (!precon) {
+      this.allDecks.set([]);
+      this.loadingList.set(false);
+      return;
+    }
     this.loadingList.set(true);
     this.listError.set(null);
     try {
-      this.allDecks.set(await this.mtgjson.getDeckList());
+      this.allDecks.set(await precon.getDeckList());
     } catch (error) {
       this.listError.set(error instanceof Error ? error.message : this.translate.instant('browseDecks.listFailed'));
     } finally {
@@ -90,24 +105,27 @@ export class BrowseDecksDialog {
     this.debounceHandle = setTimeout(() => this.committedQuery.set(value), SEARCH_DEBOUNCE_MS);
   }
 
-  async selectDeck(deck: MtgjsonDeckListEntry) {
+  async selectDeck(deck: PreconListEntry) {
     this.selectedDeck.set(deck);
     this.detailError.set(null);
     this.submitError.set(null);
 
-    const indexed = this.deckCardIndex.getEntry(deck.fileName);
+    const indexed = this.deckCardIndexActive().getEntry(deck.fileName);
     if (indexed) {
       this.detail.set({
-        heroScryfallId: indexed.heroScryfallId,
+        heroCardId: indexed.heroCardId,
         cards: indexed.cards,
         skippedCount: indexed.skippedCount,
       });
       return;
     }
 
+    const precon = this.gameService.precon();
+    if (!precon) return;
+
     this.loadingDetail.set(true);
     try {
-      this.detail.set(await this.mtgjson.getDeckDetail(deck.fileName));
+      this.detail.set(await precon.getDeckDetail(deck.fileName));
     } catch (error) {
       this.detailError.set(error instanceof Error ? error.message : this.translate.instant('browseDecks.detailFailed'));
     } finally {
