@@ -30,6 +30,17 @@
   gap: var(--spacing-sm);
 }
 
+@media (max-width: 480px) {
+  .shell-brand,
+  .shell-controls {
+    flex: 1 1 100%;
+  }
+
+  .shell-controls {
+    justify-content: space-between;
+  }
+}
+
 .corner-flourish {
   position: absolute;
   top: 0;

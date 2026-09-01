@@ -9,6 +9,16 @@
   gap: var(--spacing-lg);
 }
 
+@media (max-width: 480px) {
+  .donut-chart {
+    flex-direction: column;
+  }
+
+  .legend {
+    flex: none;
+  }
+}
+
 .ring {
   width: 180px;
   height: 180px;
