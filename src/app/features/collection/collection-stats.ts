@@ -11,14 +11,18 @@ export interface ColorCategorySummary {
 
 export type ColorCategory = 'W' | 'U' | 'B' | 'R' | 'G' | 'M' | 'C';
 
+// `label` holds an i18n key (rendered via the `translate` pipe wherever it's
+// shown), not literal text - so this data can flow straight into chart
+// components (which just interpolate `.label`) without threading a
+// translate function through every stats function.
 export const COLOR_CATEGORIES: Array<{ key: ColorCategory; label: string; color: string }> = [
-  { key: 'U', label: 'Blau', color: '#3987e5' },
-  { key: 'M', label: 'Mehrfarbig', color: '#d95926' },
-  { key: 'C', label: 'Farblos', color: '#199e70' },
-  { key: 'W', label: 'Weiß', color: '#c98500' },
-  { key: 'G', label: 'Grün', color: '#008300' },
-  { key: 'B', label: 'Schwarz', color: '#9085e9' },
-  { key: 'R', label: 'Rot', color: '#e66767' },
+  { key: 'U', label: 'colors.blue', color: '#3987e5' },
+  { key: 'M', label: 'colors.multicolor', color: '#d95926' },
+  { key: 'C', label: 'colors.colorless', color: '#199e70' },
+  { key: 'W', label: 'colors.white', color: '#c98500' },
+  { key: 'G', label: 'colors.green', color: '#008300' },
+  { key: 'B', label: 'colors.black', color: '#9085e9' },
+  { key: 'R', label: 'colors.red', color: '#e66767' },
 ];
 
 const MANA_CURVE_COLOR = '#3987e5';

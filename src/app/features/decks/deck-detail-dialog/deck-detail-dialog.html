@@ -13,7 +13,7 @@
             @if (year(); as y) {
               <span class="meta-badge">{{ y }}</span>
             }
-            <span class="meta-badge">{{ cardCount() }} Karten</span>
+            <span class="meta-badge">{{ 'decks.cardsCount' | translate: { count: cardCount() } }}</span>
             @if (totalValue() > 0) {
               <span class="meta-badge">{{ totalValue() | number: '1.2-2' }} €</span>
             }
@@ -25,11 +25,11 @@
     <div class="card-list">
       @if (missingCards().length > 0) {
         <div class="wishlist-row">
-          <span>{{ missingCards().length }} Karten fehlen noch in der Sammlung.</span>
+          <span>{{ 'deckDetail.missingCards' | translate: { count: missingCards().length } }}</span>
           @if (wishlistError()) {
             <span class="state-message error">{{ wishlistError() }}</span>
           } @else if (wishlistAdded()) {
-            <span class="wishlist-confirm">Auf der Wunschliste ✓</span>
+            <span class="wishlist-confirm">{{ 'deckDetail.onWishlist' | translate }}</span>
           } @else {
             <button
               type="button"
@@ -37,13 +37,13 @@
               [disabled]="addingToWishlist()"
               (click)="addMissingToWishlist()"
             >
-              Fehlende Karten auf Wunschliste
+              {{ 'deckDetail.wishlistButton' | translate }}
             </button>
           }
         </div>
       }
 
-      <h3>Enthaltene Karten</h3>
+      <h3>{{ 'deckDetail.containedCards' | translate }}</h3>
       <div class="results-grid">
         @for (cardEntry of sortedCards(); track cardEntry.row.id) {
           <app-card-tile [card]="cardEntry.card" [quantity]="cardEntry.row.quantity" />
@@ -57,15 +57,17 @@
 
         @if (!confirmingDelete()) {
           <button type="button" class="delete-link" (click)="confirmingDelete.set(true)">
-            Deck entfernen
+            {{ 'deckDetail.deleteLink' | translate }}
           </button>
         } @else {
           <div class="confirm-row">
-            <span>Deck wirklich entfernen? Die Karten bleiben in deiner Sammlung.</span>
+            <span>{{ 'deckDetail.confirmDeleteText' | translate }}</span>
             <button type="button" class="delete-button" [disabled]="deleting()" (click)="confirmDelete()">
-              Ja, entfernen
+              {{ 'deckDetail.confirmDeleteButton' | translate }}
             </button>
-            <button type="button" class="cancel-link" (click)="confirmingDelete.set(false)">Abbrechen</button>
+            <button type="button" class="cancel-link" (click)="confirmingDelete.set(false)">
+              {{ 'deckDetail.cancel' | translate }}
+            </button>
           </div>
         }
       </div>

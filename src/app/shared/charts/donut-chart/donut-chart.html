@@ -29,12 +29,12 @@
         (focus)="hoveredLabel.set(segment.label)"
         (blur)="hoveredLabel.set(null)"
       >
-        <title>{{ segment.label }}: {{ segment.value }} ({{ segment.percent }}%)</title>
+        <title>{{ segment.label | translate }}: {{ segment.value }} ({{ segment.percent }}%)</title>
       </circle>
     }
 
     <text class="total-value" x="85" y="80" text-anchor="middle">{{ total() }}</text>
-    <text class="total-label" x="85" y="100" text-anchor="middle">Karten</text>
+    <text class="total-label" x="85" y="100" text-anchor="middle">{{ 'common.cards' | translate }}</text>
   </svg>
 
   <ul class="legend">
@@ -46,7 +46,7 @@
         (mouseleave)="hoveredLabel.set(null)"
       >
         <span class="swatch" [style.background]="item.color"></span>
-        <span class="legend-label">{{ item.label }}</span>
+        <span class="legend-label">{{ item.label | translate }}</span>
         <span class="legend-value">{{ item.value }} · {{ item.percent }}%</span>
       </li>
     }

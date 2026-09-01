@@ -1,4 +1,5 @@
 import { Component, computed, input, signal } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
 
 import { BarChartDatum } from '../bar-chart/bar-chart';
 
@@ -15,6 +16,7 @@ const SEGMENT_GAP = 2;
 
 @Component({
   selector: 'app-donut-chart',
+  imports: [TranslatePipe],
   templateUrl: './donut-chart.html',
   styleUrl: './donut-chart.scss',
 })

@@ -1,5 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { TranslateService } from '@ngx-translate/core';
+
+const LANG_STORAGE_KEY = 'mtg-vault-lang';
 
 @Component({
   selector: 'app-root',
@@ -7,4 +10,12 @@ import { RouterOutlet } from '@angular/router';
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
-export class App {}
+export class App {
+  constructor() {
+    const translate = inject(TranslateService);
+    const saved = localStorage.getItem(LANG_STORAGE_KEY);
+    if (saved === 'de' || saved === 'en') {
+      translate.use(saved);
+    }
+  }
+}

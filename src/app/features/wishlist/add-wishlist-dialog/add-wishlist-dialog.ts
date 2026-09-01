@@ -1,5 +1,6 @@
 import { Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ScryfallCard, ScryfallService } from '../../../core/services/scryfall.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
@@ -9,13 +10,14 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 @Component({
   selector: 'app-add-wishlist-dialog',
-  imports: [FormsModule, CardTile],
+  imports: [FormsModule, CardTile, TranslatePipe],
   templateUrl: './add-wishlist-dialog.html',
   styleUrl: './add-wishlist-dialog.scss',
 })
 export class AddWishlistDialog {
   private readonly scryfall = inject(ScryfallService);
   private readonly wishlistService = inject(WishlistService);
+  private readonly translate = inject(TranslateService);
 
   readonly close = output<void>();
   readonly added = output<void>();
@@ -59,7 +61,7 @@ export class AddWishlistDialog {
     try {
       this.results.set(await this.scryfall.searchCards(query));
     } catch (error) {
-      this.searchError.set(error instanceof Error ? error.message : 'Suche fehlgeschlagen.');
+      this.searchError.set(error instanceof Error ? error.message : this.translate.instant('addCard.searchFailed'));
     } finally {
       this.searching.set(false);
     }
@@ -73,7 +75,7 @@ export class AddWishlistDialog {
       this.prints.set(await this.scryfall.getPrintsByName(card.name));
     } catch (error) {
       this.printsError.set(
-        error instanceof Error ? error.message : 'Drucke konnten nicht geladen werden.',
+        error instanceof Error ? error.message : this.translate.instant('addCard.printsFailed'),
       );
     } finally {
       this.loadingPrints.set(false);
@@ -112,7 +114,7 @@ export class AddWishlistDialog {
       this.close.emit();
     } catch (error) {
       this.submitError.set(
-        error instanceof Error ? error.message : 'Karte konnte nicht zur Wunschliste hinzugefügt werden.',
+        error instanceof Error ? error.message : this.translate.instant('addWishlist.addFailed'),
       );
     } finally {
       this.submitting.set(false);

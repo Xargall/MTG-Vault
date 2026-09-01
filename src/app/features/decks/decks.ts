@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { DeckCardIndexService } from '../../core/services/deck-card-index.service';
 import { getCardImageUrl, ScryfallService } from '../../core/services/scryfall.service';
@@ -64,7 +65,7 @@ function pickBannerSample(list: MtgjsonDeckListEntry[], count: number): MtgjsonD
 
 @Component({
   selector: 'app-decks',
-  imports: [DeckBanner, BrowseDecksDialog, DeckDetailDialog, CommanderRecommendationsDialog],
+  imports: [DeckBanner, BrowseDecksDialog, DeckDetailDialog, CommanderRecommendationsDialog, TranslatePipe],
   templateUrl: './decks.html',
   styleUrl: './decks.scss',
 })
@@ -75,6 +76,7 @@ export class Decks {
   private readonly mtgjson = inject(MtgjsonService);
   private readonly scryfall = inject(ScryfallService);
   private readonly deckCardIndex = inject(DeckCardIndexService);
+  private readonly translate = inject(TranslateService);
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
@@ -166,7 +168,7 @@ export class Decks {
       this.decks.set(decks);
       this.collectionEntries.set(collection);
     } catch (error) {
-      this.errorMessage.set(error instanceof Error ? error.message : 'Decks konnten nicht geladen werden.');
+      this.errorMessage.set(error instanceof Error ? error.message : this.translate.instant('decks.loadError'));
     } finally {
       this.loading.set(false);
     }
@@ -223,7 +225,7 @@ export class Decks {
     this.recommendationError.set(null);
     try {
       const indexed = this.deckCardIndex.getEntry(rec.deck.fileName);
-      if (!indexed) throw new Error('Deck konnte nicht geladen werden.');
+      if (!indexed) throw new Error(this.translate.instant('browseDecks.detailFailed'));
 
       await this.deckService.addPreconDeck(rec.deck.name, rec.deck.type, rec.deck.releaseDate, rec.deck.fileName, {
         heroScryfallId: indexed.heroScryfallId,
@@ -233,7 +235,7 @@ export class Decks {
       await this.loadDecks();
     } catch (error) {
       this.recommendationError.set(
-        error instanceof Error ? error.message : 'Deck konnte nicht hinzugefügt werden.',
+        error instanceof Error ? error.message : this.translate.instant('decks.addRecommendationFailed'),
       );
     } finally {
       this.addingFileName.set(null);
@@ -247,14 +249,14 @@ export class Decks {
       const existing = await this.wishlistService.getScryfallIds();
       const inputs: UpsertWishlistInput[] = rec.missingScryfallIds
         .filter((id) => !existing.has(id))
-        .map((scryfallId) => ({ scryfallId, priority: 2, notes: `Für ${rec.deck.name}` }));
+        .map((scryfallId) => ({ scryfallId, priority: 2, notes: this.translate.instant('common.forDeck', { name: rec.deck.name }) }));
 
       if (inputs.length > 0) {
         await this.wishlistService.upsertMany(inputs);
       }
     } catch (error) {
       this.recommendationError.set(
-        error instanceof Error ? error.message : 'Wunschliste konnte nicht aktualisiert werden.',
+        error instanceof Error ? error.message : this.translate.instant('decks.wishlistUpdateFailed'),
       );
     } finally {
       this.wishlistingFileName.set(null);

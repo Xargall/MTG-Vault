@@ -1,5 +1,6 @@
 import { Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { DeckCardIndexService } from '../../../core/services/deck-card-index.service';
 import { MtgjsonDeckDetail, MtgjsonDeckListEntry, MtgjsonService } from '../../../core/services/mtgjson.service';
@@ -9,7 +10,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 @Component({
   selector: 'app-browse-decks-dialog',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslatePipe],
   templateUrl: './browse-decks-dialog.html',
   styleUrl: './browse-decks-dialog.scss',
 })
@@ -17,6 +18,7 @@ export class BrowseDecksDialog {
   private readonly mtgjson = inject(MtgjsonService);
   private readonly deckService = inject(DeckService);
   protected readonly deckCardIndex = inject(DeckCardIndexService);
+  private readonly translate = inject(TranslateService);
 
   readonly close = output<void>();
   readonly added = output<void>();
@@ -76,7 +78,7 @@ export class BrowseDecksDialog {
     try {
       this.allDecks.set(await this.mtgjson.getDeckList());
     } catch (error) {
-      this.listError.set(error instanceof Error ? error.message : 'Deck-Liste konnte nicht geladen werden.');
+      this.listError.set(error instanceof Error ? error.message : this.translate.instant('browseDecks.listFailed'));
     } finally {
       this.loadingList.set(false);
     }
@@ -107,7 +109,7 @@ export class BrowseDecksDialog {
     try {
       this.detail.set(await this.mtgjson.getDeckDetail(deck.fileName));
     } catch (error) {
-      this.detailError.set(error instanceof Error ? error.message : 'Deck konnte nicht geladen werden.');
+      this.detailError.set(error instanceof Error ? error.message : this.translate.instant('browseDecks.detailFailed'));
     } finally {
       this.loadingDetail.set(false);
     }
@@ -130,7 +132,7 @@ export class BrowseDecksDialog {
       this.added.emit();
       this.close.emit();
     } catch (error) {
-      this.submitError.set(error instanceof Error ? error.message : 'Deck konnte nicht hinzugefügt werden.');
+      this.submitError.set(error instanceof Error ? error.message : this.translate.instant('browseDecks.addFailed'));
     } finally {
       this.submitting.set(false);
     }

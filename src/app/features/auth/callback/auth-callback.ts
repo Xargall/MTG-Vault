@@ -1,11 +1,13 @@
 import { Component, effect, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { TranslatePipe } from '@ngx-translate/core';
 
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-auth-callback',
-  template: `<p class="callback-message">Anmeldung wird abgeschlossen…</p>`,
+  imports: [TranslatePipe],
+  template: `<p class="callback-message">{{ 'auth.completing' | translate }}</p>`,
   styles: [
     `
       .callback-message {

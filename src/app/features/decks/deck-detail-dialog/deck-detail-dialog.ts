@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { getCardImageUrl } from '../../../core/services/scryfall.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
@@ -10,13 +11,14 @@ import { DeckCardEntry, DeckEntry, DeckService } from '../deck.service';
 
 @Component({
   selector: 'app-deck-detail-dialog',
-  imports: [CardTile, DecimalPipe],
+  imports: [CardTile, DecimalPipe, TranslatePipe],
   templateUrl: './deck-detail-dialog.html',
   styleUrl: './deck-detail-dialog.scss',
 })
 export class DeckDetailDialog {
   private readonly deckService = inject(DeckService);
   private readonly wishlistService = inject(WishlistService);
+  private readonly translate = inject(TranslateService);
 
   readonly entry = input.required<DeckEntry>();
   readonly collectionEntries = input.required<CollectionEntry[]>();
@@ -61,7 +63,7 @@ export class DeckDetailDialog {
       const deckName = this.entry().deck.name;
       const inputs: UpsertWishlistInput[] = this.missingCards()
         .filter(({ row }) => !existing.has(row.scryfall_id))
-        .map(({ row }) => ({ scryfallId: row.scryfall_id, priority: 2, notes: `Für ${deckName}` }));
+        .map(({ row }) => ({ scryfallId: row.scryfall_id, priority: 2, notes: this.translate.instant('common.forDeck', { name: deckName }) }));
 
       if (inputs.length > 0) {
         await this.wishlistService.upsertMany(inputs);
@@ -69,7 +71,7 @@ export class DeckDetailDialog {
       this.wishlistAdded.set(true);
     } catch (error) {
       this.wishlistError.set(
-        error instanceof Error ? error.message : 'Wunschliste konnte nicht aktualisiert werden.',
+        error instanceof Error ? error.message : this.translate.instant('deckDetail.wishlistFailed'),
       );
     } finally {
       this.addingToWishlist.set(false);
@@ -84,7 +86,7 @@ export class DeckDetailDialog {
       this.deleted.emit();
       this.close.emit();
     } catch (error) {
-      this.deleteError.set(error instanceof Error ? error.message : 'Deck konnte nicht entfernt werden.');
+      this.deleteError.set(error instanceof Error ? error.message : this.translate.instant('deckDetail.deleteFailed'));
     } finally {
       this.deleting.set(false);
     }

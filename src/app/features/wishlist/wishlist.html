@@ -1,19 +1,26 @@
 <div class="wishlist">
   <header class="page-header">
-    <h1>Wunschliste</h1>
-    <button type="button" class="add-button" (click)="showAddDialog.set(true)" aria-label="Karte hinzufügen">
+    <h1>{{ 'wishlist.title' | translate }}</h1>
+    <button
+      type="button"
+      class="add-button"
+      (click)="showAddDialog.set(true)"
+      [attr.aria-label]="'wishlist.addAria' | translate"
+    >
       +
     </button>
   </header>
 
   @if (loading()) {
-    <p class="state-message">Lade Wunschliste…</p>
+    <p class="state-message">{{ 'wishlist.loading' | translate }}</p>
   } @else if (errorMessage()) {
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else if (!hasEntries()) {
-    <p class="state-message">Noch keine Karten auf der Wunschliste.</p>
+    <p class="state-message">{{ 'wishlist.empty' | translate }}</p>
   } @else {
-    <p class="total-value">Gesamtwert: {{ totalValue() | number: '1.2-2' }} €</p>
+    <p class="total-value">
+      {{ 'wishlist.totalValue' | translate: { value: (totalValue() | number: '1.2-2') + ' €' } }}
+    </p>
 
     <ul class="entry-list">
       @for (entry of entries(); track entry.row.id) {
@@ -29,7 +36,7 @@
             <p class="entry-price">{{ getEntryPrice(entry) | number: '1.2-2' }} €</p>
             @if (entry.card.purchase_uris?.cardmarket; as url) {
               <a class="cardmarket-link" [href]="url" target="_blank" rel="noopener">
-                Auf Cardmarket ansehen
+                {{ 'wishlist.cardmarketLink' | translate }}
               </a>
             }
           </div>
@@ -42,21 +49,26 @@
             [value]="entry.row.priority"
             (change)="updatePriority(entry, +$any($event.target).value)"
           >
-            <option [value]="1">Niedrig</option>
-            <option [value]="2">Mittel</option>
-            <option [value]="3">Hoch</option>
+            <option [value]="1">{{ 'wishlist.priorityLow' | translate }}</option>
+            <option [value]="2">{{ 'wishlist.priorityMid' | translate }}</option>
+            <option [value]="3">{{ 'wishlist.priorityHigh' | translate }}</option>
           </select>
 
           <input
             #notesInput
             type="text"
             class="notes-input"
-            placeholder="Notiz…"
+            [placeholder]="'wishlist.notesPlaceholder' | translate"
             [value]="entry.row.notes ?? ''"
             (blur)="updateNotes(entry, notesInput.value)"
           />
 
-          <button type="button" class="remove-button" (click)="remove(entry)" aria-label="Entfernen">
+          <button
+            type="button"
+            class="remove-button"
+            (click)="remove(entry)"
+            [attr.aria-label]="'wishlist.removeAria' | translate"
+          >
             ✕
           </button>
         </li>

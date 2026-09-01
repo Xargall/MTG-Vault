@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
@@ -15,13 +16,14 @@ import { CollectionEntry, CollectionService } from '../collection.service';
 
 @Component({
   selector: 'app-collection-overview',
-  imports: [BarChart, CardTile, AddCardDialog, CardDetailDialog],
+  imports: [BarChart, CardTile, AddCardDialog, CardDetailDialog, TranslatePipe],
   templateUrl: './collection-overview.html',
   styleUrl: './collection-overview.scss',
 })
 export class CollectionOverview {
   private readonly collectionService = inject(CollectionService);
   private readonly route = inject(ActivatedRoute);
+  private readonly translate = inject(TranslateService);
 
   protected readonly colorCategories = COLOR_CATEGORIES;
 
@@ -68,7 +70,7 @@ export class CollectionOverview {
       this.entries.set(await this.collectionService.getCollectionWithCardData());
     } catch (error) {
       this.errorMessage.set(
-        error instanceof Error ? error.message : 'Sammlung konnte nicht geladen werden.',
+        error instanceof Error ? error.message : this.translate.instant('collection.loadError'),
       );
     } finally {
       this.loading.set(false);

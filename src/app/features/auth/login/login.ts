@@ -1,12 +1,13 @@
 import { Component, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, Validators, FormBuilder } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './login.html',
   styleUrl: './login.scss',
 })
@@ -15,6 +16,7 @@ export class Login {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly translate = inject(TranslateService);
 
   readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
@@ -39,7 +41,7 @@ export class Login {
       const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo') ?? '/';
       await this.router.navigateByUrl(redirectTo);
     } catch (error) {
-      this.errorMessage.set(error instanceof Error ? error.message : 'Login fehlgeschlagen.');
+      this.errorMessage.set(error instanceof Error ? error.message : this.translate.instant('auth.loginFailed'));
     } finally {
       this.isSubmitting.set(false);
     }
@@ -50,7 +52,7 @@ export class Login {
     try {
       await this.authService.signInWithGoogle();
     } catch (error) {
-      this.errorMessage.set(error instanceof Error ? error.message : 'Google-Login fehlgeschlagen.');
+      this.errorMessage.set(error instanceof Error ? error.message : this.translate.instant('auth.googleFailed'));
     }
   }
 
@@ -62,7 +64,7 @@ export class Login {
       const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo') ?? '/';
       await this.router.navigateByUrl(redirectTo);
     } catch (error) {
-      this.errorMessage.set(error instanceof Error ? error.message : 'Demo-Login fehlgeschlagen.');
+      this.errorMessage.set(error instanceof Error ? error.message : this.translate.instant('auth.demoFailed'));
     } finally {
       this.isSubmitting.set(false);
     }

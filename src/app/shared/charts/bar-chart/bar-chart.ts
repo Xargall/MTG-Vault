@@ -1,4 +1,5 @@
 import { Component, computed, input, signal } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
 
 export interface BarChartDatum {
   label: string;
@@ -21,6 +22,7 @@ const BOTTOM_PADDING = 30;
 
 @Component({
   selector: 'app-bar-chart',
+  imports: [TranslatePipe],
   templateUrl: './bar-chart.html',
   styleUrl: './bar-chart.scss',
 })

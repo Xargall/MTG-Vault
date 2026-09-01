@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { BarChart } from '../../shared/charts/bar-chart/bar-chart';
 import { DonutChart } from '../../shared/charts/donut-chart/donut-chart';
@@ -18,7 +19,7 @@ const POPULAR_CARD_ROTATION_MS = 15000;
 
 @Component({
   selector: 'app-dashboard',
-  imports: [DonutChart, BarChart, RouterLink, DecimalPipe],
+  imports: [DonutChart, BarChart, RouterLink, DecimalPipe, TranslatePipe],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -26,6 +27,7 @@ export class Dashboard {
   private readonly collectionService = inject(CollectionService);
   private readonly scryfall = inject(ScryfallService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly translate = inject(TranslateService);
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
@@ -56,7 +58,7 @@ export class Dashboard {
       this.entries.set(await this.collectionService.getCollectionWithCardData());
     } catch (error) {
       this.errorMessage.set(
-        error instanceof Error ? error.message : 'Sammlung konnte nicht geladen werden.',
+        error instanceof Error ? error.message : this.translate.instant('dashboard.loadError'),
       );
     } finally {
       this.loading.set(false);

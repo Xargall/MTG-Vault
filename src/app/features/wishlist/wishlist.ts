@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { getCardImageUrl } from '../../core/services/scryfall.service';
 import { AddWishlistDialog } from './add-wishlist-dialog/add-wishlist-dialog';
@@ -8,12 +9,13 @@ import { WishlistEntry, WishlistService } from './wishlist.service';
 
 @Component({
   selector: 'app-wishlist',
-  imports: [AddWishlistDialog, DecimalPipe],
+  imports: [AddWishlistDialog, DecimalPipe, TranslatePipe],
   templateUrl: './wishlist.html',
   styleUrl: './wishlist.scss',
 })
 export class Wishlist {
   private readonly wishlistService = inject(WishlistService);
+  private readonly translate = inject(TranslateService);
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
@@ -37,7 +39,7 @@ export class Wishlist {
       this.entries.set(await this.wishlistService.getWishlist());
     } catch (error) {
       this.errorMessage.set(
-        error instanceof Error ? error.message : 'Wunschliste konnte nicht geladen werden.',
+        error instanceof Error ? error.message : this.translate.instant('wishlist.loadError'),
       );
     } finally {
       this.loading.set(false);

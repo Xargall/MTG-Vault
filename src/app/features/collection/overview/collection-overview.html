@@ -1,24 +1,29 @@
 <div class="overview">
-  <h1>Sammlung</h1>
+  <h1>{{ 'collection.title' | translate }}</h1>
 
   @if (loading()) {
-    <p class="state-message">Lade Sammlung…</p>
+    <p class="state-message">{{ 'collection.loading' | translate }}</p>
   } @else if (errorMessage()) {
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else {
     <div class="top-row">
       <section class="chart-card toolbar-card">
-        <h2>Suche &amp; Filter</h2>
+        <h2>{{ 'collection.searchAndFilter' | translate }}</h2>
 
         <div class="search-row">
           <input
             type="text"
             class="search-input"
-            placeholder="Karte in der Sammlung suchen…"
+            [placeholder]="'collection.searchPlaceholder' | translate"
             [value]="searchQuery()"
             (input)="searchQuery.set($any($event.target).value)"
           />
-          <button type="button" class="add-button" (click)="showAddDialog.set(true)" aria-label="Karte hinzufügen">
+          <button
+            type="button"
+            class="add-button"
+            (click)="showAddDialog.set(true)"
+            [attr.aria-label]="'collection.addCardAria' | translate"
+          >
             +
           </button>
         </div>
@@ -31,7 +36,7 @@
             style="--filter-color: var(--color-accent)"
             (click)="selectedCategory.set(null)"
           >
-            Alle
+            {{ 'collection.all' | translate }}
           </button>
           @for (category of colorCategories; track category.key) {
             <button
@@ -41,7 +46,7 @@
               [style.--filter-color]="category.color"
               (click)="toggleCategory(category.key)"
             >
-              {{ category.label }}
+              {{ category.label | translate }}
             </button>
           }
         </div>
@@ -49,16 +54,16 @@
 
       @if (hasAnyCards()) {
         <section class="chart-card mana-curve-card">
-          <h2>Mana-Kurve</h2>
+          <h2>{{ 'collection.manaCurve' | translate }}</h2>
           <app-bar-chart [data]="manaCurve()" />
         </section>
       }
     </div>
 
     @if (!hasAnyCards()) {
-      <p class="state-message">Noch keine Karten in deiner Sammlung. Füge deine erste Karte hinzu!</p>
+      <p class="state-message">{{ 'collection.emptyCollection' | translate }}</p>
     } @else if (filteredEntries().length === 0) {
-      <p class="state-message">Keine Karten gefunden.</p>
+      <p class="state-message">{{ 'collection.noResults' | translate }}</p>
     } @else {
       <div class="card-grid">
         @for (entry of filteredEntries(); track entry.row.id) {

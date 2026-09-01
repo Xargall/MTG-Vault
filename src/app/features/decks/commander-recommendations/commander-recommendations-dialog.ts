@@ -1,4 +1,5 @@
 import { Component, computed, inject, output, signal } from '@angular/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { EdhrecService } from '../../../core/services/edhrec.service';
 import { getCardImageUrl, ScryfallService } from '../../../core/services/scryfall.service';
@@ -37,6 +38,7 @@ function dedupeByCardName(entries: CollectionEntry[]): CollectionEntry[] {
 
 @Component({
   selector: 'app-commander-recommendations-dialog',
+  imports: [TranslatePipe],
   templateUrl: './commander-recommendations-dialog.html',
   styleUrl: './commander-recommendations-dialog.scss',
 })
@@ -44,6 +46,7 @@ export class CommanderRecommendationsDialog {
   private readonly collectionService = inject(CollectionService);
   private readonly scryfall = inject(ScryfallService);
   private readonly edhrec = inject(EdhrecService);
+  private readonly translate = inject(TranslateService);
 
   readonly close = output<void>();
 
@@ -145,7 +148,7 @@ export class CommanderRecommendationsDialog {
       }
     } catch (error) {
       this.errorMessage.set(
-        error instanceof Error ? error.message : 'Empfehlungen konnten nicht geladen werden.',
+        error instanceof Error ? error.message : this.translate.instant('commanderRecs.loadFailed'),
       );
     } finally {
       this.loading.set(false);

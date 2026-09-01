@@ -1,8 +1,8 @@
 <div class="dashboard">
-  <h1>Willkommen bei MTG Vault</h1>
+  <h1>{{ 'dashboard.welcome' | translate }}</h1>
 
   @if (loading()) {
-    <p class="state-message">Lade Sammlung…</p>
+    <p class="state-message">{{ 'dashboard.loading' | translate }}</p>
   } @else if (errorMessage()) {
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else if (hasCards()) {
@@ -12,7 +12,7 @@
         <span class="corner corner--tr"></span>
         <span class="corner corner--bl"></span>
         <span class="corner corner--br"></span>
-        <h2>Farbverteilung</h2>
+        <h2>{{ 'dashboard.colorDistribution' | translate }}</h2>
         <app-donut-chart [data]="colorDistribution()" />
       </section>
 
@@ -22,7 +22,7 @@
           <span class="corner corner--tr"></span>
           <span class="corner corner--bl"></span>
           <span class="corner corner--br"></span>
-          <h2>Beliebte Karten</h2>
+          <h2>{{ 'dashboard.popularCards' | translate }}</h2>
           @if (getCardImageUrl(card); as imageUrl) {
             <img class="popular-image" [src]="imageUrl" [alt]="card.name" />
           } @else {
@@ -37,14 +37,14 @@
         <span class="corner corner--tr"></span>
         <span class="corner corner--bl"></span>
         <span class="corner corner--br"></span>
-        <h2>Preisverteilung</h2>
+        <h2>{{ 'dashboard.priceDistribution' | translate }}</h2>
         <p class="total-value">{{ totalValue() | number: '1.2-2' }} €</p>
         <app-bar-chart [data]="priceDistribution()" />
       </section>
     </div>
 
     <section class="color-categories">
-      <h2>Farbkategorien</h2>
+      <h2>{{ 'dashboard.colorCategories' | translate }}</h2>
       <div class="category-grid">
         @for (category of colorCategories(); track category.label) {
           <a class="category-card" routerLink="/collection" [queryParams]="{ color: category.key }">
@@ -57,15 +57,17 @@
               }
               <p class="showcase-name">{{ entry.card.name }}</p>
             } @else {
-              <div class="showcase-placeholder">Keine Karten</div>
+              <div class="showcase-placeholder">{{ 'dashboard.noCards' | translate }}</div>
             }
-            <p class="category-label">{{ category.label }}</p>
-            <p class="category-count">{{ category.count }} {{ category.count === 1 ? 'Karte' : 'Karten' }}</p>
+            <p class="category-label">{{ category.label | translate }}</p>
+            <p class="category-count">
+              {{ category.count }} {{ (category.count === 1 ? 'common.card' : 'common.cards') | translate }}
+            </p>
           </a>
         }
       </div>
     </section>
   } @else {
-    <p class="state-message">Noch keine Karten in deiner Sammlung.</p>
+    <p class="state-message">{{ 'dashboard.empty' | translate }}</p>
   }
 </div>

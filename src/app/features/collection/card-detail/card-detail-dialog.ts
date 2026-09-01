@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, input, output } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
 
 import { getCardImageUrl } from '../../../core/services/scryfall.service';
 import { COLOR_CATEGORIES, getEntryPrice } from '../collection-stats';
@@ -9,18 +10,20 @@ const SYMBOL_COLORS = new Map<string, string>(
   COLOR_CATEGORIES.map(({ key, color }) => [key, color]),
 );
 
+// Values are i18n keys, resolved via the `translate` pipe in the template -
+// same convention as COLOR_CATEGORIES' `label` field.
 const RARITY_LABELS: Record<string, string> = {
-  common: 'Gewöhnlich',
-  uncommon: 'Ungewöhnlich',
-  rare: 'Selten',
-  mythic: 'Mythisch',
-  special: 'Speziell',
-  bonus: 'Bonus',
+  common: 'rarity.common',
+  uncommon: 'rarity.uncommon',
+  rare: 'rarity.rare',
+  mythic: 'rarity.mythic',
+  special: 'rarity.special',
+  bonus: 'rarity.bonus',
 };
 
 @Component({
   selector: 'app-card-detail-dialog',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, TranslatePipe],
   templateUrl: './card-detail-dialog.html',
   styleUrl: './card-detail-dialog.scss',
 })

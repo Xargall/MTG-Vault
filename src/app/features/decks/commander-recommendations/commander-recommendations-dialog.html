@@ -1,14 +1,12 @@
 <div class="backdrop" (click)="close.emit()">
   <div class="dialog" (click)="$event.stopPropagation()">
     <header class="dialog-header">
-      <h2>Commander-Empfehlungen</h2>
+      <h2>{{ 'commanderRecs.title' | translate }}</h2>
       <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
     </header>
 
     <p class="hint">
-      Jede Legendary Creature in deiner Sammlung wird als Commander geprüft, plus Commander, die du
-      noch nicht besitzt, deren EDHREC-Durchschnittsdeck aber schon stark durch deine übrigen Karten
-      abgedeckt ist.
+      {{ 'commanderRecs.hint' | translate }}
     </p>
 
     @if (errorMessage()) {
@@ -17,15 +15,15 @@
       @if (loading()) {
         <p class="state-message">
           @if (scanPhase() === 'cards') {
-            Durchsuche Sammlung nach möglichen Commandern… ({{ checked() }} / {{ total() }})
+            {{ 'commanderRecs.scanningCards' | translate: { progress: checked() + ' / ' + total() } }}
           } @else {
-            Prüfe Commander… ({{ checked() }} / {{ total() }})
+            {{ 'commanderRecs.checkingCommanders' | translate: { progress: checked() + ' / ' + total() } }}
           }
         </p>
       }
 
       @if (hasNoResults()) {
-        <p class="state-message">Keine passenden Commander gefunden.</p>
+        <p class="state-message">{{ 'commanderRecs.noResults' | translate }}</p>
       }
 
       <ul class="recommendation-list">
@@ -39,9 +37,11 @@
 
             <div class="recommendation-info">
               <p class="commander-name">{{ rec.name }}</p>
-              <p class="match-detail">{{ rec.matchedCount }} / {{ rec.totalCount }} Karten</p>
+              <p class="match-detail">
+                {{ 'commanderRecs.cardsCount' | translate: { matched: rec.matchedCount, total: rec.totalCount } }}
+              </p>
               @if (!rec.owned) {
-                <span class="missing-tag">Commander fehlt in Sammlung</span>
+                <span class="missing-tag">{{ 'commanderRecs.missingTag' | translate }}</span>
               }
             </div>
 

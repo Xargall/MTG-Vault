@@ -1,7 +1,7 @@
 <div class="backdrop" (click)="close.emit()">
   <div class="dialog" (click)="$event.stopPropagation()">
     <header class="dialog-header">
-      <h2>Kartendetails</h2>
+      <h2>{{ 'cardDetail.title' | translate }}</h2>
       <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
     </header>
 
@@ -26,22 +26,22 @@
         }
 
         <dl class="info-list">
-          <dt>Set</dt>
+          <dt>{{ 'cardDetail.set' | translate }}</dt>
           <dd>{{ entry().card.set_name }}</dd>
 
-          <dt>Seltenheit</dt>
-          <dd>{{ rarityLabel() }}</dd>
+          <dt>{{ 'cardDetail.rarity' | translate }}</dt>
+          <dd>{{ rarityLabel() | translate }}</dd>
 
-          <dt>Foil</dt>
-          <dd>{{ entry().row.foil ? 'Ja' : 'Nein' }}</dd>
+          <dt>{{ 'cardDetail.foil' | translate }}</dt>
+          <dd>{{ (entry().row.foil ? 'common.yes' : 'common.no') | translate }}</dd>
 
-          <dt>Preis</dt>
-          <dd>{{ price() > 0 ? (price() | number: '1.2-2') + ' €' : 'Unbekannt' }}</dd>
+          <dt>{{ 'cardDetail.price' | translate }}</dt>
+          <dd>{{ price() > 0 ? (price() | number: '1.2-2') + ' €' : ('common.unknown' | translate) }}</dd>
         </dl>
 
         @if (cardmarketUrl(); as url) {
           <a class="cardmarket-link" [href]="url" target="_blank" rel="noopener">
-            Auf Cardmarket ansehen
+            {{ 'cardDetail.cardmarketLink' | translate }}
           </a>
         }
       </div>

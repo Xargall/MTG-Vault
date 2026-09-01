@@ -1,7 +1,9 @@
 import { Component, computed, input, output } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-deck-banner',
+  imports: [TranslatePipe],
   templateUrl: './deck-banner.html',
   styleUrl: './deck-banner.scss',
 })

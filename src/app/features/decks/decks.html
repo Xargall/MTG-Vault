@@ -1,16 +1,16 @@
 <div class="decks">
-  <h1>Decks</h1>
+  <h1>{{ 'decks.title' | translate }}</h1>
 
   <app-deck-banner [images]="bannerImages()" (bannerClick)="showBrowseDialog.set(true)" />
 
   <button type="button" class="commander-recs-button" (click)="showCommanderRecs.set(true)">
-    Commander-Empfehlungen aus deiner Sammlung
+    {{ 'decks.commanderRecsButton' | translate }}
   </button>
 
   @if (recommendations().length > 0) {
     <section class="recommendations">
-      <h2>Fast komplett</h2>
-      <p class="section-hint">Precon-Decks, von denen du bereits mindestens 75&nbsp;% der Karten besitzt.</p>
+      <h2>{{ 'decks.almostComplete' | translate }}</h2>
+      <p class="section-hint">{{ 'decks.almostCompleteHint' | translate }}</p>
 
       @if (recommendationError()) {
         <p class="state-message error">{{ recommendationError() }}</p>
@@ -29,7 +29,7 @@
             <p class="deck-format">{{ rec.deck.type }} · {{ rec.deck.releaseDate.slice(0, 4) }}</p>
 
             <span class="match-badge" [class.is-complete]="rec.matchPercent === 100">
-              {{ rec.matchPercent }}% in Sammlung
+              {{ 'decks.matchInCollection' | translate: { percent: rec.matchPercent } }}
             </span>
 
             <div class="recommendation-actions">
@@ -39,7 +39,7 @@
                 [disabled]="addingFileName() === rec.deck.fileName"
                 (click)="addRecommendation(rec)"
               >
-                Zu meinen Decks hinzufügen
+                {{ 'decks.addToMyDecks' | translate }}
               </button>
 
               @if (rec.missingScryfallIds.length > 0) {
@@ -49,7 +49,7 @@
                   [disabled]="wishlistingFileName() === rec.deck.fileName"
                   (click)="addRecommendationMissingToWishlist(rec)"
                 >
-                  {{ rec.missingScryfallIds.length }} fehlende Karten auf Wunschliste
+                  {{ 'decks.missingCardsToWishlist' | translate: { count: rec.missingScryfallIds.length } }}
                 </button>
               }
             </div>
@@ -60,11 +60,11 @@
   }
 
   @if (loading()) {
-    <p class="state-message">Lade Decks…</p>
+    <p class="state-message">{{ 'decks.loading' | translate }}</p>
   } @else if (errorMessage()) {
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else if (!hasDecks()) {
-    <p class="state-message">Noch keine Decks. Über das Banner ein Precon-Deck hinzufügen!</p>
+    <p class="state-message">{{ 'decks.empty' | translate }}</p>
   } @else {
     <div class="deck-grid">
       @for (summary of deckSummaries(); track summary.entry.deck.id) {
@@ -76,15 +76,15 @@
               <div class="showcase-placeholder">{{ showcase.card.name }}</div>
             }
           } @else {
-            <div class="showcase-placeholder">Keine Karten</div>
+            <div class="showcase-placeholder">{{ 'decks.noCards' | translate }}</div>
           }
 
           <p class="deck-name">{{ summary.entry.deck.name }}</p>
           <p class="deck-format">{{ summary.entry.deck.format }}</p>
-          <p class="deck-count">{{ summary.cardCount }} Karten</p>
+          <p class="deck-count">{{ 'decks.cardsCount' | translate: { count: summary.cardCount } }}</p>
 
           <span class="match-badge" [class.is-complete]="summary.matchPercent === 100">
-            {{ summary.matchPercent }}% in Sammlung
+            {{ 'decks.matchInCollection' | translate: { percent: summary.matchPercent } }}
           </span>
         </button>
       }

@@ -1,7 +1,7 @@
 <div class="backdrop" (click)="close.emit()">
   <div class="dialog" (click)="$event.stopPropagation()">
     <header class="dialog-header">
-      <h2>Karte hinzufügen</h2>
+      <h2>{{ 'addCard.title' | translate }}</h2>
       <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
     </header>
 
@@ -9,18 +9,18 @@
       <input
         type="text"
         class="search-input"
-        placeholder="Kartenname suchen…"
+        [placeholder]="'addCard.searchPlaceholder' | translate"
         [ngModel]="query()"
         (ngModelChange)="onQueryChange($event)"
         autofocus
       />
 
       @if (searching()) {
-        <p class="state-message">Suche…</p>
+        <p class="state-message">{{ 'addCard.searching' | translate }}</p>
       } @else if (searchError()) {
         <p class="state-message error">{{ searchError() }}</p>
       } @else if (query().trim() && results().length === 0) {
-        <p class="state-message">Keine Karten gefunden.</p>
+        <p class="state-message">{{ 'addCard.noCardsFound' | translate }}</p>
       } @else {
         <div class="results-grid">
           @for (card of results(); track card.id) {
@@ -32,11 +32,13 @@
       }
     } @else if (!selectedCard()) {
       <div class="prints-view">
-        <button type="button" class="back-link" (click)="backToSearch()">← Zurück zur Suche</button>
-        <h3>{{ selectedName() }} – Druck wählen</h3>
+        <button type="button" class="back-link" (click)="backToSearch()">
+          {{ 'addCard.backToSearch' | translate }}
+        </button>
+        <h3>{{ 'addCard.pickPrint' | translate: { name: selectedName() } }}</h3>
 
         @if (loadingPrints()) {
-          <p class="state-message">Lade Drucke…</p>
+          <p class="state-message">{{ 'addCard.loadingPrints' | translate }}</p>
         } @else if (printsError()) {
           <p class="state-message error">{{ printsError() }}</p>
         } @else {
@@ -52,13 +54,15 @@
       </div>
     } @else {
       <div class="detail-view">
-        <button type="button" class="back-link" (click)="backToPrints()">← Andere Version wählen</button>
+        <button type="button" class="back-link" (click)="backToPrints()">
+          {{ 'addCard.backToPrints' | translate }}
+        </button>
 
         <div class="detail-body">
           <app-card-tile [card]="selectedCard()!" />
 
           <div class="detail-form">
-            <label for="quantity">Menge</label>
+            <label for="quantity">{{ 'addCard.quantity' | translate }}</label>
             <input
               id="quantity"
               type="number"
@@ -69,10 +73,10 @@
 
             <label class="checkbox-label">
               <input type="checkbox" [ngModel]="foil()" (ngModelChange)="foil.set($event)" />
-              Foil
+              {{ 'addCard.foil' | translate }}
             </label>
 
-            <label for="condition">Zustand</label>
+            <label for="condition">{{ 'addCard.condition' | translate }}</label>
             <select
               id="condition"
               [ngModel]="condition()"
@@ -88,7 +92,7 @@
             }
 
             <button type="button" class="submit-button" [disabled]="submitting()" (click)="submit()">
-              Hinzufügen
+              {{ 'addCard.submit' | translate }}
             </button>
           </div>
         </div>

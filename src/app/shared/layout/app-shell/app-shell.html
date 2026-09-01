@@ -18,12 +18,30 @@
       <span class="shell-title">MTG Vault</span>
     </a>
     <nav class="shell-nav">
-      <a routerLink="/">Übersicht</a>
-      <a routerLink="/collection">Sammlung</a>
-      <a routerLink="/decks">Decks</a>
-      <a routerLink="/wishlist">Wishlist</a>
+      <a routerLink="/">{{ 'nav.overview' | translate }}</a>
+      <a routerLink="/collection">{{ 'nav.collection' | translate }}</a>
+      <a routerLink="/decks">{{ 'nav.decks' | translate }}</a>
+      <a routerLink="/wishlist">{{ 'nav.wishlist' | translate }}</a>
     </nav>
-    <button type="button" class="logout-button" (click)="logout()">Logout</button>
+
+    <div class="lang-switch">
+      <button
+        type="button"
+        [class.is-active]="translate.currentLang() === 'de'"
+        (click)="setLang('de')"
+      >
+        DE
+      </button>
+      <button
+        type="button"
+        [class.is-active]="translate.currentLang() === 'en'"
+        (click)="setLang('en')"
+      >
+        EN
+      </button>
+    </div>
+
+    <button type="button" class="logout-button" (click)="logout()">{{ 'nav.logout' | translate }}</button>
   </header>
 
   <main class="shell-content">

@@ -21,7 +21,7 @@
       (focus)="hoveredIndex.set(i)"
       (blur)="hoveredIndex.set(null)"
     >
-      <title>{{ bar.label }}: {{ bar.value }}</title>
+      <title>{{ bar.label | translate }}: {{ bar.value }}</title>
 
       <rect
         class="bar"
@@ -50,7 +50,7 @@
       }
 
       <text class="category-label" [attr.x]="bandCenter(i)" [attr.y]="baselineY + 18">
-        {{ bar.label }}
+        {{ bar.label | translate }}
       </text>
     </g>
   }
