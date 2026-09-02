@@ -209,6 +209,7 @@ export const de = {
     noCameraFound: 'Keine Kamera gefunden.',
     backToCollection: '← Zurück zur Sammlung',
     cameraSelect: 'Kamera auswählen',
+    focusSlider: 'Fokus',
     cameraFallbackLabel: 'Kamera {{index}}',
     foil: 'Foil',
     addToCollection: 'Zur Collection hinzufügen',

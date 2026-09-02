@@ -211,6 +211,7 @@ export const en: typeof de = {
     noCameraFound: 'No camera found.',
     backToCollection: '← Back to collection',
     cameraSelect: 'Select camera',
+    focusSlider: 'Focus',
     cameraFallbackLabel: 'Camera {{index}}',
     foil: 'Foil',
     addToCollection: 'Add to collection',

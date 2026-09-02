@@ -41,6 +41,25 @@ const AUTO_RESUME_DELAY_MS = 2000;
 type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'error';
 type ScannerToast = { message: string; variant: 'success' | 'warning' };
 
+// Manual focus / points-of-interest aren't in TS's bundled DOM types yet,
+// though Chromium-based browsers on Android support them.
+interface FocusCapableTrackCapabilities extends MediaTrackCapabilities {
+  focusMode?: string[];
+  // Real devices report their own min/max/step (e.g. 10-100), not a
+  // normalized 0-1 range, so the slider bounds must come from here.
+  focusDistance?: { min: number; max: number; step?: number };
+}
+interface FocusConstraintSet extends MediaTrackConstraintSet {
+  focusMode?: string;
+  focusDistance?: number;
+  pointsOfInterest?: { x: number; y: number }[];
+}
+interface FocusRange {
+  min: number;
+  max: number;
+  step: number;
+}
+
 @Component({
   selector: 'app-scanner',
   imports: [FormsModule, RouterLink, CardTile, TranslatePipe],
@@ -58,6 +77,7 @@ export class Scanner {
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
   private readonly captureCanvas = document.createElement('canvas');
   private stream: MediaStream | null = null;
+  private videoTrack: MediaStreamTrack | null = null;
   private timerHandle: ReturnType<typeof setTimeout> | null = null;
   private toastTimeout: ReturnType<typeof setTimeout> | null = null;
   private autoResumeTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -69,6 +89,9 @@ export class Scanner {
   protected readonly toast = signal<ScannerToast | null>(null);
   protected readonly availableCameras = signal<MediaDeviceInfo[]>([]);
   protected readonly selectedDeviceId = signal<string | null>(null);
+  protected readonly supportsManualFocus = signal(false);
+  protected readonly focusRange = signal<FocusRange>({ min: 0, max: 1, step: 0.05 });
+  protected readonly focusDistance = signal(0.5);
 
   protected readonly detectedCard = signal<Card | null>(null);
   protected readonly quantity = signal(1);
@@ -145,7 +168,8 @@ export class Scanner {
     videoEl.srcObject = this.stream;
     await videoEl.play();
 
-    this.selectedDeviceId.set(this.stream.getVideoTracks()[0]?.getSettings().deviceId ?? null);
+    this.videoTrack = this.stream.getVideoTracks()[0] ?? null;
+    this.selectedDeviceId.set(this.videoTrack?.getSettings().deviceId ?? null);
     // Now that permission is granted, labels are populated - (re-)populate
     // the camera picker.
     try {
@@ -153,6 +177,23 @@ export class Scanner {
       this.availableCameras.set(devices.filter((d) => d.kind === 'videoinput'));
     } catch {
       // Picker just stays empty; not fatal.
+    }
+
+    // Manual focus is only supported on some Chromium-based browsers
+    // (mainly Android Chrome/Edge) - show the slider only when the active
+    // device actually advertises it, nothing/no error otherwise.
+    try {
+      const capabilities = this.videoTrack?.getCapabilities?.() as FocusCapableTrackCapabilities | undefined;
+      const supportsManual = !!capabilities?.focusMode?.includes('manual');
+      this.supportsManualFocus.set(supportsManual);
+
+      if (supportsManual && capabilities?.focusDistance) {
+        const { min, max, step } = capabilities.focusDistance;
+        this.focusRange.set({ min, max, step: step || (max - min) / 20 || 1 });
+        this.focusDistance.set((min + max) / 2);
+      }
+    } catch {
+      this.supportsManualFocus.set(false);
     }
 
     // isScanning must be true before the first scheduleNextCapture() call,
@@ -165,6 +206,37 @@ export class Scanner {
 
   protected onCameraChange(deviceId: string) {
     void this.startCamera(deviceId);
+  }
+
+  protected async onFocusDistanceChange(value: number) {
+    this.focusDistance.set(value);
+    if (!this.videoTrack) return;
+    try {
+      await this.videoTrack.applyConstraints({
+        advanced: [{ focusMode: 'manual', focusDistance: value } as FocusConstraintSet],
+      });
+    } catch {
+      // Device advertised manual focus support but rejected the constraint - not critical.
+    }
+  }
+
+  // Tap-to-focus: works on more devices than the manual slider, so it's
+  // always wired up regardless of supportsManualFocus - browsers that don't
+  // support pointsOfInterest just reject the constraint, silently ignored.
+  protected async onVideoTap(event: MouseEvent) {
+    if (!this.videoTrack) return;
+    const target = event.currentTarget as HTMLVideoElement;
+    if (!target.clientWidth || !target.clientHeight) return;
+
+    const x = event.offsetX / target.clientWidth;
+    const y = event.offsetY / target.clientHeight;
+    try {
+      await this.videoTrack.applyConstraints({
+        advanced: [{ pointsOfInterest: [{ x, y }] } as FocusConstraintSet],
+      });
+    } catch {
+      // Tap-to-focus isn't supported everywhere - fail silently, no error UI.
+    }
   }
 
   private scheduleNextCapture(delayMs: number = MIN_CAPTURE_GAP_MS) {

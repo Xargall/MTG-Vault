@@ -95,6 +95,14 @@
   }
 }
 
+.focus-slider {
+  position: absolute;
+  bottom: var(--spacing-md);
+  left: var(--spacing-md);
+  right: var(--spacing-md);
+  width: auto;
+}
+
 .scanner-toast {
   position: fixed;
   bottom: 80px;

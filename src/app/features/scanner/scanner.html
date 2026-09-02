@@ -4,7 +4,7 @@
     <a routerLink="/collection">{{ 'scanner.backToCollection' | translate }}</a>
   </div>
 } @else {
-  <video #video class="scanner-video" muted playsinline></video>
+  <video #video class="scanner-video" muted playsinline (click)="onVideoTap($event)"></video>
 
   <button
     type="button"
@@ -34,6 +34,19 @@
         </option>
       }
     </select>
+  }
+
+  @if (supportsManualFocus() && status() === 'scanning') {
+    <input
+      type="range"
+      class="focus-slider"
+      [attr.min]="focusRange().min"
+      [attr.max]="focusRange().max"
+      [attr.step]="focusRange().step"
+      [value]="focusDistance()"
+      (input)="onFocusDistanceChange($any($event.target).valueAsNumber)"
+      [attr.aria-label]="'scanner.focusSlider' | translate"
+    />
   }
 
   @if (toast(); as t) {
