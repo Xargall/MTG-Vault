@@ -1,0 +1,79 @@
+@if (status() === 'error') {
+  <div class="scanner-error">
+    <p>{{ cameraErrorMessage() }}</p>
+    <a routerLink="/collection">{{ 'scanner.backToCollection' | translate }}</a>
+  </div>
+} @else {
+  <video #video class="scanner-video" muted playsinline></video>
+
+  <button
+    type="button"
+    class="scanner-close"
+    routerLink="/collection"
+    [attr.aria-label]="'scanner.close' | translate"
+  >
+    ✕
+  </button>
+
+  <div class="scan-zones">
+    <div
+      class="scan-zone scan-zone--name"
+      [class.scan-zone--primary]="gameService.currentSlug() === 'yugioh'"
+      [style.height.%]="nameZoneHeightPercent"
+    ></div>
+    @if (gameService.currentSlug() === 'mtg') {
+      <div
+        class="scan-zone scan-zone--set-code scan-zone--primary"
+        [style.height.%]="setCodeZoneHeightPercent"
+      ></div>
+    }
+    <div
+      class="scan-dim"
+      [style.top.%]="nameZoneHeightPercent"
+      [style.bottom.%]="dimOverlayBottomPercent()"
+    ></div>
+  </div>
+
+  @if (status() === 'starting') {
+    <p class="scanner-hint">{{ 'scanner.starting' | translate }}</p>
+  }
+
+  @if (detectedCard(); as card) {
+    <div class="match-panel">
+      <app-card-tile [card]="card" />
+
+      @if (card.game === 'mtg') {
+        <p class="match-set-info">{{ card.setCode.toUpperCase() }} · #{{ card.collectorNumber }}</p>
+      }
+
+      <div class="match-form">
+        <div class="quantity-control">
+          <button type="button" (click)="decreaseQuantity()" aria-label="-">−</button>
+          <span>{{ quantity() }}</span>
+          <button type="button" (click)="increaseQuantity()" aria-label="+">+</button>
+        </div>
+
+        @if (card.game === 'mtg') {
+          <label class="checkbox-label">
+            <input type="checkbox" [ngModel]="foil()" (ngModelChange)="foil.set($event)" />
+            {{ 'scanner.foil' | translate }}
+          </label>
+        }
+
+        @if (addError()) {
+          <p class="form-error">{{ addError() }}</p>
+        }
+        @if (justAdded()) {
+          <p class="success-message">{{ 'scanner.added' | translate }}</p>
+        }
+
+        <button type="button" class="add-button" [disabled]="adding()" (click)="addToCollection()">
+          {{ 'scanner.addToCollection' | translate }}
+        </button>
+        <button type="button" class="keep-scanning-button" (click)="keepScanning()">
+          {{ 'scanner.keepScanning' | translate }}
+        </button>
+      </div>
+    </div>
+  }
+}

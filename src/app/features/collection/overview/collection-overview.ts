@@ -1,5 +1,5 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
@@ -13,7 +13,7 @@ import { CollectionEntry, CollectionService } from '../collection.service';
 
 @Component({
   selector: 'app-collection-overview',
-  imports: [BarChart, CardTile, AddCardDialog, CardDetailDialog, TranslatePipe],
+  imports: [BarChart, CardTile, AddCardDialog, CardDetailDialog, RouterLink, TranslatePipe],
   templateUrl: './collection-overview.html',
   styleUrl: './collection-overview.scss',
 })

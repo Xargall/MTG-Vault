@@ -96,7 +96,8 @@ h1 {
   }
 }
 
-.add-button {
+.add-button,
+.scan-button {
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -111,6 +112,13 @@ h1 {
   &:hover {
     background: var(--color-accent-hover);
   }
+}
+
+.scan-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .card-grid {

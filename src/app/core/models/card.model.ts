@@ -25,6 +25,8 @@ export interface MtgCard extends CardBase {
   cmc: number;
   typeLine: string;
   cardmarketUrl: string | null;
+  setCode: string;
+  collectorNumber: string;
 }
 
 export type YugiohBanlistStatus = 'Forbidden' | 'Limited' | 'Semi-Limited';

@@ -1,7 +1,10 @@
 import { Injectable } from '@angular/core';
 
 import { Card, YugiohBanlistStatus, YugiohCard } from '../models/card.model';
-import { CardApiService } from './card-api.interface';
+import { cleanOcrText, similarity } from '../utils/string-similarity';
+import { CardApiService, CardIdentification } from './card-api.interface';
+
+const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
 
 interface YgoCardSet {
   set_name: string;
@@ -60,6 +63,23 @@ export class YugiohApiService implements CardApiService {
     // one canonical entry, so there's nothing meaningful to pick between.
     const raw = await this.fetchCardInfo({ name });
     return raw.length > 0 ? [this.toCard(raw[0])] : [];
+  }
+
+  async identifyCard(rawText: string): Promise<CardIdentification | null> {
+    const cleaned = cleanOcrText(rawText);
+    if (!cleaned) return null;
+
+    const raw = await this.fetchCardInfo({ fname: cleaned });
+    let best: { card: YgoRawCard; confidence: number } | null = null;
+    for (const card of raw) {
+      const confidence = similarity(cleaned, card.name);
+      if (!best || confidence > best.confidence) {
+        best = { card, confidence };
+      }
+    }
+
+    if (!best || best.confidence < IDENTIFY_CONFIDENCE_THRESHOLD) return null;
+    return { card: this.toCard(best.card), confidence: best.confidence };
   }
 
   async getCardsByNames(names: string[]): Promise<Card[]> {

@@ -43,6 +43,10 @@ export const routes: Routes = [
         path: 'wishlist',
         loadComponent: () => import('./features/wishlist/wishlist').then((m) => m.Wishlist),
       },
+      {
+        path: 'scan',
+        loadComponent: () => import('./features/scanner/scanner').then((m) => m.Scanner),
+      },
     ],
   },
   { path: '**', redirectTo: '' },
