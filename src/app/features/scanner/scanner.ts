@@ -24,8 +24,12 @@ import { parseSetCode } from '../../core/utils/set-code-parser';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
 const CAPTURE_INTERVAL_MS = 800;
-const NAME_BAND = { from: 0, to: 0.15 };
-const SET_CODE_BAND = { from: 0.9, to: 1 };
+// Sized generously (rather than tight to the printed name/collector strip)
+// so the card doesn't have to fill the whole frame to give OCR enough
+// resolution - holding it that close pushes most cameras past their
+// minimum focus distance and the image comes out blurry.
+const NAME_BAND = { from: 0, to: 0.28 };
+const SET_CODE_BAND = { from: 0.8, to: 1 };
 const NAME_UPSCALE = 2;
 const NAME_CONTRAST = 1.6;
 const SET_CODE_CONTRAST = 1.4;
@@ -202,6 +206,13 @@ export class Scanner {
 
     this.cropCanvas.width = Math.round(width * scale);
     this.cropCanvas.height = Math.round(height * scale);
+
+    // Some browsers briefly report a tiny placeholder videoWidth/videoHeight
+    // while the stream is still settling - drawing/upscaling from that
+    // produces a near-zero canvas Tesseract can't handle. Skip the frame;
+    // the next capture tick will have real dimensions.
+    if (this.cropCanvas.width < 10 || this.cropCanvas.height < 10) return null;
+
     const ctx = this.cropCanvas.getContext('2d');
     if (!ctx) return null;
 
