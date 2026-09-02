@@ -21,13 +21,19 @@ import { extractNameFromLines } from '../../core/utils/string-similarity';
 import { parseSetCode } from '../../core/utils/set-code-parser';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
-const CAPTURE_INTERVAL_MS = 800;
+// Queue-based, not a fixed interval: Tesseract itself is the bottleneck, so
+// waiting a flat 800ms on top of however long OCR just took only makes
+// every frame slower for no benefit. Wait only long enough to keep a
+// minimum gap between captures (device doesn't overheat, no back-to-back
+// camera reads), never a fixed amount regardless of how long OCR took.
+const MIN_CAPTURE_GAP_MS = 300;
+const MAX_OCR_WIDTH = 1280;
 // Two tiers: set-code+number extraction is exact/structural, so it's worth
 // trying even on a shakier frame; the fuzzy name search needs cleaner text
 // to avoid false matches, so it only kicks in above a higher bar.
 const MIN_CONFIDENCE_FOR_SET_CODE = 50;
 const MIN_CONFIDENCE_FOR_NAME = 65;
-const NO_MATCH_STREAK_FOR_TOAST = 10;
+const NO_MATCH_STREAK_FOR_TOAST = 8;
 const SUCCESS_TOAST_DURATION_MS = 3000;
 const FAILURE_TOAST_DURATION_MS = 2000;
 const AUTO_RESUME_DELAY_MS = 2000;
@@ -161,15 +167,16 @@ export class Scanner {
     void this.startCamera(deviceId);
   }
 
-  private scheduleNextCapture() {
+  private scheduleNextCapture(delayMs: number = MIN_CAPTURE_GAP_MS) {
     if (!this.isScanning) return;
-    this.timerHandle = setTimeout(() => void this.captureAndAnalyze(), CAPTURE_INTERVAL_MS);
+    this.timerHandle = setTimeout(() => void this.captureAndAnalyze(), delayMs);
   }
 
   private async captureAndAnalyze() {
     console.log('analyzing frame');
     if (!this.isScanning || this.status() !== 'scanning') return;
 
+    const start = Date.now();
     try {
       const matched = await this.analyzeFrame();
       if (matched) {
@@ -185,7 +192,10 @@ export class Scanner {
       // Bad lighting, blur, no text, a network hiccup on the lookup - all
       // expected and transient. Stay silent and just keep scanning.
     } finally {
-      if (this.isScanning && this.status() === 'scanning') this.scheduleNextCapture();
+      if (this.isScanning && this.status() === 'scanning') {
+        const elapsed = Date.now() - start;
+        this.scheduleNextCapture(Math.max(0, MIN_CAPTURE_GAP_MS - elapsed));
+      }
     }
   }
 
@@ -254,8 +264,15 @@ export class Scanner {
     const height = videoEl.videoHeight;
     if (!width || !height) return null;
 
-    this.captureCanvas.width = width;
-    this.captureCanvas.height = height;
+    // Cap the OCR input at 1280px wide - a bigger image doesn't meaningfully
+    // help Tesseract's accuracy but costs a lot more CPU time per frame,
+    // which matters a lot more on mobile hardware than on a desktop.
+    const scale = width > MAX_OCR_WIDTH ? MAX_OCR_WIDTH / width : 1;
+    const outWidth = Math.round(width * scale);
+    const outHeight = Math.round(height * scale);
+
+    this.captureCanvas.width = outWidth;
+    this.captureCanvas.height = outHeight;
 
     // Some browsers briefly report a tiny placeholder videoWidth/videoHeight
     // while the stream is still settling - drawing from that produces a
@@ -267,7 +284,7 @@ export class Scanner {
     if (!ctx) return null;
 
     ctx.filter = 'grayscale(1) contrast(1.4)';
-    ctx.drawImage(videoEl, 0, 0, width, height);
+    ctx.drawImage(videoEl, 0, 0, width, height, 0, 0, outWidth, outHeight);
     return this.captureCanvas;
   }
 
@@ -277,6 +294,7 @@ export class Scanner {
     this.addError.set(null);
     this.detectedCard.set(result.card);
     this.status.set('matched');
+    if (navigator.vibrate) navigator.vibrate(200);
   }
 
   private showToast(message: string, variant: ScannerToast['variant'], durationMs: number) {

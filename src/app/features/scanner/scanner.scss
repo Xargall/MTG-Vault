@@ -96,8 +96,8 @@
 }
 
 .scanner-toast {
-  position: absolute;
-  top: var(--spacing-lg);
+  position: fixed;
+  bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
   max-width: 85%;
@@ -108,7 +108,7 @@
   font-size: 0.9rem;
   font-weight: 600;
   text-align: center;
-  z-index: 2;
+  z-index: 9999;
 
   &--warning {
     background: #b8722f;
