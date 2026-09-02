@@ -1,0 +1,39 @@
+# TCG Vault - Angular PWA deployment config for Apache.
+
+# Force HTTPS (remove if already handled by the host/reverse proxy).
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# SPA fallback: Angular's router handles paths like /collection or /decks
+# client-side, so any request that isn't an existing file or directory
+# (assets, ngsw-worker.js, manifest.webmanifest, etc. all pass through
+# untouched) falls back to index.html instead of a 404 from Apache.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+
+# index.html and the Angular service worker's own control files must never
+# be cached, or deployed updates silently stop reaching returning users.
+<IfModule mod_headers.c>
+  <FilesMatch "^(index\.html|ngsw\.json|ngsw-worker\.js|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+</IfModule>
+
+# Angular's production build fingerprints JS/CSS/font filenames with a
+# content hash, so those are safe to cache aggressively - a new deploy gets
+# new filenames rather than needing cache invalidation.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/svg+xml "access plus 1 month"
+</IfModule>
+
+# Compress text-based responses.
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
