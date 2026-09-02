@@ -1,0 +1,79 @@
+<div class="backdrop" (click)="status() !== 'importing' && close.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <header class="dialog-header">
+      <h2>{{ 'deckImport.title' | translate }}</h2>
+      @if (status() !== 'importing') {
+        <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
+      }
+    </header>
+
+    @if (status() === 'form') {
+      <label class="field-label">
+        {{ 'deckImport.nameLabel' | translate }}
+        <input
+          type="text"
+          class="name-input"
+          [ngModel]="deckName()"
+          (ngModelChange)="deckName.set($event)"
+          [placeholder]="'deckImport.defaultName' | translate"
+        />
+      </label>
+
+      <label class="field-label">
+        {{ 'deckImport.listLabel' | translate }}
+        <textarea
+          class="list-textarea"
+          rows="10"
+          [ngModel]="listText()"
+          (ngModelChange)="listText.set($event)"
+          [placeholder]="'deckImport.listPlaceholder' | translate"
+        ></textarea>
+      </label>
+
+      <div class="dialog-actions">
+        <button type="button" class="cancel-button" (click)="close.emit()">
+          {{ 'deckImport.cancelButton' | translate }}
+        </button>
+        <button type="button" class="import-button" [disabled]="!listText().trim()" (click)="startImport()">
+          {{ 'deckImport.importButton' | translate }}
+        </button>
+      </div>
+    } @else if (status() === 'importing') {
+      <p class="state-message">
+        {{ 'deckImport.progress' | translate: { current: current(), total: total() } }}
+      </p>
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="(current() / total()) * 100"></div>
+      </div>
+    } @else {
+      @if (errorMessage()) {
+        <p class="state-message error">{{ errorMessage() }}</p>
+      } @else if (failedLines().length > 0) {
+        <p class="state-message">
+          {{ 'deckImport.doneSummary' | translate: { imported: importedCount(), failed: failedLines().length } }}
+        </p>
+      } @else {
+        <p class="state-message">
+          {{ 'deckImport.doneSummaryAllOk' | translate: { imported: importedCount() } }}
+        </p>
+      }
+
+      @if (failedLines().length > 0) {
+        <div class="failed-lines">
+          <p class="failed-lines-heading">{{ 'deckImport.failedListHeading' | translate }}</p>
+          <ul>
+            @for (line of failedLines(); track line) {
+              <li>{{ line }}</li>
+            }
+          </ul>
+        </div>
+      }
+
+      <div class="dialog-actions">
+        <button type="button" class="import-button" (click)="close.emit()">
+          {{ 'deckImport.doneButton' | translate }}
+        </button>
+      </div>
+    }
+  </div>
+</div>

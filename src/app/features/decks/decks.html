@@ -3,15 +3,20 @@
 
   <app-deck-banner [images]="bannerImages()" (bannerClick)="showBrowseDialog.set(true)" />
 
-  @if (gameService.currentSlug() === 'mtg') {
-    <button type="button" class="commander-recs-button" (click)="showCommanderRecs.set(true)">
-      {{ 'decks.commanderRecsButton' | translate }}
-    </button>
-  } @else if (gameService.currentSlug() === 'yugioh') {
-    <button type="button" class="commander-recs-button" (click)="showArchetypeBrowser.set(true)">
-      {{ 'archetypeBrowser.openButton' | translate }}
-    </button>
-  }
+  <div class="deck-action-row">
+    @if (gameService.currentSlug() === 'mtg') {
+      <button type="button" class="commander-recs-button" (click)="showCommanderRecs.set(true)">
+        {{ 'decks.commanderRecsButton' | translate }}
+      </button>
+      <button type="button" class="commander-recs-button" (click)="showDeckImport.set(true)">
+        {{ 'deckImport.openButton' | translate }}
+      </button>
+    } @else if (gameService.currentSlug() === 'yugioh') {
+      <button type="button" class="commander-recs-button" (click)="showArchetypeBrowser.set(true)">
+        {{ 'archetypeBrowser.openButton' | translate }}
+      </button>
+    }
+  </div>
 
   @if (recommendations().length > 0) {
     <section class="recommendations">
@@ -117,4 +122,8 @@
 
 @if (showArchetypeBrowser()) {
   <app-archetype-browser-dialog (close)="showArchetypeBrowser.set(false)" />
+}
+
+@if (showDeckImport()) {
+  <app-deck-import-dialog (close)="showDeckImport.set(false)" (imported)="onDeckAdded()" />
 }

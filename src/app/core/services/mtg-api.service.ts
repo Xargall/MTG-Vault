@@ -148,6 +148,12 @@ export class MtgApiService implements CardApiService {
     return response.json();
   }
 
+  /** Fuzzy, name-only lookup (e.g. for a deck-list import line with no set code) - tolerant of minor spelling/formatting differences. */
+  async getCardByFuzzyName(name: string): Promise<Card | null> {
+    const raw = await this.fetchCardByFuzzyName(name);
+    return raw ? this.toCard(raw) : null;
+  }
+
   async getCardsByIds(ids: string[]): Promise<Card[]> {
     const raw = await this.fetchCollection(ids.map((id) => ({ id })));
     return raw.map((card) => this.toCard(card));
@@ -181,7 +187,7 @@ export class MtgApiService implements CardApiService {
     // Pass 2: no German (or no confident) match - fall back to a fuzzy
     // named lookup against the canonical (English) name, tolerant of the
     // remaining OCR noise, no language filter this time.
-    const raw = await this.getCardByFuzzyName(cleaned);
+    const raw = await this.fetchCardByFuzzyName(cleaned);
     if (!raw) return null;
 
     const confidence = similarity(cleaned, raw.name);
@@ -304,7 +310,7 @@ export class MtgApiService implements CardApiService {
     return score;
   }
 
-  private async getCardByFuzzyName(name: string): Promise<ScryfallRawCard | null> {
+  private async fetchCardByFuzzyName(name: string): Promise<ScryfallRawCard | null> {
     const response = await this.scryfallFetch(`${CARD_ENDPOINT}/named?fuzzy=${encodeURIComponent(name)}`);
     if (response.status === 404) return null;
     if (!response.ok) {

@@ -141,6 +141,54 @@ export class DeckService {
     }
   }
 
+  /** Deck built from a pasted card list (see DeckImportDialog) rather than a bundled precon. */
+  async importDeck(name: string, cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
+    await this.gameService.ready;
+    const userId = this.supabase.session()?.user.id;
+    if (!userId) throw new Error('Nicht eingeloggt.');
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) throw new Error('Kein aktives Spiel.');
+
+    const { data: deck, error: deckError } = await this.supabase.client
+      .from('decks')
+      .insert({
+        user_id: userId,
+        game_id: gameId,
+        name,
+        format: null,
+        is_precon: false,
+        release_date: null,
+        mtgjson_file_name: null,
+      })
+      .select('id')
+      .single<{ id: string }>();
+
+    if (deckError) throw deckError;
+
+    const { error: cardsError } = await this.supabase.client.from('deck_cards').insert(
+      cards.map((card) => ({
+        deck_id: deck.id,
+        card_id: card.cardId,
+        quantity: card.quantity,
+      })),
+    );
+    if (cardsError) throw cardsError;
+
+    const owned = await this.collectionService.getQuantitiesByCardId();
+    const collectionInputs: AddCardInput[] = cards
+      .map((card) => ({
+        cardId: card.cardId,
+        quantity: card.quantity - (owned.get(card.cardId) ?? 0),
+        foil: false,
+        condition: 'NM',
+      }))
+      .filter((input) => input.quantity > 0);
+
+    if (collectionInputs.length > 0) {
+      await this.collectionService.addCards(collectionInputs);
+    }
+  }
+
   async deleteDeck(deckId: string): Promise<void> {
     const { error } = await this.supabase.client.from('decks').delete().eq('id', deckId);
     if (error) throw error;

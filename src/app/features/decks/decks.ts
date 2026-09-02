@@ -12,6 +12,7 @@ import { BrowseDecksDialog } from './browse-decks-dialog/browse-decks-dialog';
 import { ArchetypeBrowserDialog } from './archetype-browser-dialog/archetype-browser-dialog';
 import { CommanderRecommendationsDialog } from './commander-recommendations/commander-recommendations-dialog';
 import { DeckDetailDialog } from './deck-detail-dialog/deck-detail-dialog';
+import { DeckImportDialog } from './deck-import-dialog/deck-import-dialog';
 import { buildOwnedMap, getDeckCardCount, getDeckMatch, getDeckShowcase, getPreconMatch } from './deck-stats';
 import { DeckEntry, DeckService } from './deck.service';
 
@@ -73,6 +74,7 @@ function pickBannerSample(list: PreconListEntry[], count: number): PreconListEnt
     DeckDetailDialog,
     CommanderRecommendationsDialog,
     ArchetypeBrowserDialog,
+    DeckImportDialog,
     TranslatePipe,
   ],
   templateUrl: './decks.html',
@@ -99,6 +101,7 @@ export class Decks {
   protected readonly showBrowseDialog = signal(false);
   protected readonly showCommanderRecs = signal(false);
   protected readonly showArchetypeBrowser = signal(false);
+  protected readonly showDeckImport = signal(false);
   protected readonly selectedDeck = signal<DeckEntry | null>(null);
 
   private readonly allPreconDecks = signal<PreconListEntry[]>([]);
