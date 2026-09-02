@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { Card, MtgCard } from '../models/card.model';
 import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
 import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
-import { OcrLineLike, cleanOcrText, isCloseMatch, similarity } from '../utils/string-similarity';
+import { OcrLineLike, cleanOcrText, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification } from './card-api.interface';
 
 interface ScryfallCardFace {
@@ -21,6 +21,7 @@ interface ScryfallRawCard {
   power?: string;
   toughness?: string;
   artist?: string;
+  keywords?: string[];
   cmc: number;
   color_identity: string[];
   mana_cost?: string;
@@ -35,24 +36,32 @@ interface ScryfallRawCard {
   purchase_uris?: { cardmarket?: string };
 }
 
+interface ScryfallCandidate {
+  card: ScryfallRawCard;
+  source: 'setCode' | 'filter';
+}
+
 const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
 
-// Multi-field scoring for the camera scanner: every recognizable field adds
-// confidence, so a single noisy field can't make or break a match on its
-// own. Weights mirror how reliable each signal is (set+number is a near-
-// exact structural match; artist/mana cost are the weakest, easily
-// coincidental signals).
-const NAME_MATCH_MAX_DISTANCE = 2;
-const SCORE_NAME = 40;
-const SCORE_SET_CODE = 35;
-const SCORE_COLLECTOR_NUMBER = 35;
-const SCORE_TYPE_LINE = 20;
-const SCORE_POWER_TOUGHNESS = 20;
-const SCORE_MANA_COST = 15;
+// Multi-field scoring for the camera scanner: every recognizable structural
+// field adds confidence, so a single noisy signal can't make or break a
+// match on its own - and none of it depends on successfully OCR'ing the
+// (often mangled) printed name. A set-code-sourced candidate is already an
+// exact structural match, so it starts far ahead of one found via the
+// looser filter search.
+const SCORE_SET_CODE_SOURCE = 80;
+const SCORE_POWER = 20;
+const SCORE_TOUGHNESS = 20;
+const SCORE_CMC = 15;
+const SCORE_KEYWORD = 10;
+const KEYWORD_COUNT = 7;
 const SCORE_ARTIST = 15;
-const MAX_POSSIBLE_SCORE =
-  SCORE_NAME * 2 + SCORE_SET_CODE + SCORE_COLLECTOR_NUMBER + SCORE_TYPE_LINE + SCORE_POWER_TOUGHNESS + SCORE_MANA_COST + SCORE_ARTIST;
+const MAX_POSSIBLE_SCORE = SCORE_SET_CODE_SOURCE + SCORE_POWER + SCORE_TOUGHNESS + SCORE_CMC + SCORE_KEYWORD * KEYWORD_COUNT + SCORE_ARTIST;
 const MIN_SCORE_FOR_MATCH = 60;
+// Only worth a bulk filter search once at least this many structural
+// signals agree - any fewer and the filters are too loose to narrow down
+// Scryfall's card pool meaningfully.
+const MIN_FILTERS_FOR_SEARCH = 2;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -172,83 +181,83 @@ export class MtgApiService implements CardApiService {
   }
 
   /**
-   * Multi-field scoring: extracts every recognizable field from one frame's
-   * OCR output, then tries candidates sequentially rather than firing every
-   * query at once - set+number first (cheapest, most exact), only making a
-   * second Scryfall call for a fuzzy name lookup if that didn't already
-   * score high enough. Halves the worst-case request count per frame.
-   * Each candidate is scored against every extracted field rather than
-   * trusting whichever single field found it. Returns the candidate only if
-   * it clears MIN_SCORE_FOR_MATCH - the caller is expected to still require
-   * this to agree across several consecutive frames before treating it as
-   * confirmed.
+   * Multi-field scoring, with no "extract the name first" step at all - a
+   * mangled OCR name used to be sent straight to Scryfall before any other
+   * field was even considered, which is exactly what kept producing wrong
+   * queries. Instead: pull every structural field out of the frame in one
+   * pass, try the most reliable candidate source (exact set+number), and
+   * only fall back to a bulk filter search (power/toughness, cmc, coarse
+   * type flags) when that didn't produce one - never a name-based lookup.
+   * Every candidate that does turn up is scored against every extracted
+   * field. Returns a match only above MIN_SCORE_FOR_MATCH - the caller is
+   * expected to still require this to agree across several consecutive
+   * frames before treating it as confirmed.
    */
   async identifyCardWithScoring(rawText: string, lines: OcrLineLike[]): Promise<CardIdentification | null> {
     const fields = extractFields(rawText, lines);
-    const hasSetCodeAndNumber = fields.setCode !== null && fields.collectorNumber !== null;
-    if (!fields.name && !hasSetCodeAndNumber) return null;
+    const candidates: ScryfallCandidate[] = [];
 
-    if (hasSetCodeAndNumber) {
-      const bySetCode = await this.fetchCardBySetAndNumber(fields.setCode!, String(fields.collectorNumber));
-      if (bySetCode) {
-        const scored = this.toIdentification(bySetCode, fields);
-        if (scored) return scored;
+    if (fields.setCode && fields.collectorNumber !== null) {
+      const bySetCode = await this.fetchCardBySetAndNumber(fields.setCode, String(fields.collectorNumber));
+      if (bySetCode) candidates.push({ card: bySetCode, source: 'setCode' });
+    }
+
+    if (candidates.length === 0) {
+      const filters: string[] = [];
+      if (fields.powerToughness) {
+        const [power, toughness] = fields.powerToughness.split('/');
+        filters.push(`power=${power}`, `toughness=${toughness}`);
+      }
+      if (fields.cmc !== null) filters.push(`cmc=${fields.cmc}`);
+      if (fields.isLegendary) filters.push('is:legendary');
+      if (fields.isCreature) filters.push('type:creature');
+      if (fields.isInstant) filters.push('type:instant');
+      if (fields.isSorcery) filters.push('type:sorcery');
+
+      if (filters.length >= MIN_FILTERS_FOR_SEARCH) {
+        const results = await this.runSearch(filters.join(' '), 'unique=cards');
+        candidates.push(...results.map((card): ScryfallCandidate => ({ card, source: 'filter' })));
       }
     }
 
-    if (!fields.name) return null;
+    if (candidates.length === 0) return null;
 
-    const byName = await this.getCardByFuzzyName(fields.name);
-    if (!byName) return null;
+    const best = candidates
+      .map((candidate) => ({ candidate, score: this.scoreCandidate(candidate, fields) }))
+      .sort((a, b) => b.score - a.score)[0];
 
-    return this.toIdentification(byName, fields);
-  }
-
-  private toIdentification(candidate: ScryfallRawCard, fields: ExtractedFields): CardIdentification | null {
-    const score = this.scoreCard(candidate, fields);
-    if (score < MIN_SCORE_FOR_MATCH) return null;
+    if (best.score < MIN_SCORE_FOR_MATCH) return null;
 
     return {
-      card: this.toCard(candidate),
-      confidence: Math.min(1, score / MAX_POSSIBLE_SCORE),
-      oracleId: candidate.oracle_id,
+      card: this.toCard(best.candidate.card),
+      confidence: Math.min(1, best.score / MAX_POSSIBLE_SCORE),
+      oracleId: best.candidate.card.oracle_id,
     };
   }
 
-  private scoreCard(candidate: ScryfallRawCard, fields: ExtractedFields): number {
+  private scoreCandidate(candidate: ScryfallCandidate, fields: ExtractedFields): number {
+    const card = candidate.card;
     let score = 0;
 
-    if (fields.name) {
-      if (isCloseMatch(candidate.name, fields.name, NAME_MATCH_MAX_DISTANCE)) score += SCORE_NAME;
-      if (candidate.printed_name && isCloseMatch(candidate.printed_name, fields.name, NAME_MATCH_MAX_DISTANCE)) {
-        score += SCORE_NAME;
-      }
-    }
-
-    if (fields.setCode && candidate.set.toUpperCase() === fields.setCode.toUpperCase()) {
-      score += SCORE_SET_CODE;
-    }
-    if (fields.collectorNumber !== null && parseInt(candidate.collector_number, 10) === fields.collectorNumber) {
-      score += SCORE_COLLECTOR_NUMBER;
-    }
-
-    if (
-      fields.typeLine &&
-      (candidate.type_line?.includes(fields.typeLine) || candidate.printed_type_line?.includes(fields.typeLine))
-    ) {
-      score += SCORE_TYPE_LINE;
-    }
+    if (candidate.source === 'setCode') score += SCORE_SET_CODE_SOURCE;
 
     if (fields.powerToughness) {
       const [power, toughness] = fields.powerToughness.split('/');
-      if (candidate.power === power && candidate.toughness === toughness) score += SCORE_POWER_TOUGHNESS;
+      if (card.power === power) score += SCORE_POWER;
+      if (card.toughness === toughness) score += SCORE_TOUGHNESS;
     }
 
-    if (fields.manaCost && candidate.cmc === fields.manaCost.number) {
-      score += SCORE_MANA_COST;
+    if (fields.cmc !== null && card.cmc === fields.cmc) {
+      score += SCORE_CMC;
     }
 
-    if (fields.artist && candidate.artist?.toLowerCase().includes(fields.artist.toLowerCase())) {
+    for (const [keyword, matched] of Object.entries(fields.hasKeyword)) {
+      if (matched && card.keywords?.some((k) => k.toLowerCase().includes(keyword))) {
+        score += SCORE_KEYWORD;
+      }
+    }
+
+    if (fields.artist && card.artist?.toLowerCase().includes(fields.artist.toLowerCase())) {
       score += SCORE_ARTIST;
     }
 

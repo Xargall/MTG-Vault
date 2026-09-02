@@ -1,52 +1,55 @@
 import { parseSetCode } from './set-code-parser';
-import { OcrLineLike, extractNameFromLines } from './string-similarity';
+import { OcrLineLike } from './string-similarity';
 
-export interface ExtractedManaCost {
-  raw: string;
-  /** Generic mana + one per colored pip - a rough CMC estimate, not exact for costs like {X}. */
-  number: number;
+export interface ExtractedKeywords {
+  menace: boolean;
+  trample: boolean;
+  reach: boolean;
+  flying: boolean;
+  lifelink: boolean;
+  vigilance: boolean;
+  haste: boolean;
 }
 
 export interface ExtractedFields {
-  name: string | null;
   setCode: string | null;
   collectorNumber: number | null;
-  typeLine: string | null;
   powerToughness: string | null;
-  manaCost: ExtractedManaCost | null;
+  cmc: number | null;
+  hasKeyword: ExtractedKeywords;
+  isCreature: boolean;
+  isInstant: boolean;
+  isSorcery: boolean;
+  isLegendary: boolean;
   artist: string | null;
 }
 
-const TYPE_LINE_KEYWORDS = [
-  'Legendary',
-  'Creature',
-  'Instant',
-  'Sorcery',
-  'Enchantment',
-  'Artifact',
-  'Land',
-  'Planeswalker',
-];
 const POWER_TOUGHNESS_PATTERN = /\b(\d{1,2})\s*\/\s*(\d{1,2})\b/;
 // Requires at least one WUBRG letter so this doesn't fire on an unrelated
-// bare number (e.g. a collector number) - "3R"/"2WW"-style costs only.
-const MANA_COST_PATTERN = /\b(\d{0,2})([WUBRG]{1,5})\b/;
+// bare number (e.g. a collector number) - "3R"/"2WW"-style costs only. Not
+// exact for costs with {X} or hybrid symbols, just a rough CMC estimate.
+const CMC_PATTERN = /\b(\d{0,2})([WUBRG]{1,5})\b/;
 
-export function extractTypeLine(lines: OcrLineLike[]): string | null {
-  const match = lines.find((line) => TYPE_LINE_KEYWORDS.some((keyword) => line.text.includes(keyword)));
-  return match ? match.text.trim() : null;
-}
+const KEYWORD_PATTERNS: Record<keyof ExtractedKeywords, RegExp> = {
+  menace: /Menace|Bedrohung/i,
+  trample: /Trample|Trampelschaden/i,
+  reach: /Reach|Reichweite/i,
+  flying: /Flying|Flugfähigkeit/i,
+  lifelink: /Lifelink|Lebensband/i,
+  vigilance: /Vigilance|Wachsamkeit/i,
+  haste: /Haste|Eile/i,
+};
 
 export function extractPowerToughness(text: string): string | null {
   const match = POWER_TOUGHNESS_PATTERN.exec(text);
   return match ? `${match[1]}/${match[2]}` : null;
 }
 
-export function extractManaCost(text: string): ExtractedManaCost | null {
-  const match = MANA_COST_PATTERN.exec(text);
+export function extractCMC(text: string): number | null {
+  const match = CMC_PATTERN.exec(text);
   if (!match) return null;
   const generic = match[1] ? parseInt(match[1], 10) : 0;
-  return { raw: match[0], number: generic + match[2].length };
+  return generic + match[2].length;
 }
 
 /** Artist credit prints at the very bottom of the card, often after a "©" copyright line. */
@@ -60,16 +63,31 @@ export function extractArtist(lines: OcrLineLike[]): string | null {
   return last || null;
 }
 
-/** Pulls every scoreable field out of one frame's OCR output for the multi-field scanner scoring system. */
+/**
+ * Pulls every scoreable structural field out of one frame's OCR output, with
+ * no dependency on successfully reading the card's (often OCR-mangled) name:
+ * set code + collector number, power/toughness, a rough CMC estimate, common
+ * keyword abilities, and coarse type flags - all independently extractable
+ * signals that feed the multi-field scoring system.
+ */
 export function extractFields(text: string, lines: OcrLineLike[]): ExtractedFields {
   const setCodeMatch = parseSetCode(text);
+
+  const hasKeyword = {} as ExtractedKeywords;
+  for (const key of Object.keys(KEYWORD_PATTERNS) as (keyof ExtractedKeywords)[]) {
+    hasKeyword[key] = KEYWORD_PATTERNS[key].test(text);
+  }
+
   return {
-    name: extractNameFromLines(lines),
     setCode: setCodeMatch?.setCode ?? null,
     collectorNumber: setCodeMatch ? parseInt(setCodeMatch.collectorNumber, 10) : null,
-    typeLine: extractTypeLine(lines),
     powerToughness: extractPowerToughness(text),
-    manaCost: extractManaCost(text),
+    cmc: extractCMC(text),
+    hasKeyword,
+    isCreature: /Creature|Kreatur/i.test(text),
+    isInstant: /Instant|Spontanzauber/i.test(text),
+    isSorcery: /Sorcery|Hexerei/i.test(text),
+    isLegendary: /Legendary|Legendär/i.test(text),
     artist: extractArtist(lines),
   };
 }
