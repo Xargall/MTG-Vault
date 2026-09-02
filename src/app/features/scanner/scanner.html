@@ -15,25 +15,6 @@
     ✕
   </button>
 
-  <div class="scan-zones">
-    <div
-      class="scan-zone scan-zone--name"
-      [class.scan-zone--primary]="gameService.currentSlug() === 'yugioh'"
-      [style.height.%]="nameZoneHeightPercent"
-    ></div>
-    @if (gameService.currentSlug() === 'mtg') {
-      <div
-        class="scan-zone scan-zone--set-code scan-zone--primary"
-        [style.height.%]="setCodeZoneHeightPercent"
-      ></div>
-    }
-    <div
-      class="scan-dim"
-      [style.top.%]="nameZoneHeightPercent"
-      [style.bottom.%]="dimOverlayBottomPercent()"
-    ></div>
-  </div>
-
   @if (status() === 'starting') {
     <p class="scanner-hint">{{ 'scanner.starting' | translate }}</p>
   }

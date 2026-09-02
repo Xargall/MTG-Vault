@@ -3,7 +3,6 @@ import {
   DestroyRef,
   ElementRef,
   afterNextRender,
-  computed,
   inject,
   signal,
   viewChild,
@@ -11,7 +10,6 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { PSM } from 'tesseract.js';
 
 import { Card } from '../../core/models/card.model';
 import { CardIdentification } from '../../core/services/card-api.interface';
@@ -19,23 +17,13 @@ import { CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
 import { OcrService } from '../../core/services/ocr.service';
-import { extractNameCandidate, fixUmlauts } from '../../core/utils/string-similarity';
+import { extractNameCandidates, fixUmlauts } from '../../core/utils/string-similarity';
 import { parseSetCode } from '../../core/utils/set-code-parser';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
 const CAPTURE_INTERVAL_MS = 800;
-// Sized generously (rather than tight to the printed name/collector strip)
-// so the card doesn't have to fill the whole frame to give OCR enough
-// resolution - holding it that close pushes most cameras past their
-// minimum focus distance and the image comes out blurry.
-const NAME_BAND = { from: 0, to: 0.28 };
-const SET_CODE_BAND = { from: 0.8, to: 1 };
-const NAME_UPSCALE = 2;
-const NAME_CONTRAST = 1.6;
-const SET_CODE_CONTRAST = 1.4;
 const OCR_CONFIDENCE_THRESHOLD = 70;
 const ADD_CONFIRMATION_MS = 1500;
-const NAME_CHAR_WHITELIST = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÄÖÜäöüß ,'-";
 
 type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'error';
 
@@ -54,18 +42,13 @@ export class Scanner {
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
-  private readonly cropCanvas = document.createElement('canvas');
+  private readonly captureCanvas = document.createElement('canvas');
   private stream: MediaStream | null = null;
   private timerHandle: ReturnType<typeof setTimeout> | null = null;
+  private isScanning = false;
 
   protected readonly status = signal<ScannerStatus>('starting');
   protected readonly cameraErrorMessage = signal<string | null>(null);
-
-  protected readonly nameZoneHeightPercent = NAME_BAND.to * 100;
-  protected readonly setCodeZoneHeightPercent = (1 - SET_CODE_BAND.from) * 100;
-  protected readonly dimOverlayBottomPercent = computed(() =>
-    this.gameService.currentSlug() === 'mtg' ? this.setCodeZoneHeightPercent : 0,
-  );
 
   protected readonly detectedCard = signal<Card | null>(null);
   protected readonly quantity = signal(1);
@@ -76,8 +59,10 @@ export class Scanner {
 
   constructor() {
     this.destroyRef.onDestroy(() => {
+      this.isScanning = false;
       if (this.timerHandle) clearTimeout(this.timerHandle);
       this.stream?.getTracks().forEach((track) => track.stop());
+      void this.ocrService.terminate();
     });
 
     afterNextRender(() => void this.startCamera());
@@ -107,16 +92,18 @@ export class Scanner {
     videoEl.srcObject = this.stream;
     await videoEl.play();
 
+    this.isScanning = true;
     this.status.set('scanning');
     this.scheduleNextCapture();
   }
 
   private scheduleNextCapture() {
+    if (!this.isScanning) return;
     this.timerHandle = setTimeout(() => void this.captureAndAnalyze(), CAPTURE_INTERVAL_MS);
   }
 
   private async captureAndAnalyze() {
-    if (this.status() !== 'scanning') return;
+    if (!this.isScanning || this.status() !== 'scanning') return;
 
     try {
       await this.analyzeFrame();
@@ -124,7 +111,7 @@ export class Scanner {
       // Bad lighting, blur, no text, a network hiccup on the lookup - all
       // expected and transient. Stay silent and just keep scanning.
     } finally {
-      if (this.status() === 'scanning') this.scheduleNextCapture();
+      if (this.isScanning && this.status() === 'scanning') this.scheduleNextCapture();
     }
   }
 
@@ -132,34 +119,36 @@ export class Scanner {
     const videoEl = this.video()?.nativeElement;
     if (!videoEl || videoEl.readyState < 2) return;
 
+    // No cropping - Tesseract gets the whole card image as context, which
+    // reads far more reliably than a thin, tightly-cropped strip (and lets
+    // the card be held at a normal, in-focus distance instead of filling
+    // the frame).
+    const canvas = this.captureFrame(videoEl);
+    if (!canvas) return;
+
+    const { text, confidence } = await this.ocrService.recognizeText(canvas);
+    if (confidence <= OCR_CONFIDENCE_THRESHOLD) return;
+
     // Primary path (MTG only): the set code + collector number printed at
-    // the bottom of the card is exact and language-independent, so it's
-    // tried first. Yu-Gi-Oh has no equivalent structured identifier.
+    // the bottom of the card is exact and language-independent. Yu-Gi-Oh
+    // has no equivalent structured identifier.
     if (this.gameService.currentSlug() === 'mtg') {
-      const bySetCode = await this.tryIdentifyBySetCode(videoEl);
+      const bySetCode = await this.tryIdentifyBySetCode(text);
       if (bySetCode) {
         this.onMatch(bySetCode);
         return;
       }
     }
 
-    // Fallback: OCR the printed name and search for it (used for Yu-Gi-Oh
-    // always, and for MTG whenever the set-code strip wasn't readable).
-    const byName = await this.tryIdentifyByName(videoEl);
+    // Fallback: search for the printed name (used for Yu-Gi-Oh always, and
+    // for MTG whenever the set-code strip wasn't in/readable in this frame).
+    const byName = await this.tryIdentifyByName(text);
     if (byName) {
       this.onMatch(byName);
     }
   }
 
-  private async tryIdentifyBySetCode(videoEl: HTMLVideoElement): Promise<CardIdentification | null> {
-    const canvas = this.cropRegion(videoEl, SET_CODE_BAND.from, SET_CODE_BAND.to, {
-      contrast: SET_CODE_CONTRAST,
-    });
-    if (!canvas) return null;
-
-    const { text, confidence } = await this.ocrService.recognizeText(canvas);
-    if (confidence <= OCR_CONFIDENCE_THRESHOLD) return null;
-
+  private async tryIdentifyBySetCode(text: string): Promise<CardIdentification | null> {
     const parsed = parseSetCode(text);
     if (!parsed) return null;
 
@@ -170,55 +159,37 @@ export class Scanner {
     return { card, confidence: 1 };
   }
 
-  private async tryIdentifyByName(videoEl: HTMLVideoElement): Promise<CardIdentification | null> {
-    const canvas = this.cropRegion(videoEl, NAME_BAND.from, NAME_BAND.to, {
-      scale: NAME_UPSCALE,
-      contrast: NAME_CONTRAST,
-    });
-    if (!canvas) return null;
+  private async tryIdentifyByName(text: string): Promise<CardIdentification | null> {
+    const candidates = extractNameCandidates(fixUmlauts(text));
 
-    const { text, confidence } = await this.ocrService.recognizeText(canvas, {
-      pageSegMode: PSM.SINGLE_LINE,
-      charWhitelist: NAME_CHAR_WHITELIST,
-    });
-    if (confidence <= OCR_CONFIDENCE_THRESHOLD) return null;
+    for (const candidate of candidates) {
+      const result = await this.gameService.cardApi().identifyCard(candidate);
+      if (result) return result;
+    }
 
-    const candidate = extractNameCandidate(fixUmlauts(text));
-    if (!candidate) return null;
-
-    return this.gameService.cardApi().identifyCard(candidate);
+    return null;
   }
 
-  private cropRegion(
-    videoEl: HTMLVideoElement,
-    fromRatio: number,
-    toRatio: number,
-    options: { scale?: number; contrast?: number } = {},
-  ): HTMLCanvasElement | null {
-    const { scale = 1, contrast = 1.4 } = options;
+  private captureFrame(videoEl: HTMLVideoElement): HTMLCanvasElement | null {
     const width = videoEl.videoWidth;
-    const totalHeight = videoEl.videoHeight;
-    if (!width || !totalHeight) return null;
+    const height = videoEl.videoHeight;
+    if (!width || !height) return null;
 
-    const sourceY = Math.round(totalHeight * fromRatio);
-    const height = Math.round(totalHeight * (toRatio - fromRatio));
-    if (!height) return null;
-
-    this.cropCanvas.width = Math.round(width * scale);
-    this.cropCanvas.height = Math.round(height * scale);
+    this.captureCanvas.width = width;
+    this.captureCanvas.height = height;
 
     // Some browsers briefly report a tiny placeholder videoWidth/videoHeight
-    // while the stream is still settling - drawing/upscaling from that
-    // produces a near-zero canvas Tesseract can't handle. Skip the frame;
-    // the next capture tick will have real dimensions.
-    if (this.cropCanvas.width < 10 || this.cropCanvas.height < 10) return null;
+    // while the stream is still settling - drawing from that produces a
+    // near-zero canvas Tesseract can't handle. Skip the frame; the next
+    // capture tick will have real dimensions.
+    if (this.captureCanvas.width < 10 || this.captureCanvas.height < 10) return null;
 
-    const ctx = this.cropCanvas.getContext('2d');
+    const ctx = this.captureCanvas.getContext('2d');
     if (!ctx) return null;
 
-    ctx.filter = `grayscale(1) contrast(${contrast})`;
-    ctx.drawImage(videoEl, 0, sourceY, width, height, 0, 0, this.cropCanvas.width, this.cropCanvas.height);
-    return this.cropCanvas;
+    ctx.filter = 'grayscale(1) contrast(1.4)';
+    ctx.drawImage(videoEl, 0, 0, width, height);
+    return this.captureCanvas;
   }
 
   private onMatch(result: CardIdentification) {

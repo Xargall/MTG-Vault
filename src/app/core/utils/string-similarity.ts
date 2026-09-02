@@ -50,33 +50,28 @@ export function fixUmlauts(text: string): string {
     .replace(/ue/g, 'ü');
 }
 
-const MIN_CANDIDATE_LENGTH = 4;
+const MIN_WORD_LENGTH = 4;
 const MAX_CANDIDATE_WORDS = 3;
-const SHORT_TOKEN = /^\w{1,2}$/;
 
 /**
- * Reduces raw, noisy OCR output to a plausible card-name candidate: isolated
- * 1-2 character tokens are almost always OCR noise rather than part of the
- * name, so this keeps only the longest contiguous run of words longer than
- * that, then caps the result at a few words (card names are rarely longer).
- * Returns null if nothing long enough survives - callers should skip the
- * API lookup entirely in that case rather than search on noise.
+ * Turns noisy, unstructured OCR output (a whole card image, not just a
+ * cropped name strip) into an ordered list of card-name guesses to try
+ * against the API: words shorter than 4 characters are almost always OCR
+ * noise or unrelated card text rather than part of the name, so they're
+ * dropped; the remaining words are combined from most specific (all of
+ * them, up to 3) down to just the first, so a caller can retry with a
+ * shorter guess if the more specific one comes back with no match.
  */
-export function extractNameCandidate(raw: string): string | null {
-  const words = cleanOcrText(raw).split(' ').filter(Boolean);
+export function extractNameCandidates(raw: string): string[] {
+  const words = cleanOcrText(raw)
+    .split(' ')
+    .filter((word) => word.length >= MIN_WORD_LENGTH)
+    .slice(0, MAX_CANDIDATE_WORDS);
 
-  let bestRun: string[] = [];
-  let currentRun: string[] = [];
-  for (const word of words) {
-    if (SHORT_TOKEN.test(word)) {
-      if (currentRun.length > bestRun.length) bestRun = currentRun;
-      currentRun = [];
-    } else {
-      currentRun.push(word);
-    }
+  const candidates: string[] = [];
+  for (let take = words.length; take >= 1; take--) {
+    const candidate = words.slice(0, take).join(' ');
+    if (candidate && !candidates.includes(candidate)) candidates.push(candidate);
   }
-  if (currentRun.length > bestRun.length) bestRun = currentRun;
-
-  const candidate = bestRun.slice(0, MAX_CANDIDATE_WORDS).join(' ');
-  return candidate.length >= MIN_CANDIDATE_LENGTH ? candidate : null;
+  return candidates;
 }
