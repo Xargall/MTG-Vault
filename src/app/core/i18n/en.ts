@@ -205,6 +205,8 @@ export const en: typeof de = {
     cameraPermissionDenied: 'Camera access denied. Please allow it in your browser settings.',
     noCameraFound: 'No camera found.',
     backToCollection: '← Back to collection',
+    cameraSelect: 'Select camera',
+    cameraFallbackLabel: 'Camera {{index}}',
     foil: 'Foil',
     addToCollection: 'Add to collection',
     keepScanning: 'Keep scanning',

@@ -21,6 +21,21 @@
     <div class="scan-pulse" aria-hidden="true"></div>
   }
 
+  @if (availableCameras().length > 1) {
+    <select
+      class="camera-select"
+      [ngModel]="selectedDeviceId()"
+      (ngModelChange)="onCameraChange($event)"
+      [attr.aria-label]="'scanner.cameraSelect' | translate"
+    >
+      @for (device of availableCameras(); track device.deviceId) {
+        <option [value]="device.deviceId">
+          {{ device.label || ('scanner.cameraFallbackLabel' | translate: { index: $index + 1 }) }}
+        </option>
+      }
+    </select>
+  }
+
   @if (toast(); as t) {
     <div class="scanner-toast" [class.scanner-toast--warning]="t.variant === 'warning'">{{ t.message }}</div>
   }

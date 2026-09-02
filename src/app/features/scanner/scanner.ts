@@ -57,6 +57,8 @@ export class Scanner {
   protected readonly status = signal<ScannerStatus>('starting');
   protected readonly cameraErrorMessage = signal<string | null>(null);
   protected readonly toast = signal<ScannerToast | null>(null);
+  protected readonly availableCameras = signal<MediaDeviceInfo[]>([]);
+  protected readonly selectedDeviceId = signal<string | null>(null);
 
   protected readonly detectedCard = signal<Card | null>(null);
   protected readonly quantity = signal(1);
@@ -77,13 +79,45 @@ export class Scanner {
     afterNextRender(() => void this.startCamera());
   }
 
-  private async startCamera() {
+  private async startCamera(deviceId?: string) {
     const videoEl = this.video()?.nativeElement;
     if (!videoEl) return;
 
+    // Switching cameras re-enters this method while already scanning -
+    // stop the previous loop/stream first so they don't run in parallel.
+    this.isScanning = false;
+    if (this.timerHandle) {
+      clearTimeout(this.timerHandle);
+      this.timerHandle = null;
+    }
+    this.stream?.getTracks().forEach((track) => track.stop());
+
+    let preferredDeviceId = deviceId ?? null;
+    if (!preferredDeviceId) {
+      // Prefer a USB camera over built-in/virtual ones (e.g. a "Lenovo
+      // Virtual Camera") since it typically has much higher resolution.
+      // Labels are only populated once permission has already been
+      // granted at least once for this origin - if not, this just finds
+      // nothing and falls back to the default camera below.
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const usbCamera = devices
+          .filter((d) => d.kind === 'videoinput')
+          .find((d) => d.label.toLowerCase().includes('usb'));
+        preferredDeviceId = usbCamera?.deviceId ?? null;
+      } catch {
+        // enumerateDevices() failing just means no auto-preference - carry on.
+      }
+    }
+
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: {
+          deviceId: preferredDeviceId ? { exact: preferredDeviceId } : undefined,
+          facingMode: preferredDeviceId ? undefined : { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
         audio: false,
       });
     } catch (error) {
@@ -101,12 +135,26 @@ export class Scanner {
     videoEl.srcObject = this.stream;
     await videoEl.play();
 
+    this.selectedDeviceId.set(this.stream.getVideoTracks()[0]?.getSettings().deviceId ?? null);
+    // Now that permission is granted, labels are populated - (re-)populate
+    // the camera picker.
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      this.availableCameras.set(devices.filter((d) => d.kind === 'videoinput'));
+    } catch {
+      // Picker just stays empty; not fatal.
+    }
+
     // isScanning must be true before the first scheduleNextCapture() call,
     // or that call's own guard would immediately no-op and the loop would
     // never start.
     this.isScanning = true;
     this.status.set('scanning');
     this.scheduleNextCapture();
+  }
+
+  protected onCameraChange(deviceId: string) {
+    void this.startCamera(deviceId);
   }
 
   private scheduleNextCapture() {

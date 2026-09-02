@@ -203,6 +203,8 @@ export const de = {
     cameraPermissionDenied: 'Kamerazugriff verweigert. Bitte in den Browser-Einstellungen erlauben.',
     noCameraFound: 'Keine Kamera gefunden.',
     backToCollection: '← Zurück zur Sammlung',
+    cameraSelect: 'Kamera auswählen',
+    cameraFallbackLabel: 'Kamera {{index}}',
     foil: 'Foil',
     addToCollection: 'Zur Collection hinzufügen',
     keepScanning: 'Weiter scannen',

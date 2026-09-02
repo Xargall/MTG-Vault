@@ -42,6 +42,19 @@
   font-size: 0.85rem;
 }
 
+.camera-select {
+  position: absolute;
+  top: calc(var(--spacing-md) + 36px + var(--spacing-sm));
+  left: var(--spacing-md);
+  max-width: calc(100% - var(--spacing-md) * 2);
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.8rem;
+}
+
 .scanner-error {
   position: absolute;
   inset: 0;
