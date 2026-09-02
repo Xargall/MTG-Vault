@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 
 import { Card, MtgCard } from '../models/card.model';
 import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
+import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
 import { OcrLineLike, cleanOcrText, isCloseMatch, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification } from './card-api.interface';
 
@@ -61,9 +62,26 @@ const CARD_ENDPOINT = 'https://api.scryfall.com/cards';
 const COLLECTION_ENDPOINT = 'https://api.scryfall.com/cards/collection';
 const SEARCH_ENDPOINT = 'https://api.scryfall.com/cards/search';
 const BATCH_SIZE = 75;
+const SCRYFALL_USER_AGENT = 'TCGVault/1.0 (mathias-mayer.de)';
 
 @Injectable({ providedIn: 'root' })
 export class MtgApiService implements CardApiService {
+  // Every Scryfall call funnels through this queue (max 10 req/s, per
+  // Scryfall's documented limit) and carries an identifying User-Agent -
+  // both required to avoid the 403s a bursty, unidentified scanner triggers.
+  private readonly queue = new ScryfallQueue();
+
+  private scryfallFetch(url: string, init?: RequestInit): Promise<Response> {
+    return this.queue.add(async () => {
+      const response = await fetch(url, {
+        ...init,
+        headers: { ...init?.headers, 'User-Agent': SCRYFALL_USER_AGENT },
+      });
+      if (response.status === 403) throw new ScryfallRateLimitError();
+      return response;
+    });
+  }
+
   async searchCards(query: string): Promise<Card[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
@@ -87,7 +105,7 @@ export class MtgApiService implements CardApiService {
   }
 
   async getCard(id: string): Promise<Card | null> {
-    const response = await fetch(`${CARD_ENDPOINT}/${id}`);
+    const response = await this.scryfallFetch(`${CARD_ENDPOINT}/${id}`);
     if (response.status === 404) return null;
     if (!response.ok) {
       throw new Error(`Scryfall-Anfrage fehlgeschlagen (${response.status})`);
@@ -103,7 +121,7 @@ export class MtgApiService implements CardApiService {
   }
 
   private async fetchCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {
-    const response = await fetch(`${CARD_ENDPOINT}/${setCode.toLowerCase()}/${collectorNumber}`);
+    const response = await this.scryfallFetch(`${CARD_ENDPOINT}/${setCode.toLowerCase()}/${collectorNumber}`);
     if (response.status === 404) return null;
     if (!response.ok) {
       throw new Error(`Scryfall-Anfrage fehlgeschlagen (${response.status})`);
@@ -155,61 +173,45 @@ export class MtgApiService implements CardApiService {
 
   /**
    * Multi-field scoring: extracts every recognizable field from one frame's
-   * OCR output, fetches candidates via whichever fields are present (set+
-   * number exact lookup, fuzzy name, German exact-quoted name search),
-   * dedupes by oracle_id, and scores each candidate against all extracted
-   * fields rather than trusting a single field on its own. Returns the best
-   * candidate only if it clears MIN_SCORE_FOR_MATCH - the caller is
-   * expected to still require this to agree across several consecutive
-   * frames before treating it as confirmed.
+   * OCR output, then tries candidates sequentially rather than firing every
+   * query at once - set+number first (cheapest, most exact), only making a
+   * second Scryfall call for a fuzzy name lookup if that didn't already
+   * score high enough. Halves the worst-case request count per frame.
+   * Each candidate is scored against every extracted field rather than
+   * trusting whichever single field found it. Returns the candidate only if
+   * it clears MIN_SCORE_FOR_MATCH - the caller is expected to still require
+   * this to agree across several consecutive frames before treating it as
+   * confirmed.
    */
   async identifyCardWithScoring(rawText: string, lines: OcrLineLike[]): Promise<CardIdentification | null> {
     const fields = extractFields(rawText, lines);
     const hasSetCodeAndNumber = fields.setCode !== null && fields.collectorNumber !== null;
     if (!fields.name && !hasSetCodeAndNumber) return null;
 
-    const fetches: Promise<ScryfallRawCard[]>[] = [];
-
     if (hasSetCodeAndNumber) {
-      fetches.push(
-        this.fetchCardBySetAndNumber(fields.setCode!, String(fields.collectorNumber))
-          .then((card) => (card ? [card] : []))
-          .catch(() => []),
-      );
-    }
-    if (fields.name) {
-      fetches.push(
-        this.getCardByFuzzyName(fields.name)
-          .then((card) => (card ? [card] : []))
-          .catch(() => []),
-      );
-      const escapedName = fields.name.replace(/"/g, '\\"');
-      fetches.push(this.runSearch(`lang:de "${escapedName}"`, 'unique=cards').catch(() => []));
-    }
-
-    const groups = await Promise.all(fetches);
-    const seenOracleIds = new Set<string>();
-    const candidates: ScryfallRawCard[] = [];
-    for (const group of groups) {
-      for (const raw of group) {
-        if (raw.oracle_id && !seenOracleIds.has(raw.oracle_id)) {
-          seenOracleIds.add(raw.oracle_id);
-          candidates.push(raw);
-        }
+      const bySetCode = await this.fetchCardBySetAndNumber(fields.setCode!, String(fields.collectorNumber));
+      if (bySetCode) {
+        const scored = this.toIdentification(bySetCode, fields);
+        if (scored) return scored;
       }
     }
-    if (candidates.length === 0) return null;
 
-    const best = candidates
-      .map((card) => ({ card, score: this.scoreCard(card, fields) }))
-      .sort((a, b) => b.score - a.score)[0];
+    if (!fields.name) return null;
 
-    if (best.score < MIN_SCORE_FOR_MATCH) return null;
+    const byName = await this.getCardByFuzzyName(fields.name);
+    if (!byName) return null;
+
+    return this.toIdentification(byName, fields);
+  }
+
+  private toIdentification(candidate: ScryfallRawCard, fields: ExtractedFields): CardIdentification | null {
+    const score = this.scoreCard(candidate, fields);
+    if (score < MIN_SCORE_FOR_MATCH) return null;
 
     return {
-      card: this.toCard(best.card),
-      confidence: Math.min(1, best.score / MAX_POSSIBLE_SCORE),
-      oracleId: best.card.oracle_id,
+      card: this.toCard(candidate),
+      confidence: Math.min(1, score / MAX_POSSIBLE_SCORE),
+      oracleId: candidate.oracle_id,
     };
   }
 
@@ -254,7 +256,7 @@ export class MtgApiService implements CardApiService {
   }
 
   private async getCardByFuzzyName(name: string): Promise<ScryfallRawCard | null> {
-    const response = await fetch(`${CARD_ENDPOINT}/named?fuzzy=${encodeURIComponent(name)}`);
+    const response = await this.scryfallFetch(`${CARD_ENDPOINT}/named?fuzzy=${encodeURIComponent(name)}`);
     if (response.status === 404) return null;
     if (!response.ok) {
       throw new Error(`Scryfall-Anfrage fehlgeschlagen (${response.status})`);
@@ -317,7 +319,7 @@ export class MtgApiService implements CardApiService {
 
   private async runSearch(scryfallQuery: string, params: string): Promise<ScryfallRawCard[]> {
     const url = `${SEARCH_ENDPOINT}?q=${encodeURIComponent(scryfallQuery)}&${params}`;
-    const response = await fetch(url);
+    const response = await this.scryfallFetch(url);
 
     if (response.status === 404) {
       return [];
@@ -337,7 +339,7 @@ export class MtgApiService implements CardApiService {
 
     for (let i = 0; i < identifiers.length; i += BATCH_SIZE) {
       const batch = identifiers.slice(i, i + BATCH_SIZE);
-      const response = await fetch(COLLECTION_ENDPOINT, {
+      const response = await this.scryfallFetch(COLLECTION_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifiers: batch }),

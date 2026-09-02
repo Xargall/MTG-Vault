@@ -216,6 +216,7 @@ export const de = {
     keepScanning: 'Weiter scannen',
     addedToast: '✓ {{name}} zur Sammlung hinzugefügt',
     notRecognized: 'Karte nicht erkannt — bitte Karte deutlicher vor die Kamera halten',
+    rateLimited: 'Zu viele Anfragen — kurze Pause…',
     addFailed: 'Karte konnte nicht hinzugefügt werden.',
   },
   addWishlist: {

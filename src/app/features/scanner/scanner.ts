@@ -17,6 +17,7 @@ import { CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
 import { OcrLine, OcrService } from '../../core/services/ocr.service';
+import { ScryfallRateLimitError } from '../../core/utils/scryfall-queue';
 import { extractNameFromLines } from '../../core/utils/string-similarity';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
@@ -40,6 +41,11 @@ const CONSECUTIVE_MATCHES_REQUIRED = 3;
 const SUCCESS_TOAST_DURATION_MS = 3000;
 const FAILURE_TOAST_DURATION_MS = 2000;
 const AUTO_RESUME_DELAY_MS = 2000;
+const RATE_LIMIT_TOAST_DURATION_MS = 3000;
+// Non-blocking: a 403 sets a "cool off until" timestamp rather than
+// awaiting a delay inline, so the loop (and the UI) never freezes for it.
+const RATE_LIMIT_PAUSE_MS = 5000;
+const RATE_LIMIT_RETRY_DELAY_MS = 1000;
 
 type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'error';
 type ScannerToast = { message: string; variant: 'success' | 'warning' };
@@ -88,6 +94,7 @@ export class Scanner {
   private noMatchStreak = 0;
   private lastOracleId: string | null = null;
   private consecutiveMatches = 0;
+  private rateLimitedUntil = 0;
 
   protected readonly status = signal<ScannerStatus>('starting');
   protected readonly cameraErrorMessage = signal<string | null>(null);
@@ -253,6 +260,15 @@ export class Scanner {
     console.log('analyzing frame');
     if (!this.isScanning || this.status() !== 'scanning') return;
 
+    // Non-blocking rate-limit cool-off: a prior 403 set a "retry after"
+    // timestamp rather than awaiting a delay inline, so a tick that lands
+    // during the cool-off just reschedules itself further out instead of
+    // doing any work (or freezing the loop/UI while waiting it out).
+    if (Date.now() < this.rateLimitedUntil) {
+      this.scheduleNextCapture(RATE_LIMIT_RETRY_DELAY_MS);
+      return;
+    }
+
     const start = Date.now();
     try {
       const matched = await this.analyzeFrame();
@@ -265,13 +281,22 @@ export class Scanner {
           this.noMatchStreak = 0;
         }
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof ScryfallRateLimitError) {
+        console.warn('Scryfall Rate-Limit — pausiere 5 Sekunden');
+        this.rateLimitedUntil = Date.now() + RATE_LIMIT_PAUSE_MS;
+        this.showToast(this.translate.instant('scanner.rateLimited'), 'warning', RATE_LIMIT_TOAST_DURATION_MS);
+      }
       // Bad lighting, blur, no text, a network hiccup on the lookup - all
-      // expected and transient. Stay silent and just keep scanning.
+      // expected and transient otherwise. Stay silent and just keep scanning.
     } finally {
       if (this.isScanning && this.status() === 'scanning') {
-        const elapsed = Date.now() - start;
-        this.scheduleNextCapture(Math.max(0, MIN_CAPTURE_GAP_MS - elapsed));
+        if (Date.now() < this.rateLimitedUntil) {
+          this.scheduleNextCapture(RATE_LIMIT_RETRY_DELAY_MS);
+        } else {
+          const elapsed = Date.now() - start;
+          this.scheduleNextCapture(Math.max(0, MIN_CAPTURE_GAP_MS - elapsed));
+        }
       }
     }
   }
