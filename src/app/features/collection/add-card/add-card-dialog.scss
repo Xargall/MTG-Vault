@@ -137,13 +137,22 @@
     width: 170px;
     flex-shrink: 0;
   }
+
+  // Below this, the form no longer has room next to a 170px-wide image
+  // without being squeezed - stack it underneath instead, full width.
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: center;
+  }
 }
 
 .detail-form {
   flex: 1;
+  min-width: 0; // let this shrink instead of forcing the row to overflow
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  width: 100%;
 
   label {
     font-size: 0.85rem;
@@ -152,6 +161,8 @@
 
   input[type='number'],
   select {
+    width: 100%;
+    box-sizing: border-box;
     padding: var(--spacing-sm);
     border-radius: var(--radius);
     border: 1px solid var(--color-border);
