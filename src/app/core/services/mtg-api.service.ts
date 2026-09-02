@@ -38,7 +38,7 @@ interface ScryfallRawCard {
 
 interface ScryfallCandidate {
   card: ScryfallRawCard;
-  source: 'exact' | 'filter';
+  source: 'exact' | 'name' | 'filter';
 }
 
 const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
@@ -50,6 +50,11 @@ const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
 // exact structural match, so it starts far ahead of one found via the
 // looser filter search.
 const SCORE_SET_CODE_SOURCE = 80;
+// A fuzzy name lookup is a good signal for finding the right oracle card,
+// but (unlike an exact set+number hit) not certain to be the exact print
+// scanned - worth less than the exact-lookup bonus, and still has to beat
+// out other structural signals (collector number above all) in scoring.
+const SCORE_NAME_SOURCE = 50;
 const SCORE_POWER = 20;
 const SCORE_TOUGHNESS = 20;
 const SCORE_KEYWORD = 10;
@@ -59,8 +64,6 @@ const SCORE_ARTIST = 15;
 // code) still pick out the right printing/variant in scoring - e.g. two
 // prints of the same card with different collector numbers otherwise tie.
 const SCORE_COLLECTOR_NUMBER = 30;
-const MAX_POSSIBLE_SCORE =
-  SCORE_SET_CODE_SOURCE + SCORE_POWER + SCORE_TOUGHNESS + SCORE_KEYWORD * KEYWORD_COUNT + SCORE_ARTIST + SCORE_COLLECTOR_NUMBER;
 // Only worth a bulk filter search once at least this many structural
 // signals agree - any fewer and the filters are too loose to narrow down
 // Scryfall's card pool meaningfully.
@@ -237,14 +240,22 @@ export class MtgApiService implements CardApiService {
       if (fields.isInstant) filters.push('type:instant');
       if (fields.isSorcery) filters.push('type:sorcery');
 
-      if (filters.length >= MIN_FILTERS_FOR_SEARCH) {
-        // unique=prints, not unique=cards: every printing/variant of a card
-        // comes back separately (regular, extended art, showcase, ...)
-        // rather than being collapsed to one - scoring (collector number
-        // above all) then picks out the specific print that was scanned.
-        const results = await this.runSearch(filters.join(' '), 'unique=prints');
-        candidates.push(...results.map((card): ScryfallCandidate => ({ card, source: 'filter' })));
-      }
+      // Fuzzy name lookup runs alongside the filter search, not instead of
+      // it - neither is trusted alone, both just feed the same scoring pool
+      // (a cleaned-up name is still the OCR field most prone to noise).
+      const [byName, filterResults] = await Promise.all([
+        fields.name ? this.fetchCardByFuzzyName(fields.name).catch(() => null) : Promise.resolve(null),
+        filters.length >= MIN_FILTERS_FOR_SEARCH
+          ? // unique=prints, not unique=cards: every printing/variant of a
+            // card comes back separately (regular, extended art, showcase,
+            // ...) rather than being collapsed to one - scoring (collector
+            // number above all) then picks out the specific print scanned.
+            this.runSearch(filters.join(' '), 'unique=prints')
+          : Promise.resolve([]),
+      ]);
+
+      if (byName) candidates.push({ card: byName, source: 'name' });
+      candidates.push(...filterResults.map((card): ScryfallCandidate => ({ card, source: 'filter' })));
     }
 
     if (candidates.length === 0) return null;
@@ -286,6 +297,7 @@ export class MtgApiService implements CardApiService {
     let score = 0;
 
     if (candidate.source === 'exact') score += SCORE_SET_CODE_SOURCE;
+    if (candidate.source === 'name') score += SCORE_NAME_SOURCE;
 
     if (fields.powerToughness) {
       const [power, toughness] = fields.powerToughness.split('/');

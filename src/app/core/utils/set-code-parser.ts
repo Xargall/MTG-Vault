@@ -44,6 +44,9 @@ const IGNORED_SET_TOKENS = [
   'EIN', 'WEN', 'WEM', 'WER', 'IHM', 'IHN',
   'SIE', 'MIR', 'MAN', 'NUR', 'OFT', 'SEI',
   'TUT', 'WIE', 'ZIE', 'ZUR',
+  // Printed on every card of a licensed/crossover product line, not a set code:
+  'MARVEL', 'WIZARDS', 'COAST', 'HASBRO',
+  'FOIL', 'RARE', 'MYTHIC', 'COMMON',
 ];
 
 /** Standalone collector-number extraction, independent of finding a valid set code alongside it - lets a caller still use the number for scoring even when the set code couldn't be read. */
