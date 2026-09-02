@@ -23,9 +23,13 @@ import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
 const CAPTURE_INTERVAL_MS = 800;
 const OCR_CONFIDENCE_THRESHOLD = 70;
-const ADD_CONFIRMATION_MS = 1500;
+const NO_MATCH_STREAK_FOR_TOAST = 10;
+const SUCCESS_TOAST_DURATION_MS = 3000;
+const FAILURE_TOAST_DURATION_MS = 2000;
+const AUTO_RESUME_DELAY_MS = 2000;
 
 type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'error';
+type ScannerToast = { message: string; variant: 'success' | 'warning' };
 
 @Component({
   selector: 'app-scanner',
@@ -45,22 +49,27 @@ export class Scanner {
   private readonly captureCanvas = document.createElement('canvas');
   private stream: MediaStream | null = null;
   private timerHandle: ReturnType<typeof setTimeout> | null = null;
+  private toastTimeout: ReturnType<typeof setTimeout> | null = null;
+  private autoResumeTimeout: ReturnType<typeof setTimeout> | null = null;
   private isScanning = false;
+  private noMatchStreak = 0;
 
   protected readonly status = signal<ScannerStatus>('starting');
   protected readonly cameraErrorMessage = signal<string | null>(null);
+  protected readonly toast = signal<ScannerToast | null>(null);
 
   protected readonly detectedCard = signal<Card | null>(null);
   protected readonly quantity = signal(1);
   protected readonly foil = signal(false);
   protected readonly adding = signal(false);
   protected readonly addError = signal<string | null>(null);
-  protected readonly justAdded = signal(false);
 
   constructor() {
     this.destroyRef.onDestroy(() => {
       this.isScanning = false;
       if (this.timerHandle) clearTimeout(this.timerHandle);
+      if (this.toastTimeout) clearTimeout(this.toastTimeout);
+      if (this.autoResumeTimeout) clearTimeout(this.autoResumeTimeout);
       this.stream?.getTracks().forEach((track) => track.stop());
       void this.ocrService.terminate();
     });
@@ -92,6 +101,9 @@ export class Scanner {
     videoEl.srcObject = this.stream;
     await videoEl.play();
 
+    // isScanning must be true before the first scheduleNextCapture() call,
+    // or that call's own guard would immediately no-op and the loop would
+    // never start.
     this.isScanning = true;
     this.status.set('scanning');
     this.scheduleNextCapture();
@@ -103,10 +115,20 @@ export class Scanner {
   }
 
   private async captureAndAnalyze() {
+    console.log('analyzing frame');
     if (!this.isScanning || this.status() !== 'scanning') return;
 
     try {
-      await this.analyzeFrame();
+      const matched = await this.analyzeFrame();
+      if (matched) {
+        this.noMatchStreak = 0;
+      } else {
+        this.noMatchStreak++;
+        if (this.noMatchStreak >= NO_MATCH_STREAK_FOR_TOAST) {
+          this.showToast(this.translate.instant('scanner.notRecognized'), 'warning', FAILURE_TOAST_DURATION_MS);
+          this.noMatchStreak = 0;
+        }
+      }
     } catch {
       // Bad lighting, blur, no text, a network hiccup on the lookup - all
       // expected and transient. Stay silent and just keep scanning.
@@ -115,19 +137,20 @@ export class Scanner {
     }
   }
 
-  private async analyzeFrame() {
+  private async analyzeFrame(): Promise<boolean> {
     const videoEl = this.video()?.nativeElement;
-    if (!videoEl || videoEl.readyState < 2) return;
+    if (!videoEl || videoEl.readyState < 2) return false;
 
     // No cropping - Tesseract gets the whole card image as context, which
     // reads far more reliably than a thin, tightly-cropped strip (and lets
     // the card be held at a normal, in-focus distance instead of filling
     // the frame).
     const canvas = this.captureFrame(videoEl);
-    if (!canvas) return;
+    if (!canvas) return false;
 
     const { text, confidence } = await this.ocrService.recognizeText(canvas);
-    if (confidence <= OCR_CONFIDENCE_THRESHOLD) return;
+    console.log('OCR result:', text, 'confidence:', confidence);
+    if (confidence <= OCR_CONFIDENCE_THRESHOLD) return false;
 
     // Primary path (MTG only): the set code + collector number printed at
     // the bottom of the card is exact and language-independent. Yu-Gi-Oh
@@ -136,7 +159,7 @@ export class Scanner {
       const bySetCode = await this.tryIdentifyBySetCode(text);
       if (bySetCode) {
         this.onMatch(bySetCode);
-        return;
+        return true;
       }
     }
 
@@ -145,7 +168,10 @@ export class Scanner {
     const byName = await this.tryIdentifyByName(text);
     if (byName) {
       this.onMatch(byName);
+      return true;
     }
+
+    return false;
   }
 
   private async tryIdentifyBySetCode(text: string): Promise<CardIdentification | null> {
@@ -196,9 +222,14 @@ export class Scanner {
     this.quantity.set(1);
     this.foil.set(false);
     this.addError.set(null);
-    this.justAdded.set(false);
     this.detectedCard.set(result.card);
     this.status.set('matched');
+  }
+
+  private showToast(message: string, variant: ScannerToast['variant'], durationMs: number) {
+    if (this.toastTimeout) clearTimeout(this.toastTimeout);
+    this.toast.set({ message, variant });
+    this.toastTimeout = setTimeout(() => this.toast.set(null), durationMs);
   }
 
   protected increaseQuantity() {
@@ -222,8 +253,12 @@ export class Scanner {
         foil: this.foil(),
         condition: 'NM',
       });
-      this.justAdded.set(true);
-      setTimeout(() => this.justAdded.set(false), ADD_CONFIRMATION_MS);
+      this.showToast(
+        this.translate.instant('scanner.addedToast', { name: card.name }),
+        'success',
+        SUCCESS_TOAST_DURATION_MS,
+      );
+      this.autoResumeTimeout = setTimeout(() => this.keepScanning(), AUTO_RESUME_DELAY_MS);
     } catch (error) {
       this.addError.set(
         error instanceof Error ? error.message : this.translate.instant('scanner.addFailed'),
@@ -234,6 +269,10 @@ export class Scanner {
   }
 
   protected keepScanning() {
+    if (this.autoResumeTimeout) {
+      clearTimeout(this.autoResumeTimeout);
+      this.autoResumeTimeout = null;
+    }
     this.detectedCard.set(null);
     this.status.set('scanning');
     this.scheduleNextCapture();

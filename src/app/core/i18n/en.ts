@@ -208,7 +208,8 @@ export const en: typeof de = {
     foil: 'Foil',
     addToCollection: 'Add to collection',
     keepScanning: 'Keep scanning',
-    added: 'Added ✓',
+    addedToast: '✓ {{name}} added to collection',
+    notRecognized: 'Card not recognized — please hold the card more clearly in front of the camera',
     addFailed: 'Card could not be added.',
   },
   addWishlist: {

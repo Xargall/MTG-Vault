@@ -17,6 +17,12 @@
 
   @if (status() === 'starting') {
     <p class="scanner-hint">{{ 'scanner.starting' | translate }}</p>
+  } @else if (status() === 'scanning') {
+    <div class="scan-pulse" aria-hidden="true"></div>
+  }
+
+  @if (toast(); as t) {
+    <div class="scanner-toast" [class.scanner-toast--warning]="t.variant === 'warning'">{{ t.message }}</div>
   }
 
   @if (detectedCard(); as card) {
@@ -43,9 +49,6 @@
 
         @if (addError()) {
           <p class="form-error">{{ addError() }}</p>
-        }
-        @if (justAdded()) {
-          <p class="success-message">{{ 'scanner.added' | translate }}</p>
         }
 
         <button type="button" class="add-button" [disabled]="adding()" (click)="addToCollection()">

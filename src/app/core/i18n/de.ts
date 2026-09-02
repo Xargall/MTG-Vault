@@ -206,7 +206,8 @@ export const de = {
     foil: 'Foil',
     addToCollection: 'Zur Collection hinzufügen',
     keepScanning: 'Weiter scannen',
-    added: 'Hinzugefügt ✓',
+    addedToast: '✓ {{name}} zur Sammlung hinzugefügt',
+    notRecognized: 'Karte nicht erkannt — bitte Karte deutlicher vor die Kamera halten',
     addFailed: 'Karte konnte nicht hinzugefügt werden.',
   },
   addWishlist: {
