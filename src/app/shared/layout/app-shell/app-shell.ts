@@ -6,12 +6,13 @@ import { AuthService } from '../../../core/services/auth.service';
 import { GameSlug } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
 import { AppFooter } from '../app-footer/app-footer';
+import { GuestBanner } from '../guest-banner/guest-banner';
 
 const LANG_STORAGE_KEY = 'mtg-vault-lang';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterLink, RouterOutlet, AppFooter, TranslatePipe],
+  imports: [RouterLink, RouterOutlet, AppFooter, GuestBanner, TranslatePipe],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.scss',
 })

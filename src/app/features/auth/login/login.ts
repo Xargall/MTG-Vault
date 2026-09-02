@@ -27,6 +27,15 @@ export class Login {
   readonly isSubmitting = signal(false);
   readonly isSeedingDemo = signal(false);
 
+  constructor() {
+    const error = this.route.snapshot.queryParamMap.get('error');
+    if (error === 'inviteRequired') {
+      this.errorMessage.set(this.translate.instant('auth.inviteRequiredError'));
+    } else if (error === 'demoExpired') {
+      this.errorMessage.set(this.translate.instant('auth.demoExpired'));
+    }
+  }
+
   async submit() {
     if (this.form.invalid) {
       this.form.markAllAsTouched();

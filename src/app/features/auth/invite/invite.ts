@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, Validators, FormBuilder, AbstractControl, ValidationErrors } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { AuthService } from '../../../core/services/auth.service';
@@ -12,19 +12,21 @@ function passwordsMatch(control: AbstractControl): ValidationErrors | null {
 }
 
 @Component({
-  selector: 'app-register',
+  selector: 'app-invite',
   imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
-  templateUrl: './register.html',
-  styleUrl: './register.scss',
+  templateUrl: './invite.html',
+  styleUrl: './invite.scss',
 })
-export class Register {
+export class Invite {
   private readonly fb = inject(FormBuilder);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
 
   readonly form = this.fb.nonNullable.group(
     {
+      inviteCode: [this.route.snapshot.queryParamMap.get('code') ?? '', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', [Validators.required]],
@@ -46,15 +48,41 @@ export class Register {
     this.successMessage.set(null);
     this.isSubmitting.set(true);
 
+    const { inviteCode, email, password } = this.form.getRawValue();
+    let token: string;
     try {
-      const { email, password } = this.form.getRawValue();
-      await this.authService.signUpWithEmail(email, password);
+      token = await this.authService.verifyInviteCode(inviteCode);
+    } catch {
+      this.errorMessage.set(this.translate.instant('auth.inviteInvalid'));
+      this.isSubmitting.set(false);
+      return;
+    }
+
+    try {
+      await this.authService.signUpWithEmail(email, password, token);
       this.successMessage.set(this.translate.instant('auth.accountCreated'));
       setTimeout(() => this.router.navigateByUrl('/login'), 1500);
     } catch (error) {
-      this.errorMessage.set(error instanceof Error ? error.message : this.translate.instant('auth.registerFailed'));
+      this.errorMessage.set(error instanceof Error ? error.message : this.translate.instant('auth.inviteInvalid'));
     } finally {
       this.isSubmitting.set(false);
+    }
+  }
+
+  async signUpWithGoogle() {
+    const inviteCode = this.form.controls.inviteCode.value;
+    if (!inviteCode) {
+      this.form.controls.inviteCode.markAsTouched();
+      return;
+    }
+
+    this.errorMessage.set(null);
+    try {
+      const token = await this.authService.verifyInviteCode(inviteCode);
+      this.authService.recordPendingInviteToken(token);
+      await this.authService.signInWithGoogle();
+    } catch (error) {
+      this.errorMessage.set(this.translate.instant('auth.inviteInvalid'));
     }
   }
 }

@@ -12,6 +12,10 @@ export const authGuard: CanActivateFn = async (_route, state) => {
   await supabase.ready;
 
   if (authService.isAuthenticated()) {
+    if (authService.isGuestExpired()) {
+      await authService.signOut();
+      return router.createUrlTree(['/login'], { queryParams: { error: 'demoExpired' } });
+    }
     return true;
   }
 

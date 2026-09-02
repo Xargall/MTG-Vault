@@ -1,6 +1,15 @@
 <div class="auth-page">
   <form class="auth-card" [formGroup]="form" (ngSubmit)="submit()">
-    <h1>{{ 'auth.registerTitle' | translate }}</h1>
+    <h1>{{ 'auth.inviteTitle' | translate }}</h1>
+
+    <label for="inviteCode">{{ 'auth.inviteCodeLabel' | translate }}</label>
+    <input
+      id="inviteCode"
+      type="text"
+      formControlName="inviteCode"
+      [placeholder]="'auth.inviteCodePlaceholder' | translate"
+      autocomplete="off"
+    />
 
     <label for="email">{{ 'auth.email' | translate }}</label>
     <input id="email" type="email" formControlName="email" autocomplete="email" />
@@ -27,7 +36,10 @@
       <p class="success-message">{{ successMessage() }}</p>
     }
 
-    <button type="submit" [disabled]="isSubmitting()">{{ 'auth.registerSubmit' | translate }}</button>
+    <button type="submit" [disabled]="isSubmitting()">{{ 'auth.inviteSubmit' | translate }}</button>
+    <button type="button" class="google-button" [disabled]="isSubmitting()" (click)="signUpWithGoogle()">
+      {{ 'auth.inviteGoogle' | translate }}
+    </button>
 
     <p class="switch-link">
       {{ 'auth.haveAccount' | translate }} <a routerLink="/login">{{ 'auth.loginLink' | translate }}</a>

@@ -1,0 +1,10 @@
+.guest-banner {
+  display: flex;
+  justify-content: center;
+  padding: 0.4rem var(--spacing-md);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}

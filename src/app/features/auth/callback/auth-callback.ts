@@ -22,12 +22,23 @@ import { AuthService } from '../../../core/services/auth.service';
 export class AuthCallback {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private handled = false;
 
   constructor() {
     effect(() => {
-      if (this.authService.isAuthenticated()) {
-        this.router.navigateByUrl('/');
+      if (this.authService.isAuthenticated() && !this.handled) {
+        this.handled = true;
+        void this.finish();
       }
     });
+  }
+
+  private async finish() {
+    const result = await this.authService.finalizeGoogleSignIn().catch(() => 'rejected' as const);
+    if (result === 'ok') {
+      await this.router.navigateByUrl('/');
+    } else {
+      await this.router.navigate(['/login'], { queryParams: { error: 'inviteRequired' } });
+    }
   }
 }

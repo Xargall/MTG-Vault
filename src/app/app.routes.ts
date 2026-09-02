@@ -9,8 +9,8 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login/login').then((m) => m.Login),
   },
   {
-    path: 'register',
-    loadComponent: () => import('./features/auth/register/register').then((m) => m.Register),
+    path: 'invite',
+    loadComponent: () => import('./features/auth/invite/invite').then((m) => m.Invite),
   },
   {
     path: 'auth/callback',
