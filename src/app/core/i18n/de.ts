@@ -124,6 +124,11 @@ export const de = {
     foil: 'Foil',
     price: 'Preis',
     cardmarketLink: 'Auf Cardmarket ansehen',
+    deleteLink: 'Aus Sammlung entfernen',
+    confirmDeleteText: 'Karte wirklich aus der Sammlung entfernen?',
+    confirmDeleteButton: 'Ja, entfernen',
+    cancel: 'Abbrechen',
+    deleteFailed: 'Karte konnte nicht entfernt werden.',
   },
   decks: {
     title: 'Decks',

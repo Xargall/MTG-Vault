@@ -65,6 +65,10 @@ export class CollectionOverview {
     this.selectedCategory.set(this.selectedCategory() === key ? null : key);
   }
 
+  protected onEntryDeleted() {
+    this.load();
+  }
+
   protected async load() {
     this.loading.set(true);
     this.errorMessage.set(null);

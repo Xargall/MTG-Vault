@@ -71,6 +71,28 @@
             {{ 'cardDetail.cardmarketLink' | translate }}
           </a>
         }
+
+        <div class="danger-zone">
+          @if (deleteError()) {
+            <p class="state-message error">{{ deleteError() }}</p>
+          }
+
+          @if (!confirmingDelete()) {
+            <button type="button" class="delete-link" (click)="confirmingDelete.set(true)">
+              {{ 'cardDetail.deleteLink' | translate }}
+            </button>
+          } @else {
+            <div class="confirm-row">
+              <span>{{ 'cardDetail.confirmDeleteText' | translate }}</span>
+              <button type="button" class="delete-button" [disabled]="deleting()" (click)="confirmDelete()">
+                {{ 'cardDetail.confirmDeleteButton' | translate }}
+              </button>
+              <button type="button" class="cancel-link" (click)="confirmingDelete.set(false)">
+                {{ 'cardDetail.cancel' | translate }}
+              </button>
+            </div>
+          }
+        </div>
       </div>
     </div>
   </div>

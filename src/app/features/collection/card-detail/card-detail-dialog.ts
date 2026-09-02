@@ -1,11 +1,11 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, input, output } from '@angular/core';
-import { TranslatePipe } from '@ngx-translate/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card, MtgCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
 import { ATTRIBUTE_CATEGORIES } from '../yugioh-collection-stats';
 import { COLOR_CATEGORIES, getEntryPrice } from '../collection-stats';
-import { CollectionEntry } from '../collection.service';
+import { CollectionEntry, CollectionService } from '../collection.service';
 
 const SYMBOL_COLORS = new Map<string, string>(
   COLOR_CATEGORIES.map(({ key, color }) => [key, color]),
@@ -39,8 +39,32 @@ const BANLIST_LABELS: Record<YugiohBanlistStatus, string> = {
   styleUrl: './card-detail-dialog.scss',
 })
 export class CardDetailDialog {
+  private readonly collectionService = inject(CollectionService);
+  private readonly translate = inject(TranslateService);
+
   readonly entry = input.required<CollectionEntry>();
   readonly close = output<void>();
+  readonly deleted = output<void>();
+
+  protected readonly confirmingDelete = signal(false);
+  protected readonly deleting = signal(false);
+  protected readonly deleteError = signal<string | null>(null);
+
+  async confirmDelete() {
+    this.deleting.set(true);
+    this.deleteError.set(null);
+    try {
+      await this.collectionService.deleteEntry(this.entry().row.id);
+      this.deleted.emit();
+      this.close.emit();
+    } catch (error) {
+      this.deleteError.set(
+        error instanceof Error ? error.message : this.translate.instant('cardDetail.deleteFailed'),
+      );
+    } finally {
+      this.deleting.set(false);
+    }
+  }
 
   protected readonly rarityLabel = computed(() => {
     const rarity = this.entry().card.rarity;

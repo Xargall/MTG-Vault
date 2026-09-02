@@ -153,3 +153,73 @@
     background: var(--color-accent-hover);
   }
 }
+
+.danger-zone {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.state-message {
+  margin: 0 0 var(--spacing-sm);
+
+  &.error {
+    color: var(--color-danger);
+  }
+}
+
+.delete-link {
+  background: transparent;
+  border: none;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.delete-button {
+  padding: 4px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-danger);
+  background: transparent;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--color-danger);
+    color: var(--color-bg);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.cancel-link {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+
+  &:hover {
+    color: var(--color-text);
+  }
+}

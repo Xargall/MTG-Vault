@@ -126,6 +126,11 @@ export const en: typeof de = {
     foil: 'Foil',
     price: 'Price',
     cardmarketLink: 'View on Cardmarket',
+    deleteLink: 'Remove from collection',
+    confirmDeleteText: 'Really remove this card from your collection?',
+    confirmDeleteButton: 'Yes, remove',
+    cancel: 'Cancel',
+    deleteFailed: 'Card could not be removed.',
   },
   decks: {
     title: 'Decks',

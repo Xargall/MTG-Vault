@@ -96,5 +96,9 @@
 }
 
 @if (selectedEntry(); as entry) {
-  <app-card-detail-dialog [entry]="entry" (close)="selectedEntry.set(null)" />
+  <app-card-detail-dialog
+    [entry]="entry"
+    (close)="selectedEntry.set(null)"
+    (deleted)="onEntryDeleted()"
+  />
 }

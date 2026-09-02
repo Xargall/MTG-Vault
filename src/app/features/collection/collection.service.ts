@@ -117,6 +117,12 @@ export class CollectionService {
     if (error) throw error;
   }
 
+  /** Deletes one specific collection row (a single card/foil/condition stack), unlike removeCard() which drops every row for that card. */
+  async deleteEntry(rowId: string): Promise<void> {
+    const { error } = await this.supabase.client.from('collection_cards').delete().eq('id', rowId);
+    if (error) throw error;
+  }
+
   async removeCard(cardId: string): Promise<void> {
     await this.gameService.ready;
     const gameId = this.gameService.currentGameId();
