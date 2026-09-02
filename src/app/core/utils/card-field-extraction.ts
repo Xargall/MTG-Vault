@@ -1,4 +1,4 @@
-import { parseSetCode } from './set-code-parser';
+import { extractCollectorNumber, parseSetCode } from './set-code-parser';
 import { OcrLineLike } from './string-similarity';
 
 export interface ExtractedKeywords {
@@ -69,7 +69,10 @@ export function extractFields(text: string, lines: OcrLineLike[]): ExtractedFiel
 
   return {
     setCode: setCodeMatch?.setCode ?? null,
-    collectorNumber: setCodeMatch ? parseInt(setCodeMatch.collectorNumber, 10) : null,
+    // Prefer the number paired with a valid set code; otherwise still worth
+    // pulling a bare collector number out for scoring, even with no set
+    // code to pair it with for an exact lookup.
+    collectorNumber: setCodeMatch ? parseInt(setCodeMatch.collectorNumber, 10) : extractCollectorNumber(text),
     powerToughness: extractPowerToughness(text),
     hasKeyword,
     isCreature: /Creature|Kreatur/i.test(text),

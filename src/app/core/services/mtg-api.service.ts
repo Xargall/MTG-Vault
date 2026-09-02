@@ -55,7 +55,12 @@ const SCORE_TOUGHNESS = 20;
 const SCORE_KEYWORD = 10;
 const KEYWORD_COUNT = 7;
 const SCORE_ARTIST = 15;
-const MAX_POSSIBLE_SCORE = SCORE_SET_CODE_SOURCE + SCORE_POWER + SCORE_TOUGHNESS + SCORE_KEYWORD * KEYWORD_COUNT + SCORE_ARTIST;
+// Lets a bare collector number (read even without a valid accompanying set
+// code) still pick out the right printing/variant in scoring - e.g. two
+// prints of the same card with different collector numbers otherwise tie.
+const SCORE_COLLECTOR_NUMBER = 30;
+const MAX_POSSIBLE_SCORE =
+  SCORE_SET_CODE_SOURCE + SCORE_POWER + SCORE_TOUGHNESS + SCORE_KEYWORD * KEYWORD_COUNT + SCORE_ARTIST + SCORE_COLLECTOR_NUMBER;
 // Only worth a bulk filter search once at least this many structural
 // signals agree - any fewer and the filters are too loose to narrow down
 // Scryfall's card pool meaningfully.
@@ -227,7 +232,11 @@ export class MtgApiService implements CardApiService {
       if (fields.isSorcery) filters.push('type:sorcery');
 
       if (filters.length >= MIN_FILTERS_FOR_SEARCH) {
-        const results = await this.runSearch(filters.join(' '), 'unique=cards');
+        // unique=prints, not unique=cards: every printing/variant of a card
+        // comes back separately (regular, extended art, showcase, ...)
+        // rather than being collapsed to one - scoring (collector number
+        // above all) then picks out the specific print that was scanned.
+        const results = await this.runSearch(filters.join(' '), 'unique=prints');
         candidates.push(...results.map((card): ScryfallCandidate => ({ card, source: 'filter' })));
       }
     }
@@ -276,6 +285,10 @@ export class MtgApiService implements CardApiService {
       const [power, toughness] = fields.powerToughness.split('/');
       if (card.power === power) score += SCORE_POWER;
       if (card.toughness === toughness) score += SCORE_TOUGHNESS;
+    }
+
+    if (fields.collectorNumber !== null && parseInt(card.collector_number, 10) === fields.collectorNumber) {
+      score += SCORE_COLLECTOR_NUMBER;
     }
 
     for (const [keyword, matched] of Object.entries(fields.hasKeyword)) {

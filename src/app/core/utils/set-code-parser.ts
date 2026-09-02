@@ -46,12 +46,17 @@ const IGNORED_SET_TOKENS = [
   'TUT', 'WIE', 'ZIE', 'ZUR',
 ];
 
+/** Standalone collector-number extraction, independent of finding a valid set code alongside it - lets a caller still use the number for scoring even when the set code couldn't be read. */
+export function extractCollectorNumber(rawText: string): number | null {
+  const numMatch = COLLECTOR_NUMBER_PATTERN.exec(rawText);
+  return numMatch ? parseInt(numMatch[1], 10) : null;
+}
+
 export function parseSetCode(rawText: string): SetCodeMatch | null {
   const setMatches = rawText.match(SET_CODE_TOKEN_PATTERN);
-  const numMatch = COLLECTOR_NUMBER_PATTERN.exec(rawText);
+  const collectorNum = extractCollectorNumber(rawText);
 
   const setCode = setMatches?.find((s) => !IGNORED_SET_TOKENS.includes(s))?.toLowerCase();
-  const collectorNum = numMatch ? parseInt(numMatch[1], 10) : null;
 
   if (!setCode || collectorNum === null) return null;
   return { setCode, collectorNumber: String(collectorNum) };
