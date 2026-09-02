@@ -12,7 +12,7 @@ import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../core/models/card.model';
-import { CardIdentification, ScoredCandidate } from '../../core/services/card-api.interface';
+import { CardIdentification, MtgIdentificationResult, ScoredCandidate } from '../../core/services/card-api.interface';
 import { CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
@@ -38,6 +38,10 @@ const NO_MATCH_STREAK_FOR_TOAST = 8;
 // OCR outlier on one frame could still score above the match threshold, so
 // the same oracle_id must win 3 frames in a row before it's confirmed.
 const CONSECUTIVE_MATCHES_REQUIRED = 3;
+// A filter-sourced top score at or above this auto-confirms just like an
+// exact set+number match; below it, MtgApiService already sized `runners`
+// to the right picker tier (5 for medium confidence, 10 for low).
+const AUTO_CONFIRM_THRESHOLD = 70;
 const SUCCESS_TOAST_DURATION_MS = 3000;
 const FAILURE_TOAST_DURATION_MS = 2000;
 const AUTO_RESUME_DELAY_MS = 2000;
@@ -107,6 +111,11 @@ export class Scanner {
 
   protected readonly detectedCard = signal<Card | null>(null);
   protected readonly candidateChoices = signal<ScoredCandidate[] | null>(null);
+  // Which heading/copy the picker shows - 'medium' (5 options, fairly
+  // confident guess) vs 'low' (10 options, weak signal). Derived from how
+  // many runners MtgApiService already decided to include, not recomputed
+  // from a duplicated threshold here.
+  protected readonly pickerTier = signal<'medium' | 'low'>('medium');
   protected readonly quantity = signal(1);
   protected readonly foil = signal(false);
   protected readonly adding = signal(false);
@@ -346,10 +355,10 @@ export class Scanner {
       return false;
     }
 
-    if (result.best.oracleId === this.lastOracleId) {
+    if (result.topCandidate.oracleId === this.lastOracleId) {
       this.consecutiveMatches++;
     } else {
-      this.lastOracleId = result.best.oracleId;
+      this.lastOracleId = result.topCandidate.oracleId;
       this.consecutiveMatches = 1;
     }
 
@@ -360,14 +369,14 @@ export class Scanner {
     this.lastOracleId = null;
     this.consecutiveMatches = 0;
 
-    if (result.source === 'setCode' || result.alternatives.length === 0) {
-      // Exact set+number match, or no close runner-up to be unsure about.
-      this.onMatch(result.best);
+    if (result.source === 'exact' || result.confidence >= AUTO_CONFIRM_THRESHOLD) {
+      // Exact set+number match, or a confident enough filter-search guess.
+      this.onMatch(result.topCandidate);
     } else {
       // The filter-search fallback has no name check, so a similar real
-      // card can score close behind the top pick - let the user decide
-      // instead of silently trusting a guess two cards could tie on.
-      this.onAmbiguousMatch([result.best, ...result.alternatives]);
+      // card can score close behind the top pick - let the user pick
+      // manually instead of silently trusting a weak guess.
+      this.onAmbiguousMatch(result);
     }
     return true;
   }
@@ -418,14 +427,42 @@ export class Scanner {
     if (navigator.vibrate) navigator.vibrate(200);
   }
 
-  private onAmbiguousMatch(choices: ScoredCandidate[]) {
-    this.candidateChoices.set(choices);
+  private onAmbiguousMatch(result: MtgIdentificationResult) {
+    // MtgApiService already sized `runners` to the tier (4 for medium
+    // confidence -> 5 total, 9 for low -> 10 total) - read the tier back
+    // from that instead of re-checking the score threshold here too.
+    this.pickerTier.set(result.runners.length <= 4 ? 'medium' : 'low');
+    this.candidateChoices.set([result.topCandidate, ...result.runners]);
     this.status.set('choosing');
     if (navigator.vibrate) navigator.vibrate(200);
   }
 
-  protected selectCandidate(candidate: ScoredCandidate) {
-    this.onMatch(candidate);
+  // Picking a candidate is itself the confirming action - add it straight
+  // away (quantity 1, no foil) with a success toast, rather than routing
+  // through the quantity/foil form the auto-confirm path uses.
+  protected async selectCandidate(candidate: ScoredCandidate) {
+    this.candidateChoices.set(null);
+    this.status.set('scanning');
+    try {
+      await this.collectionService.addCard({
+        cardId: candidate.card.id,
+        quantity: 1,
+        foil: false,
+        condition: 'NM',
+      });
+      this.showToast(
+        this.translate.instant('scanner.addedToast', { name: candidate.card.name }),
+        'success',
+        SUCCESS_TOAST_DURATION_MS,
+      );
+    } catch (error) {
+      this.showToast(
+        error instanceof Error ? error.message : this.translate.instant('scanner.addFailed'),
+        'warning',
+        FAILURE_TOAST_DURATION_MS,
+      );
+    }
+    this.scheduleNextCapture();
   }
 
   protected cancelChoices() {

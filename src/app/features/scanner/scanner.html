@@ -55,17 +55,30 @@
 
   @if (status() === 'choosing' && candidateChoices(); as choices) {
     <div class="match-panel choices-panel">
-      <p class="choices-hint">{{ 'scanner.chooseCardHint' | translate }}</p>
-      <div class="choices-grid">
+      <p class="choices-hint">
+        {{ (pickerTier() === 'medium' ? 'scanner.chooseCardHintMedium' : 'scanner.chooseCardHintLow') | translate }}
+      </p>
+      <div class="choices-list">
         @for (choice of choices; track choice.oracleId) {
-          <button type="button" class="choice-item" (click)="selectCandidate(choice)">
-            <app-card-tile [card]="choice.card" />
+          <button type="button" class="choice-row" (click)="selectCandidate(choice)">
+            @if (choice.thumbnailUrl) {
+              <img class="choice-thumb" [src]="choice.thumbnailUrl" [alt]="choice.card.name" />
+            } @else {
+              <div class="choice-thumb choice-thumb--placeholder"></div>
+            }
+            <span class="choice-info">
+              <span class="choice-name">{{ choice.card.name }}</span>
+              <span class="choice-set">{{ choice.card.setName }}</span>
+            </span>
           </button>
         }
+        <button type="button" class="choice-row choice-row--none" (click)="cancelChoices()">
+          <span class="choice-thumb choice-thumb--none" aria-hidden="true">✕</span>
+          <span class="choice-info">
+            <span class="choice-name">{{ 'scanner.noneOfThese' | translate }}</span>
+          </span>
+        </button>
       </div>
-      <button type="button" class="keep-scanning-button" (click)="cancelChoices()">
-        {{ 'scanner.keepScanning' | translate }}
-      </button>
     </div>
   }
 

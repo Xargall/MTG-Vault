@@ -38,7 +38,7 @@ interface ScryfallRawCard {
 
 interface ScryfallCandidate {
   card: ScryfallRawCard;
-  source: 'setCode' | 'filter';
+  source: 'exact' | 'filter';
 }
 
 const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
@@ -57,16 +57,17 @@ const SCORE_KEYWORD = 10;
 const KEYWORD_COUNT = 7;
 const SCORE_ARTIST = 15;
 const MAX_POSSIBLE_SCORE = SCORE_SET_CODE_SOURCE + SCORE_POWER + SCORE_TOUGHNESS + SCORE_CMC + SCORE_KEYWORD * KEYWORD_COUNT + SCORE_ARTIST;
-const MIN_SCORE_FOR_MATCH = 60;
 // Only worth a bulk filter search once at least this many structural
 // signals agree - any fewer and the filters are too loose to narrow down
 // Scryfall's card pool meaningfully.
 const MIN_FILTERS_FOR_SEARCH = 2;
-// Filter-search candidates can tie or nearly tie on the same stat line
-// (e.g. two different legendary 4/4s) with no name check to break the tie,
-// so up to this many runners-up are offered as a manual pick instead of
-// silently trusting the top score.
-const MAX_ALTERNATIVES = 2;
+// Confidence tier for a filter-sourced top candidate that decides how many
+// runners-up to offer if the caller doesn't auto-confirm it (an exact
+// set+number lookup always skips this, being unambiguous by construction):
+// 5 options total for a fairly confident guess, the full 10 when weak.
+const MEDIUM_CONFIDENCE_THRESHOLD = 50;
+const TOP_N_MEDIUM_CONFIDENCE = 5;
+const TOP_N_LOW_CONFIDENCE = 10;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -194,9 +195,15 @@ export class MtgApiService implements CardApiService {
    * only fall back to a bulk filter search (power/toughness, cmc, coarse
    * type flags) when that didn't produce one - never a name-based lookup.
    * Every candidate that does turn up is scored against every extracted
-   * field. Returns a match only above MIN_SCORE_FOR_MATCH - the caller is
-   * expected to still require this to agree across several consecutive
-   * frames before treating it as confirmed.
+   * field.
+   *
+   * An exact set+number hit is unambiguous by construction and always wins
+   * outright. A filter-sourced top score is only ever a confidence signal,
+   * never a hard gate - the caller is expected to require this to agree
+   * across several consecutive frames, then either auto-confirm (>=70) or
+   * offer a manual pick sized to how confident the guess is (5 options for
+   * 50-69, the full 10 below that). Returns null only when no candidate was
+   * found at all.
    */
   async identifyCardWithScoring(rawText: string, lines: OcrLineLike[]): Promise<MtgIdentificationResult | null> {
     const fields = extractFields(rawText, lines);
@@ -204,7 +211,7 @@ export class MtgApiService implements CardApiService {
 
     if (fields.setCode && fields.collectorNumber !== null) {
       const bySetCode = await this.fetchCardBySetAndNumber(fields.setCode, String(fields.collectorNumber));
-      if (bySetCode) candidates.push({ card: bySetCode, source: 'setCode' });
+      if (bySetCode) candidates.push({ card: bySetCode, source: 'exact' });
     }
 
     if (candidates.length === 0) {
@@ -232,34 +239,38 @@ export class MtgApiService implements CardApiService {
       .sort((a, b) => b.score - a.score);
 
     const top = scored[0];
-    if (top.score < MIN_SCORE_FOR_MATCH) return null;
 
-    const toScoredCandidate = (entry: (typeof scored)[number]): ScoredCandidate => ({
-      card: this.toCard(entry.candidate.card),
-      confidence: Math.min(1, entry.score / MAX_POSSIBLE_SCORE),
-      oracleId: entry.candidate.card.oracle_id,
-    });
+    const toScoredCandidate = (entry: (typeof scored)[number]): ScoredCandidate => {
+      const raw = entry.candidate.card;
+      return {
+        card: this.toCard(raw),
+        confidence: entry.score,
+        oracleId: raw.oracle_id,
+        thumbnailUrl: raw.image_uris?.small ?? raw.card_faces?.[0]?.image_uris?.small ?? null,
+      };
+    };
 
-    // The exact set+number lookup is unambiguous by construction (one
-    // request, one card) - alternatives only make sense for the looser
-    // filter search, where a similar real card can score close behind.
-    const alternatives =
-      top.candidate.source === 'filter'
-        ? scored
-            .slice(1)
-            .filter((entry) => entry.candidate.card.oracle_id !== top.candidate.card.oracle_id)
-            .slice(0, MAX_ALTERNATIVES)
-            .map(toScoredCandidate)
-        : [];
+    const topCandidate = toScoredCandidate(top);
 
-    return { best: toScoredCandidate(top), source: top.candidate.source, alternatives };
+    if (top.candidate.source === 'exact') {
+      return { topCandidate, runners: [], confidence: topCandidate.confidence, source: 'exact' };
+    }
+
+    const runnerCount = top.score >= MEDIUM_CONFIDENCE_THRESHOLD ? TOP_N_MEDIUM_CONFIDENCE - 1 : TOP_N_LOW_CONFIDENCE - 1;
+    const runners = scored
+      .slice(1)
+      .filter((entry) => entry.candidate.card.oracle_id !== top.candidate.card.oracle_id)
+      .slice(0, runnerCount)
+      .map(toScoredCandidate);
+
+    return { topCandidate, runners, confidence: topCandidate.confidence, source: 'filter' };
   }
 
   private scoreCandidate(candidate: ScryfallCandidate, fields: ExtractedFields): number {
     const card = candidate.card;
     let score = 0;
 
-    if (candidate.source === 'setCode') score += SCORE_SET_CODE_SOURCE;
+    if (candidate.source === 'exact') score += SCORE_SET_CODE_SOURCE;
 
     if (fields.powerToughness) {
       const [power, toughness] = fields.powerToughness.split('/');

@@ -9,15 +9,20 @@ export interface CardIdentification {
 
 export interface ScoredCandidate {
   card: Card;
+  /** Raw structural-match score (not normalized) - only comparable to other ScoredCandidates from the same identification call. */
   confidence: number;
   oracleId: string;
+  /** Small Scryfall thumbnail for compact picker rows, when known. */
+  thumbnailUrl: string | null;
 }
 
 export interface MtgIdentificationResult {
-  best: ScoredCandidate;
-  source: 'setCode' | 'filter';
-  /** Next-best scored candidates when the source isn't the exact set+number lookup - lets the caller offer a manual pick instead of trusting a structural match that a similar real card could tie on. */
-  alternatives: ScoredCandidate[];
+  topCandidate: ScoredCandidate;
+  /** Next-best scored candidates - empty for an exact set+number lookup, up to 9 for a filter-search match, sized by confidence tier. */
+  runners: ScoredCandidate[];
+  /** Same value as topCandidate.confidence, surfaced at the top level for tier decisions. */
+  confidence: number;
+  source: 'exact' | 'filter';
 }
 
 export interface CardApiService {
