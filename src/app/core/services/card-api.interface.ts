@@ -3,6 +3,8 @@ import { Card } from '../models/card.model';
 export interface CardIdentification {
   card: Card;
   confidence: number;
+  /** Scryfall's printing-independent card id, when known - lets a caller check for the same underlying card across frames/printings. */
+  oracleId?: string;
 }
 
 export interface CardApiService {

@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 
 import { Card, MtgCard } from '../models/card.model';
-import { cleanOcrText, similarity } from '../utils/string-similarity';
+import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
+import { OcrLineLike, cleanOcrText, isCloseMatch, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification } from './card-api.interface';
 
 interface ScryfallCardFace {
@@ -11,9 +12,14 @@ interface ScryfallCardFace {
 
 interface ScryfallRawCard {
   id: string;
+  oracle_id: string;
   name: string;
   printed_name?: string;
   type_line: string;
+  printed_type_line?: string;
+  power?: string;
+  toughness?: string;
+  artist?: string;
   cmc: number;
   color_identity: string[];
   mana_cost?: string;
@@ -29,6 +35,23 @@ interface ScryfallRawCard {
 }
 
 const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
+
+// Multi-field scoring for the camera scanner: every recognizable field adds
+// confidence, so a single noisy field can't make or break a match on its
+// own. Weights mirror how reliable each signal is (set+number is a near-
+// exact structural match; artist/mana cost are the weakest, easily
+// coincidental signals).
+const NAME_MATCH_MAX_DISTANCE = 2;
+const SCORE_NAME = 40;
+const SCORE_SET_CODE = 35;
+const SCORE_COLLECTOR_NUMBER = 35;
+const SCORE_TYPE_LINE = 20;
+const SCORE_POWER_TOUGHNESS = 20;
+const SCORE_MANA_COST = 15;
+const SCORE_ARTIST = 15;
+const MAX_POSSIBLE_SCORE =
+  SCORE_NAME * 2 + SCORE_SET_CODE + SCORE_COLLECTOR_NUMBER + SCORE_TYPE_LINE + SCORE_POWER_TOUGHNESS + SCORE_MANA_COST + SCORE_ARTIST;
+const MIN_SCORE_FOR_MATCH = 60;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -73,15 +96,19 @@ export class MtgApiService implements CardApiService {
     return this.toCard(raw);
   }
 
-  /** Exact, language-independent lookup by set code + collector number (e.g. "iko"/"123") - the primary path for the camera scanner. */
+  /** Exact, language-independent lookup by set code + collector number (e.g. "iko"/"123"). */
   async getCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<Card | null> {
+    const raw = await this.fetchCardBySetAndNumber(setCode, collectorNumber);
+    return raw ? this.toCard(raw) : null;
+  }
+
+  private async fetchCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {
     const response = await fetch(`${CARD_ENDPOINT}/${setCode.toLowerCase()}/${collectorNumber}`);
     if (response.status === 404) return null;
     if (!response.ok) {
       throw new Error(`Scryfall-Anfrage fehlgeschlagen (${response.status})`);
     }
-    const raw: ScryfallRawCard = await response.json();
-    return this.toCard(raw);
+    return response.json();
   }
 
   async getCardsByIds(ids: string[]): Promise<Card[]> {
@@ -124,6 +151,106 @@ export class MtgApiService implements CardApiService {
     if (confidence < IDENTIFY_CONFIDENCE_THRESHOLD) return null;
 
     return { card: this.toCard(raw), confidence };
+  }
+
+  /**
+   * Multi-field scoring: extracts every recognizable field from one frame's
+   * OCR output, fetches candidates via whichever fields are present (set+
+   * number exact lookup, fuzzy name, German exact-quoted name search),
+   * dedupes by oracle_id, and scores each candidate against all extracted
+   * fields rather than trusting a single field on its own. Returns the best
+   * candidate only if it clears MIN_SCORE_FOR_MATCH - the caller is
+   * expected to still require this to agree across several consecutive
+   * frames before treating it as confirmed.
+   */
+  async identifyCardWithScoring(rawText: string, lines: OcrLineLike[]): Promise<CardIdentification | null> {
+    const fields = extractFields(rawText, lines);
+    const hasSetCodeAndNumber = fields.setCode !== null && fields.collectorNumber !== null;
+    if (!fields.name && !hasSetCodeAndNumber) return null;
+
+    const fetches: Promise<ScryfallRawCard[]>[] = [];
+
+    if (hasSetCodeAndNumber) {
+      fetches.push(
+        this.fetchCardBySetAndNumber(fields.setCode!, String(fields.collectorNumber))
+          .then((card) => (card ? [card] : []))
+          .catch(() => []),
+      );
+    }
+    if (fields.name) {
+      fetches.push(
+        this.getCardByFuzzyName(fields.name)
+          .then((card) => (card ? [card] : []))
+          .catch(() => []),
+      );
+      const escapedName = fields.name.replace(/"/g, '\\"');
+      fetches.push(this.runSearch(`lang:de "${escapedName}"`, 'unique=cards').catch(() => []));
+    }
+
+    const groups = await Promise.all(fetches);
+    const seenOracleIds = new Set<string>();
+    const candidates: ScryfallRawCard[] = [];
+    for (const group of groups) {
+      for (const raw of group) {
+        if (raw.oracle_id && !seenOracleIds.has(raw.oracle_id)) {
+          seenOracleIds.add(raw.oracle_id);
+          candidates.push(raw);
+        }
+      }
+    }
+    if (candidates.length === 0) return null;
+
+    const best = candidates
+      .map((card) => ({ card, score: this.scoreCard(card, fields) }))
+      .sort((a, b) => b.score - a.score)[0];
+
+    if (best.score < MIN_SCORE_FOR_MATCH) return null;
+
+    return {
+      card: this.toCard(best.card),
+      confidence: Math.min(1, best.score / MAX_POSSIBLE_SCORE),
+      oracleId: best.card.oracle_id,
+    };
+  }
+
+  private scoreCard(candidate: ScryfallRawCard, fields: ExtractedFields): number {
+    let score = 0;
+
+    if (fields.name) {
+      if (isCloseMatch(candidate.name, fields.name, NAME_MATCH_MAX_DISTANCE)) score += SCORE_NAME;
+      if (candidate.printed_name && isCloseMatch(candidate.printed_name, fields.name, NAME_MATCH_MAX_DISTANCE)) {
+        score += SCORE_NAME;
+      }
+    }
+
+    if (fields.setCode && candidate.set.toUpperCase() === fields.setCode.toUpperCase()) {
+      score += SCORE_SET_CODE;
+    }
+    if (fields.collectorNumber !== null && parseInt(candidate.collector_number, 10) === fields.collectorNumber) {
+      score += SCORE_COLLECTOR_NUMBER;
+    }
+
+    if (
+      fields.typeLine &&
+      (candidate.type_line?.includes(fields.typeLine) || candidate.printed_type_line?.includes(fields.typeLine))
+    ) {
+      score += SCORE_TYPE_LINE;
+    }
+
+    if (fields.powerToughness) {
+      const [power, toughness] = fields.powerToughness.split('/');
+      if (candidate.power === power && candidate.toughness === toughness) score += SCORE_POWER_TOUGHNESS;
+    }
+
+    if (fields.manaCost && candidate.cmc === fields.manaCost.number) {
+      score += SCORE_MANA_COST;
+    }
+
+    if (fields.artist && candidate.artist?.toLowerCase().includes(fields.artist.toLowerCase())) {
+      score += SCORE_ARTIST;
+    }
+
+    return score;
   }
 
   private async getCardByFuzzyName(name: string): Promise<ScryfallRawCard | null> {

@@ -27,6 +27,11 @@ export function similarity(a: string, b: string): number {
   return 1 - levenshtein(normA, normB) / maxLength;
 }
 
+/** True if two strings are within a small raw Levenshtein edit distance of each other, case/whitespace-insensitive. */
+export function isCloseMatch(a: string, b: string, maxDistance = 2): boolean {
+  return levenshtein(normalize(a), normalize(b)) <= maxDistance;
+}
+
 /** Collapses raw OCR output (line breaks, stray symbols) into a single search-friendly line. */
 export function cleanOcrText(raw: string): string {
   return raw

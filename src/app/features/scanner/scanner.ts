@@ -18,7 +18,6 @@ import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
 import { OcrLine, OcrService } from '../../core/services/ocr.service';
 import { extractNameFromLines } from '../../core/utils/string-similarity';
-import { parseSetCode } from '../../core/utils/set-code-parser';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
 // Queue-based, not a fixed interval: Tesseract itself is the bottleneck, so
@@ -34,6 +33,10 @@ const MAX_OCR_WIDTH = 1280;
 const MIN_CONFIDENCE_FOR_SET_CODE = 50;
 const MIN_CONFIDENCE_FOR_NAME = 65;
 const NO_MATCH_STREAK_FOR_TOAST = 8;
+// MTG's multi-field scoring is a per-frame best guess, not a certainty - an
+// OCR outlier on one frame could still score above the match threshold, so
+// the same oracle_id must win 3 frames in a row before it's confirmed.
+const CONSECUTIVE_MATCHES_REQUIRED = 3;
 const SUCCESS_TOAST_DURATION_MS = 3000;
 const FAILURE_TOAST_DURATION_MS = 2000;
 const AUTO_RESUME_DELAY_MS = 2000;
@@ -83,6 +86,8 @@ export class Scanner {
   private autoResumeTimeout: ReturnType<typeof setTimeout> | null = null;
   private isScanning = false;
   private noMatchStreak = 0;
+  private lastOracleId: string | null = null;
+  private consecutiveMatches = 0;
 
   protected readonly status = signal<ScannerStatus>('starting');
   protected readonly cameraErrorMessage = signal<string | null>(null);
@@ -286,22 +291,15 @@ export class Scanner {
     console.log('OCR result:', ocrResult.text, 'confidence:', ocrResult.confidence);
     if (ocrResult.confidence < MIN_CONFIDENCE_FOR_SET_CODE) return false;
 
-    // Primary path (MTG only): the set code + collector number printed at
-    // the bottom of the card is exact and language-independent. Yu-Gi-Oh
-    // has no equivalent structured identifier. Tried even at the lower
-    // confidence bar since it's a structural match, not a fuzzy guess.
+    // MTG: multi-field scoring across every recognizable field (name, set
+    // code, collector number, type line, P/T, mana cost, artist) instead of
+    // trusting a single one - see handleMtgFrame. Yu-Gi-Oh has none of
+    // those structured Scryfall fields, so it keeps the simpler name-only
+    // path below.
     if (this.gameService.currentSlug() === 'mtg') {
-      const bySetCode = await this.tryIdentifyBySetCode(ocrResult.text);
-      if (bySetCode) {
-        this.onMatch(bySetCode);
-        return true;
-      }
+      return this.handleMtgFrame(ocrResult);
     }
 
-    // Fallback: search for the printed name (used for Yu-Gi-Oh always, and
-    // for MTG whenever the set-code strip wasn't in/readable in this frame).
-    // Needs cleaner text than the set-code path to avoid a wrong fuzzy
-    // match, so it only runs above the higher confidence bar.
     if (ocrResult.confidence >= MIN_CONFIDENCE_FOR_NAME) {
       const byName = await this.tryIdentifyByName(ocrResult.lines);
       if (byName) {
@@ -313,15 +311,30 @@ export class Scanner {
     return false;
   }
 
-  private async tryIdentifyBySetCode(text: string): Promise<CardIdentification | null> {
-    const parsed = parseSetCode(text);
-    if (!parsed) return null;
+  private async handleMtgFrame(ocrResult: { text: string; lines: OcrLine[] }): Promise<boolean> {
+    const result = await this.mtgApi.identifyCardWithScoring(ocrResult.text, ocrResult.lines);
 
-    const card = await this.mtgApi.getCardBySetAndNumber(parsed.setCode, parsed.collectorNumber);
-    if (!card) return null;
+    if (!result?.oracleId) {
+      this.lastOracleId = null;
+      this.consecutiveMatches = 0;
+      return false;
+    }
 
-    // Exact structural match, not a fuzzy text guess - always full confidence.
-    return { card, confidence: 1 };
+    if (result.oracleId === this.lastOracleId) {
+      this.consecutiveMatches++;
+    } else {
+      this.lastOracleId = result.oracleId;
+      this.consecutiveMatches = 1;
+    }
+
+    if (this.consecutiveMatches < CONSECUTIVE_MATCHES_REQUIRED) {
+      return false;
+    }
+
+    this.lastOracleId = null;
+    this.consecutiveMatches = 0;
+    this.onMatch(result);
+    return true;
   }
 
   private async tryIdentifyByName(lines: OcrLine[]): Promise<CardIdentification | null> {
@@ -416,6 +429,8 @@ export class Scanner {
       clearTimeout(this.autoResumeTimeout);
       this.autoResumeTimeout = null;
     }
+    this.lastOracleId = null;
+    this.consecutiveMatches = 0;
     this.detectedCard.set(null);
     this.status.set('scanning');
     this.scheduleNextCapture();
