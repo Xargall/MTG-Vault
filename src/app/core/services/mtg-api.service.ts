@@ -52,11 +52,10 @@ const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
 const SCORE_SET_CODE_SOURCE = 80;
 const SCORE_POWER = 20;
 const SCORE_TOUGHNESS = 20;
-const SCORE_CMC = 15;
 const SCORE_KEYWORD = 10;
 const KEYWORD_COUNT = 7;
 const SCORE_ARTIST = 15;
-const MAX_POSSIBLE_SCORE = SCORE_SET_CODE_SOURCE + SCORE_POWER + SCORE_TOUGHNESS + SCORE_CMC + SCORE_KEYWORD * KEYWORD_COUNT + SCORE_ARTIST;
+const MAX_POSSIBLE_SCORE = SCORE_SET_CODE_SOURCE + SCORE_POWER + SCORE_TOUGHNESS + SCORE_KEYWORD * KEYWORD_COUNT + SCORE_ARTIST;
 // Only worth a bulk filter search once at least this many structural
 // signals agree - any fewer and the filters are too loose to narrow down
 // Scryfall's card pool meaningfully.
@@ -192,8 +191,10 @@ export class MtgApiService implements CardApiService {
    * field was even considered, which is exactly what kept producing wrong
    * queries. Instead: pull every structural field out of the frame in one
    * pass, try the most reliable candidate source (exact set+number), and
-   * only fall back to a bulk filter search (power/toughness, cmc, coarse
-   * type flags) when that didn't produce one - never a name-based lookup.
+   * only fall back to a bulk filter search (power/toughness, keywords,
+   * coarse type flags) when that didn't produce one - never a name-based
+   * lookup, and deliberately no CMC filter either (OCR too often confuses
+   * an unrelated number on the card for the mana cost).
    * Every candidate that does turn up is scored against every extracted
    * field.
    *
@@ -220,7 +221,6 @@ export class MtgApiService implements CardApiService {
         const [power, toughness] = fields.powerToughness.split('/');
         filters.push(`power=${power}`, `toughness=${toughness}`);
       }
-      if (fields.cmc !== null) filters.push(`cmc=${fields.cmc}`);
       if (fields.isLegendary) filters.push('is:legendary');
       if (fields.isCreature) filters.push('type:creature');
       if (fields.isInstant) filters.push('type:instant');
@@ -276,10 +276,6 @@ export class MtgApiService implements CardApiService {
       const [power, toughness] = fields.powerToughness.split('/');
       if (card.power === power) score += SCORE_POWER;
       if (card.toughness === toughness) score += SCORE_TOUGHNESS;
-    }
-
-    if (fields.cmc !== null && card.cmc === fields.cmc) {
-      score += SCORE_CMC;
     }
 
     for (const [keyword, matched] of Object.entries(fields.hasKeyword)) {
@@ -358,7 +354,9 @@ export class MtgApiService implements CardApiService {
   }
 
   private async runSearch(scryfallQuery: string, params: string): Promise<ScryfallRawCard[]> {
-    const url = `${SEARCH_ENDPOINT}?q=${encodeURIComponent(scryfallQuery)}&${params}`;
+    // Scryfall expects '+' between query terms, not a literal %20 space.
+    const encodedQuery = encodeURIComponent(scryfallQuery).replace(/%20/g, '+');
+    const url = `${SEARCH_ENDPOINT}?q=${encodedQuery}&${params}`;
     const response = await this.scryfallFetch(url);
 
     if (response.status === 404) {

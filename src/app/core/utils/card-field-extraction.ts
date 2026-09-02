@@ -15,7 +15,6 @@ export interface ExtractedFields {
   setCode: string | null;
   collectorNumber: number | null;
   powerToughness: string | null;
-  cmc: number | null;
   hasKeyword: ExtractedKeywords;
   isCreature: boolean;
   isInstant: boolean;
@@ -25,10 +24,6 @@ export interface ExtractedFields {
 }
 
 const POWER_TOUGHNESS_PATTERN = /\b(\d{1,2})\s*\/\s*(\d{1,2})\b/;
-// Requires at least one WUBRG letter so this doesn't fire on an unrelated
-// bare number (e.g. a collector number) - "3R"/"2WW"-style costs only. Not
-// exact for costs with {X} or hybrid symbols, just a rough CMC estimate.
-const CMC_PATTERN = /\b(\d{0,2})([WUBRG]{1,5})\b/;
 
 const KEYWORD_PATTERNS: Record<keyof ExtractedKeywords, RegExp> = {
   menace: /Menace|Bedrohung/i,
@@ -45,13 +40,6 @@ export function extractPowerToughness(text: string): string | null {
   return match ? `${match[1]}/${match[2]}` : null;
 }
 
-export function extractCMC(text: string): number | null {
-  const match = CMC_PATTERN.exec(text);
-  if (!match) return null;
-  const generic = match[1] ? parseInt(match[1], 10) : 0;
-  return generic + match[2].length;
-}
-
 /** Artist credit prints at the very bottom of the card, often after a "©" copyright line. */
 export function extractArtist(lines: OcrLineLike[]): string | null {
   const copyrightLine = lines.find((line) => line.text.includes('©'));
@@ -66,9 +54,10 @@ export function extractArtist(lines: OcrLineLike[]): string | null {
 /**
  * Pulls every scoreable structural field out of one frame's OCR output, with
  * no dependency on successfully reading the card's (often OCR-mangled) name:
- * set code + collector number, power/toughness, a rough CMC estimate, common
- * keyword abilities, and coarse type flags - all independently extractable
- * signals that feed the multi-field scoring system.
+ * set code + collector number, power/toughness, common keyword abilities,
+ * and coarse type flags - all independently extractable signals that feed
+ * the multi-field scoring system. Deliberately no CMC estimate - OCR too
+ * often confuses an unrelated number on the card for the mana cost.
  */
 export function extractFields(text: string, lines: OcrLineLike[]): ExtractedFields {
   const setCodeMatch = parseSetCode(text);
@@ -82,7 +71,6 @@ export function extractFields(text: string, lines: OcrLineLike[]): ExtractedFiel
     setCode: setCodeMatch?.setCode ?? null,
     collectorNumber: setCodeMatch ? parseInt(setCodeMatch.collectorNumber, 10) : null,
     powerToughness: extractPowerToughness(text),
-    cmc: extractCMC(text),
     hasKeyword,
     isCreature: /Creature|Kreatur/i.test(text),
     isInstant: /Instant|Spontanzauber/i.test(text),
