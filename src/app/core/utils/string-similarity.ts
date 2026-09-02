@@ -56,31 +56,55 @@ export interface OcrLineLike {
 }
 
 const LINE_CONFIDENCE_THRESHOLD = 70;
-const UPPERCASE_LINE_PATTERN = /^[A-ZÄÖÜ\s-]+$/;
-const DISALLOWED_LINE_CHARS = /[{}[\]()©/]/;
+const MIN_LINE_LENGTH = 3;
+const HAS_LETTER_PATTERN = /\p{L}/u;
+
+// The card name always prints in one of the first lines, before the type
+// line - once any of these show up (a type-line word or an early rules-text
+// word, whichever comes first), everything from there on is rules text, not
+// the name, so it's excluded rather than fed into the "longest line" pick.
+const STOP_KEYWORDS = [
+  'Legendary',
+  'Creature',
+  'Instant',
+  'Sorcery',
+  'Enchantment',
+  'Artifact',
+  'Land',
+  'Planeswalker',
+  'Reichweite',
+  'Trampelschaden',
+  'Menace',
+  'Whenever',
+  'Immer wenn',
+  'Marke',
+  'Schaden',
+  'Ziel',
+  'Wahll',
+];
 
 /**
  * Picks the most plausible card-name line out of a whole card image's OCR
- * output: card names are printed as their own line, so this keeps only
- * confident lines (Tesseract's per-line confidence, not the whole-image
- * one), drops anything containing symbols that only ever show up in mana
- * costs/rules text/copyright lines ({}, [], (), ©, /), prefers lines that
- * are purely letters/spaces/hyphens (how names are typically printed) over
- * ones that also have a few other characters mixed in, and finally takes
- * the longest survivor - the fullest name is more useful to search on than
- * a truncated fragment. Returns null if nothing survives the filters.
+ * output: card names are printed as their own line, before the type line
+ * and rules text, so this first cuts off everything from the first
+ * type-line/rules-text keyword onward. Of what's left, confident lines
+ * (Tesseract's per-line confidence, not the whole-image one) have any
+ * stray parentheses stripped (OCR sometimes wraps the name in them), lines
+ * with no letters at all or under 3 characters are dropped, and the
+ * longest survivor is taken - the fullest name is more useful to search on
+ * than a truncated fragment. Returns null if nothing survives.
  */
 export function extractNameFromLines(lines: OcrLineLike[]): string | null {
-  const candidates = lines
+  const stopIndex = lines.findIndex((line) => STOP_KEYWORDS.some((keyword) => line.text.includes(keyword)));
+  const candidateLines = stopIndex === -1 ? lines : lines.slice(0, stopIndex);
+
+  const candidates = candidateLines
     .filter((line) => line.confidence > LINE_CONFIDENCE_THRESHOLD)
-    .map((line) => line.text.trim())
-    .filter((text) => text.length > 0 && !DISALLOWED_LINE_CHARS.test(text));
+    .map((line) => line.text.replace(/[()]/g, '').trim())
+    .filter((text) => text.length >= MIN_LINE_LENGTH && HAS_LETTER_PATTERN.test(text));
 
   if (candidates.length === 0) return null;
 
-  const uppercaseOnly = candidates.filter((text) => UPPERCASE_LINE_PATTERN.test(text));
-  const pool = uppercaseOnly.length > 0 ? uppercaseOnly : candidates;
-
-  const longest = pool.reduce((best, current) => (current.length > best.length ? current : best));
+  const longest = candidates.reduce((best, current) => (current.length > best.length ? current : best));
   return fixUmlauts(longest);
 }
