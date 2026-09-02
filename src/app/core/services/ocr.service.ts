@@ -8,10 +8,17 @@ export interface OcrOptions {
   charWhitelist?: string;
 }
 
+export interface OcrLine {
+  text: string;
+  /** Tesseract's confidence in this specific line, 0-100. */
+  confidence: number;
+}
+
 export interface OcrResult {
   text: string;
-  /** Tesseract's own confidence in the transcription, 0-100. */
+  /** Tesseract's own confidence in the whole-image transcription, 0-100. */
   confidence: number;
+  lines: OcrLine[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -29,7 +36,11 @@ export class OcrService {
       tessedit_char_whitelist: options.charWhitelist ?? '',
     });
     const { data } = await worker.recognize(source);
-    return { text: data.text.trim(), confidence: data.confidence };
+    return {
+      text: data.text.trim(),
+      confidence: data.confidence,
+      lines: data.lines.map((line) => ({ text: line.text.trim(), confidence: line.confidence })),
+    };
   }
 
   /** Shuts down the current worker (if any) so no OCR work continues in the background; a fresh one is created lazily on next use. */

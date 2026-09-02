@@ -3,12 +3,16 @@ export interface SetCodeMatch {
   collectorNumber: string;
 }
 
-// Matches the collector strip printed on the bottom of MTG cards, e.g.
-// "IKO · EN · 123/274" -> set code "IKO", collector number "123".
-const SET_CODE_PATTERN = /([A-Z]{2,4})\s*[·•]\s*\w+\s*[·•]\s*(\d+)/;
+// Looks for a short uppercase set-code token followed later in the text by
+// a 3-4 digit collector number - lenient on purpose since real OCR output
+// rarely preserves the printed "·"/"•" separators cleanly (e.g. "SPM ...
+// 0067" reads out of a full card image, not a clean "SPM · EN · 67/281").
+const SET_CODE_PATTERN = /\b([A-Z]{2,4})\b.*?\b(\d{3,4})\b/;
 
 export function parseSetCode(rawText: string): SetCodeMatch | null {
   const match = SET_CODE_PATTERN.exec(rawText.toUpperCase());
   if (!match) return null;
-  return { setCode: match[1], collectorNumber: match[2] };
+  // Collector numbers are often printed zero-padded ("0067") but Scryfall's
+  // own numbering usually isn't - normalize away the leading zeros.
+  return { setCode: match[1].toLowerCase(), collectorNumber: String(parseInt(match[2], 10)) };
 }

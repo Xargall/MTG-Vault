@@ -16,13 +16,13 @@ import { CardIdentification } from '../../core/services/card-api.interface';
 import { CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
-import { OcrService } from '../../core/services/ocr.service';
-import { extractNameCandidates, fixUmlauts } from '../../core/utils/string-similarity';
+import { OcrLine, OcrService } from '../../core/services/ocr.service';
+import { extractNameFromLines } from '../../core/utils/string-similarity';
 import { parseSetCode } from '../../core/utils/set-code-parser';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
 const CAPTURE_INTERVAL_MS = 800;
-const OCR_CONFIDENCE_THRESHOLD = 70;
+const OCR_CONFIDENCE_THRESHOLD = 55;
 const NO_MATCH_STREAK_FOR_TOAST = 10;
 const SUCCESS_TOAST_DURATION_MS = 3000;
 const FAILURE_TOAST_DURATION_MS = 2000;
@@ -196,15 +196,15 @@ export class Scanner {
     const canvas = this.captureFrame(videoEl);
     if (!canvas) return false;
 
-    const { text, confidence } = await this.ocrService.recognizeText(canvas);
-    console.log('OCR result:', text, 'confidence:', confidence);
-    if (confidence <= OCR_CONFIDENCE_THRESHOLD) return false;
+    const ocrResult = await this.ocrService.recognizeText(canvas);
+    console.log('OCR result:', ocrResult.text, 'confidence:', ocrResult.confidence);
+    if (ocrResult.confidence <= OCR_CONFIDENCE_THRESHOLD) return false;
 
     // Primary path (MTG only): the set code + collector number printed at
     // the bottom of the card is exact and language-independent. Yu-Gi-Oh
     // has no equivalent structured identifier.
     if (this.gameService.currentSlug() === 'mtg') {
-      const bySetCode = await this.tryIdentifyBySetCode(text);
+      const bySetCode = await this.tryIdentifyBySetCode(ocrResult.text);
       if (bySetCode) {
         this.onMatch(bySetCode);
         return true;
@@ -213,7 +213,7 @@ export class Scanner {
 
     // Fallback: search for the printed name (used for Yu-Gi-Oh always, and
     // for MTG whenever the set-code strip wasn't in/readable in this frame).
-    const byName = await this.tryIdentifyByName(text);
+    const byName = await this.tryIdentifyByName(ocrResult.lines);
     if (byName) {
       this.onMatch(byName);
       return true;
@@ -233,15 +233,11 @@ export class Scanner {
     return { card, confidence: 1 };
   }
 
-  private async tryIdentifyByName(text: string): Promise<CardIdentification | null> {
-    const candidates = extractNameCandidates(fixUmlauts(text));
+  private async tryIdentifyByName(lines: OcrLine[]): Promise<CardIdentification | null> {
+    const candidate = extractNameFromLines(lines);
+    if (!candidate) return null;
 
-    for (const candidate of candidates) {
-      const result = await this.gameService.cardApi().identifyCard(candidate);
-      if (result) return result;
-    }
-
-    return null;
+    return this.gameService.cardApi().identifyCard(candidate);
   }
 
   private captureFrame(videoEl: HTMLVideoElement): HTMLCanvasElement | null {
