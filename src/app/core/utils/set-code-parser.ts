@@ -3,16 +3,21 @@ export interface SetCodeMatch {
   collectorNumber: string;
 }
 
-// Looks for a short uppercase set-code token followed later in the text by
-// a 3-4 digit collector number - lenient on purpose since real OCR output
-// rarely preserves the printed "·"/"•" separators cleanly (e.g. "SPM ...
-// 0067" reads out of a full card image, not a clean "SPM · EN · 67/281").
-const SET_CODE_PATTERN = /\b([A-Z]{2,4})\b.*?\b(\d{3,4})\b/;
+// Case-sensitive on purpose: matching only already-uppercase tokens avoids
+// the previous approach's false positives (e.g. uppercasing the whole text
+// first turned "Spider-Man" into "SPIDER-MAN", making "MAN" match as a
+// bogus set code) - a real printed name's mixed case never matches this.
+const SET_CODE_TOKEN_PATTERN = /\b([A-Z]{2,4})\b/g;
+const COLLECTOR_NUMBER_PATTERN = /\b(0\d{3}|\d{4})\b/;
+const IGNORED_SET_TOKENS = ['EN', 'U', 'X', 'M', 'A', 'EZ', 'DD'];
 
 export function parseSetCode(rawText: string): SetCodeMatch | null {
-  const match = SET_CODE_PATTERN.exec(rawText.toUpperCase());
-  if (!match) return null;
-  // Collector numbers are often printed zero-padded ("0067") but Scryfall's
-  // own numbering usually isn't - normalize away the leading zeros.
-  return { setCode: match[1].toLowerCase(), collectorNumber: String(parseInt(match[2], 10)) };
+  const setMatches = rawText.match(SET_CODE_TOKEN_PATTERN);
+  const numMatch = COLLECTOR_NUMBER_PATTERN.exec(rawText);
+
+  const setCode = setMatches?.find((s) => s.length >= 3 && !IGNORED_SET_TOKENS.includes(s))?.toLowerCase();
+  const collectorNum = numMatch ? parseInt(numMatch[1], 10) : null;
+
+  if (!setCode || collectorNum === null) return null;
+  return { setCode, collectorNumber: String(collectorNum) };
 }

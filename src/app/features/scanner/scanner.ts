@@ -22,7 +22,11 @@ import { parseSetCode } from '../../core/utils/set-code-parser';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
 const CAPTURE_INTERVAL_MS = 800;
-const OCR_CONFIDENCE_THRESHOLD = 55;
+// Two tiers: set-code+number extraction is exact/structural, so it's worth
+// trying even on a shakier frame; the fuzzy name search needs cleaner text
+// to avoid false matches, so it only kicks in above a higher bar.
+const MIN_CONFIDENCE_FOR_SET_CODE = 50;
+const MIN_CONFIDENCE_FOR_NAME = 65;
 const NO_MATCH_STREAK_FOR_TOAST = 10;
 const SUCCESS_TOAST_DURATION_MS = 3000;
 const FAILURE_TOAST_DURATION_MS = 2000;
@@ -198,11 +202,12 @@ export class Scanner {
 
     const ocrResult = await this.ocrService.recognizeText(canvas);
     console.log('OCR result:', ocrResult.text, 'confidence:', ocrResult.confidence);
-    if (ocrResult.confidence <= OCR_CONFIDENCE_THRESHOLD) return false;
+    if (ocrResult.confidence < MIN_CONFIDENCE_FOR_SET_CODE) return false;
 
     // Primary path (MTG only): the set code + collector number printed at
     // the bottom of the card is exact and language-independent. Yu-Gi-Oh
-    // has no equivalent structured identifier.
+    // has no equivalent structured identifier. Tried even at the lower
+    // confidence bar since it's a structural match, not a fuzzy guess.
     if (this.gameService.currentSlug() === 'mtg') {
       const bySetCode = await this.tryIdentifyBySetCode(ocrResult.text);
       if (bySetCode) {
@@ -213,10 +218,14 @@ export class Scanner {
 
     // Fallback: search for the printed name (used for Yu-Gi-Oh always, and
     // for MTG whenever the set-code strip wasn't in/readable in this frame).
-    const byName = await this.tryIdentifyByName(ocrResult.lines);
-    if (byName) {
-      this.onMatch(byName);
-      return true;
+    // Needs cleaner text than the set-code path to avoid a wrong fuzzy
+    // match, so it only runs above the higher confidence bar.
+    if (ocrResult.confidence >= MIN_CONFIDENCE_FOR_NAME) {
+      const byName = await this.tryIdentifyByName(ocrResult.lines);
+      if (byName) {
+        this.onMatch(byName);
+        return true;
+      }
     }
 
     return false;
