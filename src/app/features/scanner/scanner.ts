@@ -19,7 +19,7 @@ import { CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
 import { OcrService } from '../../core/services/ocr.service';
-import { extractNameCandidate } from '../../core/utils/string-similarity';
+import { extractNameCandidate, fixUmlauts } from '../../core/utils/string-similarity';
 import { parseSetCode } from '../../core/utils/set-code-parser';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
@@ -179,7 +179,7 @@ export class Scanner {
     });
     if (confidence <= OCR_CONFIDENCE_THRESHOLD) return null;
 
-    const candidate = extractNameCandidate(text);
+    const candidate = extractNameCandidate(fixUmlauts(text));
     if (!candidate) return null;
 
     return this.gameService.cardApi().identifyCard(candidate);

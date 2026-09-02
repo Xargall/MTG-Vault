@@ -36,6 +36,20 @@ export function cleanOcrText(raw: string): string {
     .trim();
 }
 
+/** Tesseract regularly mis-reads German umlauts as plain-letter digraphs - undo the common cases before searching. */
+export function fixUmlauts(text: string): string {
+  return text
+    .replace(/\bii\b/gi, 'ü')
+    .replace(/ii([a-z])/gi, 'ü$1')
+    .replace(/([a-z])ii/gi, '$1ü')
+    .replace(/Ae/g, 'Ä')
+    .replace(/ae/g, 'ä')
+    .replace(/Oe/g, 'Ö')
+    .replace(/oe/g, 'ö')
+    .replace(/Ue/g, 'Ü')
+    .replace(/ue/g, 'ü');
+}
+
 const MIN_CANDIDATE_LENGTH = 4;
 const MAX_CANDIDATE_WORDS = 3;
 const SHORT_TOKEN = /^\w{1,2}$/;

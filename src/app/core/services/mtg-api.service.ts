@@ -104,36 +104,26 @@ export class MtgApiService implements CardApiService {
     const cleaned = cleanOcrText(rawText);
     if (!cleaned) return null;
 
-    // Pass 1: German prints first - a physical card in the collection may be
-    // a German printing, whose printed_name won't match the canonical
-    // (English) name field at all.
-    const germanMatches = await this.runSearch(`${cleaned} lang:de`, 'unique=cards');
+    // Pass 1: German prints first - an exact quoted-name search scoped to
+    // lang:de, so a noisy/partial name still resolves precisely rather than
+    // matching unrelated cards via a loose full-text query.
+    const escaped = cleaned.replace(/"/g, '\\"');
+    const germanMatches = await this.runSearch(`lang:de "${escaped}"`, 'unique=cards');
     const germanBest = this.bestMatch(cleaned, germanMatches, (card) => card.printed_name ?? card.name);
     if (germanBest && germanBest.confidence >= IDENTIFY_CONFIDENCE_THRESHOLD) {
       return { card: this.toCard(germanBest.raw), confidence: germanBest.confidence };
     }
 
-    // Pass 2: fall back to the canonical (English) name via autocomplete,
-    // which tolerates noisy/partial OCR text far better than a literal
-    // search query - but only trust it when it converges on a single
-    // suggestion, then confirm that suggestion with a fuzzy named lookup.
-    const suggestions = await this.autocompleteSuggestions(cleaned);
-    if (suggestions.length !== 1) return null;
-
-    const raw = await this.getCardByFuzzyName(suggestions[0]);
+    // Pass 2: no German (or no confident) match - fall back to a fuzzy
+    // named lookup against the canonical (English) name, tolerant of the
+    // remaining OCR noise, no language filter this time.
+    const raw = await this.getCardByFuzzyName(cleaned);
     if (!raw) return null;
 
     const confidence = similarity(cleaned, raw.name);
     if (confidence < IDENTIFY_CONFIDENCE_THRESHOLD) return null;
 
     return { card: this.toCard(raw), confidence };
-  }
-
-  private async autocompleteSuggestions(query: string): Promise<string[]> {
-    const response = await fetch(`${CARD_ENDPOINT}/autocomplete?q=${encodeURIComponent(query)}`);
-    if (!response.ok) return [];
-    const body: { data: string[] } = await response.json();
-    return body.data;
   }
 
   private async getCardByFuzzyName(name: string): Promise<ScryfallRawCard | null> {
