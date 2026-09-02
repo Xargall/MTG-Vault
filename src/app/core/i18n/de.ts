@@ -211,6 +211,7 @@ export const de = {
     cameraSelect: 'Kamera auswählen',
     focusSlider: 'Fokus',
     cameraFallbackLabel: 'Kamera {{index}}',
+    chooseCardHint: 'Mehrere mögliche Treffer — bitte die richtige Karte auswählen:',
     foil: 'Foil',
     addToCollection: 'Zur Collection hinzufügen',
     keepScanning: 'Weiter scannen',

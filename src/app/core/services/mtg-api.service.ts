@@ -4,7 +4,7 @@ import { Card, MtgCard } from '../models/card.model';
 import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
 import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
 import { OcrLineLike, cleanOcrText, similarity } from '../utils/string-similarity';
-import { CardApiService, CardIdentification } from './card-api.interface';
+import { CardApiService, CardIdentification, MtgIdentificationResult, ScoredCandidate } from './card-api.interface';
 
 interface ScryfallCardFace {
   image_uris?: { normal: string; small: string; art_crop: string };
@@ -62,6 +62,11 @@ const MIN_SCORE_FOR_MATCH = 60;
 // signals agree - any fewer and the filters are too loose to narrow down
 // Scryfall's card pool meaningfully.
 const MIN_FILTERS_FOR_SEARCH = 2;
+// Filter-search candidates can tie or nearly tie on the same stat line
+// (e.g. two different legendary 4/4s) with no name check to break the tie,
+// so up to this many runners-up are offered as a manual pick instead of
+// silently trusting the top score.
+const MAX_ALTERNATIVES = 2;
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -193,7 +198,7 @@ export class MtgApiService implements CardApiService {
    * expected to still require this to agree across several consecutive
    * frames before treating it as confirmed.
    */
-  async identifyCardWithScoring(rawText: string, lines: OcrLineLike[]): Promise<CardIdentification | null> {
+  async identifyCardWithScoring(rawText: string, lines: OcrLineLike[]): Promise<MtgIdentificationResult | null> {
     const fields = extractFields(rawText, lines);
     const candidates: ScryfallCandidate[] = [];
 
@@ -222,17 +227,32 @@ export class MtgApiService implements CardApiService {
 
     if (candidates.length === 0) return null;
 
-    const best = candidates
+    const scored = candidates
       .map((candidate) => ({ candidate, score: this.scoreCandidate(candidate, fields) }))
-      .sort((a, b) => b.score - a.score)[0];
+      .sort((a, b) => b.score - a.score);
 
-    if (best.score < MIN_SCORE_FOR_MATCH) return null;
+    const top = scored[0];
+    if (top.score < MIN_SCORE_FOR_MATCH) return null;
 
-    return {
-      card: this.toCard(best.candidate.card),
-      confidence: Math.min(1, best.score / MAX_POSSIBLE_SCORE),
-      oracleId: best.candidate.card.oracle_id,
-    };
+    const toScoredCandidate = (entry: (typeof scored)[number]): ScoredCandidate => ({
+      card: this.toCard(entry.candidate.card),
+      confidence: Math.min(1, entry.score / MAX_POSSIBLE_SCORE),
+      oracleId: entry.candidate.card.oracle_id,
+    });
+
+    // The exact set+number lookup is unambiguous by construction (one
+    // request, one card) - alternatives only make sense for the looser
+    // filter search, where a similar real card can score close behind.
+    const alternatives =
+      top.candidate.source === 'filter'
+        ? scored
+            .slice(1)
+            .filter((entry) => entry.candidate.card.oracle_id !== top.candidate.card.oracle_id)
+            .slice(0, MAX_ALTERNATIVES)
+            .map(toScoredCandidate)
+        : [];
+
+    return { best: toScoredCandidate(top), source: top.candidate.source, alternatives };
   }
 
   private scoreCandidate(candidate: ScryfallCandidate, fields: ExtractedFields): number {

@@ -53,6 +53,22 @@
     <div class="scanner-toast" [class.scanner-toast--warning]="t.variant === 'warning'">{{ t.message }}</div>
   }
 
+  @if (status() === 'choosing' && candidateChoices(); as choices) {
+    <div class="match-panel choices-panel">
+      <p class="choices-hint">{{ 'scanner.chooseCardHint' | translate }}</p>
+      <div class="choices-grid">
+        @for (choice of choices; track choice.oracleId) {
+          <button type="button" class="choice-item" (click)="selectCandidate(choice)">
+            <app-card-tile [card]="choice.card" />
+          </button>
+        }
+      </div>
+      <button type="button" class="keep-scanning-button" (click)="cancelChoices()">
+        {{ 'scanner.keepScanning' | translate }}
+      </button>
+    </div>
+  }
+
   @if (detectedCard(); as card) {
     <div class="match-panel">
       <app-card-tile [card]="card" />

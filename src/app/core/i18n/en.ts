@@ -213,6 +213,7 @@ export const en: typeof de = {
     cameraSelect: 'Select camera',
     focusSlider: 'Focus',
     cameraFallbackLabel: 'Camera {{index}}',
+    chooseCardHint: 'Multiple possible matches — please choose the right card:',
     foil: 'Foil',
     addToCollection: 'Add to collection',
     keepScanning: 'Keep scanning',

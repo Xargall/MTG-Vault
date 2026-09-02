@@ -12,7 +12,7 @@ import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../core/models/card.model';
-import { CardIdentification } from '../../core/services/card-api.interface';
+import { CardIdentification, ScoredCandidate } from '../../core/services/card-api.interface';
 import { CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
@@ -47,7 +47,7 @@ const RATE_LIMIT_TOAST_DURATION_MS = 3000;
 const RATE_LIMIT_PAUSE_MS = 5000;
 const RATE_LIMIT_RETRY_DELAY_MS = 1000;
 
-type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'error';
+type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'choosing' | 'error';
 type ScannerToast = { message: string; variant: 'success' | 'warning' };
 
 // Manual focus / points-of-interest aren't in TS's bundled DOM types yet,
@@ -106,6 +106,7 @@ export class Scanner {
   protected readonly focusDistance = signal(0.5);
 
   protected readonly detectedCard = signal<Card | null>(null);
+  protected readonly candidateChoices = signal<ScoredCandidate[] | null>(null);
   protected readonly quantity = signal(1);
   protected readonly foil = signal(false);
   protected readonly adding = signal(false);
@@ -339,16 +340,16 @@ export class Scanner {
   private async handleMtgFrame(ocrResult: { text: string; lines: OcrLine[] }): Promise<boolean> {
     const result = await this.mtgApi.identifyCardWithScoring(ocrResult.text, ocrResult.lines);
 
-    if (!result?.oracleId) {
+    if (!result) {
       this.lastOracleId = null;
       this.consecutiveMatches = 0;
       return false;
     }
 
-    if (result.oracleId === this.lastOracleId) {
+    if (result.best.oracleId === this.lastOracleId) {
       this.consecutiveMatches++;
     } else {
-      this.lastOracleId = result.oracleId;
+      this.lastOracleId = result.best.oracleId;
       this.consecutiveMatches = 1;
     }
 
@@ -358,7 +359,16 @@ export class Scanner {
 
     this.lastOracleId = null;
     this.consecutiveMatches = 0;
-    this.onMatch(result);
+
+    if (result.source === 'setCode' || result.alternatives.length === 0) {
+      // Exact set+number match, or no close runner-up to be unsure about.
+      this.onMatch(result.best);
+    } else {
+      // The filter-search fallback has no name check, so a similar real
+      // card can score close behind the top pick - let the user decide
+      // instead of silently trusting a guess two cards could tie on.
+      this.onAmbiguousMatch([result.best, ...result.alternatives]);
+    }
     return true;
   }
 
@@ -402,9 +412,26 @@ export class Scanner {
     this.quantity.set(1);
     this.foil.set(false);
     this.addError.set(null);
+    this.candidateChoices.set(null);
     this.detectedCard.set(result.card);
     this.status.set('matched');
     if (navigator.vibrate) navigator.vibrate(200);
+  }
+
+  private onAmbiguousMatch(choices: ScoredCandidate[]) {
+    this.candidateChoices.set(choices);
+    this.status.set('choosing');
+    if (navigator.vibrate) navigator.vibrate(200);
+  }
+
+  protected selectCandidate(candidate: ScoredCandidate) {
+    this.onMatch(candidate);
+  }
+
+  protected cancelChoices() {
+    this.candidateChoices.set(null);
+    this.status.set('scanning');
+    this.scheduleNextCapture();
   }
 
   private showToast(message: string, variant: ScannerToast['variant'], durationMs: number) {
@@ -457,6 +484,7 @@ export class Scanner {
     this.lastOracleId = null;
     this.consecutiveMatches = 0;
     this.detectedCard.set(null);
+    this.candidateChoices.set(null);
     this.status.set('scanning');
     this.scheduleNextCapture();
   }

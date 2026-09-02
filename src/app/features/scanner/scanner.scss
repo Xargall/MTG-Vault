@@ -143,6 +143,39 @@
   }
 }
 
+.choices-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--spacing-md);
+}
+
+.choices-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.choices-grid {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+}
+
+.choice-item {
+  background: transparent;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 4px;
+  cursor: pointer;
+  width: 110px;
+  flex-shrink: 0;
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+}
+
 @keyframes slide-up {
   from {
     transform: translateY(100%);

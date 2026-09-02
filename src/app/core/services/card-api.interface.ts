@@ -7,6 +7,19 @@ export interface CardIdentification {
   oracleId?: string;
 }
 
+export interface ScoredCandidate {
+  card: Card;
+  confidence: number;
+  oracleId: string;
+}
+
+export interface MtgIdentificationResult {
+  best: ScoredCandidate;
+  source: 'setCode' | 'filter';
+  /** Next-best scored candidates when the source isn't the exact set+number lookup - lets the caller offer a manual pick instead of trusting a structural match that a similar real card could tie on. */
+  alternatives: ScoredCandidate[];
+}
+
 export interface CardApiService {
   searchCards(query: string): Promise<Card[]>;
   getCard(id: string): Promise<Card | null>;
