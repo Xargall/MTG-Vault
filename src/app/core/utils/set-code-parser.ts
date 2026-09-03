@@ -101,16 +101,43 @@ function isCompactInfoLine(line: string): boolean {
  * (e.g. before the real list has finished loading for the first time).
  */
 export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string> | null): SetCodeMatch | null {
-  const setMatches = rawText.match(SET_CODE_TOKEN_PATTERN);
   const isValidToken = (token: string) =>
     validSetCodes ? validSetCodes.has(token) : !IGNORED_SET_TOKENS.includes(token);
-  const setCodeMatch = setMatches?.find(isValidToken);
-  if (!setCodeMatch) return null;
 
   const lines = rawText
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+
+  // Primary read: the card's actual bottom strip - set code (+ language,
+  // artist, copyright) prints on the very last OCR line, the collector
+  // number (+ rarity letter, brand watermark) on the second-to-last, e.g.
+  // "c 0082 © MARVEL" / "MSH*DE > Mateus Manhanini & © 2026 Wizards...".
+  // Checked first and most strictly, since it's the most reliable
+  // positional signal observed in practice.
+  const lastLine = lines[lines.length - 1];
+  const secondLastLine = lines.length >= 2 ? lines[lines.length - 2] : null;
+
+  const setCodeFromLastLine = lastLine ? lastLine.match(SET_CODE_TOKEN_PATTERN)?.find(isValidToken) : undefined;
+  if (setCodeFromLastLine) {
+    // A frame can also OCR the whole strip as one merged last line - fall
+    // back to that same line for the number if the second-to-last one
+    // doesn't have it.
+    const collectorNum =
+      (secondLastLine && extractCollectorNumber(secondLastLine)) ?? extractCollectorNumber(lastLine);
+    if (collectorNum !== null) {
+      return { setCode: setCodeFromLastLine.toLowerCase(), collectorNumber: String(collectorNum) };
+    }
+  }
+
+  // Fallback: the set code wasn't on the last line at all, or neither of
+  // the last two lines had a number next to it - search the whole frame
+  // for a valid set-code token, then look for the number near wherever
+  // that landed instead of giving up outright.
+  const setMatches = rawText.match(SET_CODE_TOKEN_PATTERN);
+  const setCodeMatch = setMatches?.find(isValidToken);
+  if (!setCodeMatch) return null;
+
   const setCodeLineIndex = lines.findIndex((line) => line.includes(setCodeMatch));
 
   // Pass 1: the set code's own line and its immediate neighbor - covers the
