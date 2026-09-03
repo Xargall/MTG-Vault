@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Card, MtgCard } from '../models/card.model';
 import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
 import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
+import { extractCollectorNumber, parseSetCode } from '../utils/set-code-parser';
 import { OcrLineLike, cleanOcrText, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification, MtgIdentificationResult, ScoredCandidate } from './card-api.interface';
 import { MtgBulkDataService } from './mtg-bulk-data.service';
@@ -200,6 +201,34 @@ export class MtgApiService implements CardApiService {
   async getCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<Card | null> {
     const raw = await this.fetchCardBySetAndNumber(setCode, collectorNumber);
     return raw ? this.toCard(raw) : null;
+  }
+
+  /**
+   * Identifies a card from OCR text scoped to just the card's bottom-left
+   * set-code/collector-number corner (see Scanner's crop-based capture) -
+   * an exact set+number hit only, no name/power-toughness/keyword fallback,
+   * since a tight crop of that corner never has those fields in it anyway.
+   */
+  async identifyByCroppedText(text: string): Promise<Card | null> {
+    const validSetCodes = await this.getValidSetCodes();
+    const match = parseSetCode(text, validSetCodes);
+    if (match) {
+      const raw = await this.lookupBySetAndNumber(match.setCode, match.collectorNumber);
+      if (raw) return this.toCard(raw);
+    }
+
+    // The crop is tight enough that the set code sometimes falls just
+    // outside it (it often prints on the line just below/above the rarity
+    // + collector number) while the number itself still reads cleanly -
+    // fall back to every locally-known printing at that number, but only
+    // when there's exactly one. With no other field left to score against,
+    // a tie can't be resolved safely, so it's treated as no match rather
+    // than guessing.
+    const bareNumber = extractCollectorNumber(text);
+    if (bareNumber === null) return null;
+
+    const candidates = await this.bulkData.findAllByCollectorNumber(String(bareNumber));
+    return candidates.length === 1 ? this.toCard(candidates[0]) : null;
   }
 
   private async fetchCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {

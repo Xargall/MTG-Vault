@@ -10,6 +10,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { PSM } from 'tesseract.js';
 
 import { Card } from '../../core/models/card.model';
 import { CardIdentification, MtgIdentificationResult, ScoredCandidate } from '../../core/services/card-api.interface';
@@ -32,9 +33,121 @@ const MAX_OCR_WIDTH = 1280;
 // Two tiers: set-code+number extraction is exact/structural, so it's worth
 // trying even on a shakier frame; the fuzzy name search needs cleaner text
 // to avoid false matches, so it only kicks in above a higher bar.
+// (Yu-Gi-Oh's name-only path only - see MTG's own crop-based pipeline below.)
 const MIN_CONFIDENCE_FOR_SET_CODE = 50;
 const MIN_CONFIDENCE_FOR_NAME = 65;
 const NO_MATCH_STREAK_FOR_TOAST = 8;
+
+interface CropStrategy {
+  name: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+// MTG's set-code/collector-number corner always prints bottom-left - these
+// three crop windows (fractions of the full captured frame) are tried in
+// order until one OCRs cleanly enough (see scoreCollectorNumberText),
+// covering a card held slightly higher/lower or shifted right of ideal
+// instead of requiring exact, precise framing.
+const CROP_STRATEGIES: CropStrategy[] = [
+  { name: 'optimal', x: 0.0, y: 0.82, w: 0.5, h: 0.1 },
+  { name: 'wider', x: 0.0, y: 0.78, w: 0.6, h: 0.15 },
+  { name: 'offsetRight', x: 0.1, y: 0.82, w: 0.5, h: 0.1 },
+];
+// Only a clean, unambiguous read ("U 0082", "0082") is accepted outright -
+// anything looser just moves on to the next crop strategy instead of
+// risking a wrong exact lookup.
+const MIN_SCORE_TO_ACCEPT = 80;
+const COLLECTOR_NUMBER_CHAR_WHITELIST = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/*-';
+
+interface ImageCharacteristics {
+  colorVariance: number;
+  darkPixelRatio: number;
+  brightPixelRatio: number;
+  midtonePixelRatio: number;
+}
+
+/** Per-pixel brightness/color-variance profile of a crop - foil cards scatter light in a way a plain grayscale+contrast pass handles badly, so this decides which preprocessing pass to use before OCR. */
+function analyzeImageCharacteristics(data: Uint8ClampedArray): ImageCharacteristics {
+  let colorVariance = 0;
+  let darkPixels = 0;
+  let brightPixels = 0;
+  let midtonePixels = 0;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const brightness = (r + g + b) / 3;
+    colorVariance += Math.abs(r - g) + Math.abs(g - b) + Math.abs(r - b);
+    if (brightness < 85) darkPixels++;
+    else if (brightness > 170) brightPixels++;
+    else midtonePixels++;
+  }
+
+  const total = data.length / 4;
+  return {
+    colorVariance: colorVariance / total,
+    darkPixelRatio: darkPixels / total,
+    brightPixelRatio: brightPixels / total,
+    midtonePixelRatio: midtonePixels / total,
+  };
+}
+
+function isFoilImage(stats: ImageCharacteristics): boolean {
+  return (
+    [
+      stats.colorVariance > 15,
+      stats.midtonePixelRatio > 0.4,
+      stats.darkPixelRatio < 0.3 && stats.brightPixelRatio < 0.3,
+    ].filter(Boolean).length >= 2
+  );
+}
+
+/** Normal (non-foil) crop: grayscale, contrast boost, then a flat threshold - a plain card's info strip is high-contrast enough that a single global cutoff reads cleanly. */
+function processNormalCropPixels(data: Uint8ClampedArray): void {
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    const enhanced = Math.max(0, Math.min(255, (gray - 128) * 2.5 + 128));
+    const binarized = enhanced >= 128 ? 255 : 0;
+    data[i] = binarized;
+    data[i + 1] = binarized;
+    data[i + 2] = binarized;
+  }
+}
+
+/** Foil crop: grayscale, sigmoid smoothing (softens the holofoil pattern's harsh local contrast), then thresholded against the crop's own average brightness instead of a fixed cutoff - the foil surface's brightness varies too much frame-to-frame for one hardcoded value to work. */
+function processFoilCropPixels(data: Uint8ClampedArray): void {
+  const pixelCount = data.length / 4;
+  const smoothed = new Float32Array(pixelCount);
+  const sigmoidSteepness = 20;
+  let sum = 0;
+
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    const value = 255 / (1 + Math.exp(-(gray - 128) / sigmoidSteepness));
+    smoothed[p] = value;
+    sum += value;
+  }
+
+  const dynamicThreshold = sum / pixelCount;
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const binarized = smoothed[p] >= dynamicThreshold ? 255 : 0;
+    data[i] = binarized;
+    data[i + 1] = binarized;
+    data[i + 2] = binarized;
+  }
+}
+
+/** How closely OCR'd text matches the expected "[rarity] collector-number" shape - a clean match (100) accepts the crop outright, a loose one (70) still moves on to try the next crop strategy rather than risking a wrong exact lookup. */
+function scoreCollectorNumberText(text: string): number {
+  const trimmed = text.trim();
+  if (/^[UCRM]?\s*\d{3,4}$/.test(trimmed)) return 100;
+  if (/\d{3,4}/.test(trimmed)) return 70;
+  return 0;
+}
 // MTG's multi-field scoring is a per-frame best guess, not a certainty - a
 // sliding window over the last few frames confirms a result once the same
 // oracle_id wins enough of them, tolerating a single noisy/no-match frame
@@ -100,9 +213,9 @@ export class Scanner {
   private autoResumeTimeout: ReturnType<typeof setTimeout> | null = null;
   private isScanning = false;
   private noMatchStreak = 0;
-  // Rolling window of the last few frames' top candidates (null for a frame
+  // Rolling window of the last few frames' resolved cards (null for a frame
   // with no result at all) - see getConsistentResult().
-  private frameHistory: Array<{ oracleId: string; result: MtgIdentificationResult } | null> = [];
+  private frameHistory: Array<{ id: string; card: Card } | null> = [];
   private rateLimitedUntil = 0;
 
   protected readonly status = signal<ScannerStatus>('starting');
@@ -320,25 +433,22 @@ export class Scanner {
     const videoEl = this.video()?.nativeElement;
     if (!videoEl || videoEl.readyState < 2) return false;
 
-    // No cropping - Tesseract gets the whole card image as context, which
-    // reads far more reliably than a thin, tightly-cropped strip (and lets
-    // the card be held at a normal, in-focus distance instead of filling
-    // the frame).
+    // MTG no longer OCRs the whole frame at all - only its own cropped
+    // set-code/collector-number corner (see handleMtgFrame), so it branches
+    // out before the whole-frame capture below even runs.
+    if (this.gameService.currentSlug() === 'mtg') {
+      return this.handleMtgFrame(videoEl);
+    }
+
+    // Yu-Gi-Oh: unchanged, whole-frame OCR feeding the name-only lookup
+    // (it has none of MTG's structured Scryfall set-code/collector-number
+    // fields to crop toward).
     const canvas = this.captureFrame(videoEl);
     if (!canvas) return false;
 
     const ocrResult = await this.ocrService.recognizeText(canvas);
     console.log('OCR result:', ocrResult.text, 'confidence:', ocrResult.confidence);
     if (ocrResult.confidence < MIN_CONFIDENCE_FOR_SET_CODE) return false;
-
-    // MTG: multi-field scoring across every recognizable field (name, set
-    // code, collector number, type line, P/T, mana cost, artist) instead of
-    // trusting a single one - see handleMtgFrame. Yu-Gi-Oh has none of
-    // those structured Scryfall fields, so it keeps the simpler name-only
-    // path below.
-    if (this.gameService.currentSlug() === 'mtg') {
-      return this.handleMtgFrame(ocrResult);
-    }
 
     if (ocrResult.confidence >= MIN_CONFIDENCE_FOR_NAME) {
       const byName = await this.tryIdentifyByName(ocrResult.lines);
@@ -351,48 +461,80 @@ export class Scanner {
     return false;
   }
 
-  private async handleMtgFrame(ocrResult: { text: string; lines: OcrLine[] }): Promise<boolean> {
-    const result = await this.mtgApi.identifyCardWithScoring(ocrResult.text, ocrResult.lines);
+  /**
+   * Crop-based collector-number scan (mtgscan-derived): tries each of
+   * CROP_STRATEGIES's bottom-left corner windows in turn, foil-detects the
+   * crop to pick the right adaptive preprocessing pass, OCRs it with a
+   * numeric-only Tesseract config, and stops at the first strategy whose
+   * result scores well enough (see scoreCollectorNumberText). That text is
+   * then resolved to an exact set+number hit only - no name/power-
+   * toughness/keyword fallback, since a crop this tight never has those
+   * fields in it anyway.
+   */
+  private async handleMtgFrame(videoEl: HTMLVideoElement): Promise<boolean> {
+    let card: Card | null = null;
 
-    this.pushFrameHistory(result ? { oracleId: result.topCandidate.oracleId, result } : null);
-    if (!result) return false;
+    for (const strategy of CROP_STRATEGIES) {
+      const cropCanvas = this.cropToStrategy(videoEl, strategy);
+      if (!cropCanvas) continue;
 
-    const confirmed = this.getConsistentResult();
+      const ctx = cropCanvas.getContext('2d');
+      if (!ctx) continue;
+
+      const imageData = ctx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
+      const stats = analyzeImageCharacteristics(imageData.data);
+      if (isFoilImage(stats)) {
+        processFoilCropPixels(imageData.data);
+      } else {
+        processNormalCropPixels(imageData.data);
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      const ocrResult = await this.ocrService.recognizeText(cropCanvas, {
+        pageSegMode: PSM.SINGLE_LINE,
+        charWhitelist: COLLECTOR_NUMBER_CHAR_WHITELIST,
+      });
+      const score = scoreCollectorNumberText(ocrResult.text);
+      console.log(
+        `Collector-number OCR [${strategy.name}, ${isFoilImage(stats) ? 'foil' : 'normal'}]:`,
+        JSON.stringify(ocrResult.text),
+        'score:',
+        score,
+      );
+
+      if (score < MIN_SCORE_TO_ACCEPT) continue;
+
+      card = await this.mtgApi.identifyByCroppedText(ocrResult.text);
+      break;
+    }
+
+    const confirmed = this.confirmMtgCard(card);
     if (!confirmed) return false;
 
-    this.frameHistory = [];
-
-    if (confirmed.source === 'exact' || confirmed.confidence >= AUTO_CONFIRM_THRESHOLD) {
-      // Exact set+number match, or a confident enough filter-search guess.
-      this.onMatch(confirmed.topCandidate);
-    } else {
-      // The filter-search fallback has no name check, so a similar real
-      // card can score close behind the top pick - let the user pick
-      // manually instead of silently trusting a weak guess.
-      this.onAmbiguousMatch(confirmed);
-    }
+    this.onMatch({ card: confirmed, confidence: 1 });
     return true;
   }
 
-  private pushFrameHistory(entry: { oracleId: string; result: MtgIdentificationResult } | null) {
+  private pushFrameHistory(entry: { id: string; card: Card } | null) {
     this.frameHistory.push(entry);
     if (this.frameHistory.length > FRAME_HISTORY_SIZE) this.frameHistory.shift();
   }
 
-  /** Sliding-window consistency check: within the last FRAME_HISTORY_SIZE frames, the same oracle_id must appear at least CONSISTENT_MATCHES_REQUIRED times - tolerates a single noisy/no-match frame in between two real hits instead of a strict streak. */
-  private getConsistentResult(): MtgIdentificationResult | null {
-    const entries = this.frameHistory.filter(
-      (entry): entry is { oracleId: string; result: MtgIdentificationResult } => entry !== null,
-    );
+  /** Sliding-window consistency check: within the last FRAME_HISTORY_SIZE frames, the same card must appear at least CONSISTENT_MATCHES_REQUIRED times - tolerates a single noisy/no-match frame in between two real hits instead of a strict streak. */
+  private confirmMtgCard(card: Card | null): Card | null {
+    this.pushFrameHistory(card ? { id: card.id, card } : null);
+    if (!card) return null;
+
+    const entries = this.frameHistory.filter((entry): entry is { id: string; card: Card } => entry !== null);
 
     const counts = new Map<string, number>();
-    for (const entry of entries) counts.set(entry.oracleId, (counts.get(entry.oracleId) ?? 0) + 1);
+    for (const entry of entries) counts.set(entry.id, (counts.get(entry.id) ?? 0) + 1);
 
     let topId: string | null = null;
     let topCount = 0;
-    for (const [oracleId, count] of counts) {
+    for (const [id, count] of counts) {
       if (count > topCount) {
-        topId = oracleId;
+        topId = id;
         topCount = count;
       }
     }
@@ -400,9 +542,34 @@ export class Scanner {
     if (!topId || topCount < CONSISTENT_MATCHES_REQUIRED) return null;
 
     // Use the most recent frame that agreed, not the oldest - its OCR read
-    // (and derived confidence/candidate list) is the freshest one.
-    const latest = [...entries].reverse().find((entry) => entry.oracleId === topId);
-    return latest?.result ?? null;
+    // is the freshest one.
+    const latest = [...entries].reverse().find((entry) => entry.id === topId);
+    if (!latest) return null;
+
+    this.frameHistory = [];
+    return latest.card;
+  }
+
+  private cropToStrategy(videoEl: HTMLVideoElement, strategy: CropStrategy): HTMLCanvasElement | null {
+    const videoWidth = videoEl.videoWidth;
+    const videoHeight = videoEl.videoHeight;
+    if (!videoWidth || !videoHeight) return null;
+
+    const sx = Math.round(strategy.x * videoWidth);
+    const sy = Math.round(strategy.y * videoHeight);
+    const sw = Math.round(strategy.w * videoWidth);
+    const sh = Math.round(strategy.h * videoHeight);
+    // Same guard as captureFrame() - a transiently tiny reported video size
+    // while the stream settles would otherwise produce a near-zero crop.
+    if (sw < 10 || sh < 10) return null;
+
+    this.captureCanvas.width = sw;
+    this.captureCanvas.height = sh;
+    const ctx = this.captureCanvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, sw, sh);
+    return this.captureCanvas;
   }
 
   private async tryIdentifyByName(lines: OcrLine[]): Promise<CardIdentification | null> {
