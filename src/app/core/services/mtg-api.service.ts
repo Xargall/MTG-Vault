@@ -75,6 +75,15 @@ const MIN_FILTERS_FOR_SEARCH = 2;
 const MEDIUM_CONFIDENCE_THRESHOLD = 50;
 const TOP_N_MEDIUM_CONFIDENCE = 5;
 const TOP_N_LOW_CONFIDENCE = 10;
+// Below this, a candidate is discarded outright rather than offered in the
+// picker - a near-zero score means almost nothing about it actually agreed
+// with what was scanned, so showing it just invites picking the wrong card.
+const MIN_SCORE_FOR_CANDIDATE = 30;
+// Universes Beyond Marvel cards print "MARVEL" prominently instead of (or
+// alongside) a clearly readable set code - when that's the only text found,
+// try the handful of real Marvel-line sets directly with the OCR'd
+// collector number rather than falling back to a vague filter search.
+const MARVEL_FALLBACK_SET_CODES = ['msh', 'spm', 'acx', 'fan'];
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -271,7 +280,30 @@ export class MtgApiService implements CardApiService {
       if (bySetCode) candidates.push({ card: bySetCode, source: 'exact' });
     }
 
+    // No readable set code, but "MARVEL" (printed on every Universes Beyond
+    // Marvel card) plus a collector number is still enough to try the real
+    // Marvel-line sets directly - stops at the first one that resolves.
+    if (candidates.length === 0 && fields.collectorNumber !== null && rawText.includes('MARVEL')) {
+      for (const setCode of MARVEL_FALLBACK_SET_CODES) {
+        const card = await this.fetchCardBySetAndNumber(setCode, String(fields.collectorNumber));
+        if (card) {
+          candidates.push({ card, source: 'exact' });
+          break;
+        }
+      }
+    }
+
     if (candidates.length === 0) {
+      // Not worth even trying the vague filter/fuzzy fallback without at
+      // least one strong signal - a query built from weak/absent fields
+      // returns hundreds of irrelevant cards, the first few of which would
+      // otherwise get offered in the picker as if they were real guesses.
+      const hasStrongMatch =
+        fields.powerToughness !== null ||
+        (fields.setCode !== null && fields.collectorNumber !== null) ||
+        (fields.name !== null && fields.name.length > 3);
+      if (!hasStrongMatch) return null;
+
       const filters: string[] = [];
       if (fields.powerToughness) {
         const [power, toughness] = fields.powerToughness.split('/');
@@ -304,7 +336,10 @@ export class MtgApiService implements CardApiService {
 
     const scored = candidates
       .map((candidate) => ({ candidate, score: this.scoreCandidate(candidate, fields) }))
+      .filter((entry) => entry.score >= MIN_SCORE_FOR_CANDIDATE)
       .sort((a, b) => b.score - a.score);
+
+    if (scored.length === 0) return null;
 
     const top = scored[0];
 
