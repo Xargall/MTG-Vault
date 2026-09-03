@@ -211,11 +211,25 @@ export class MtgApiService implements CardApiService {
     return response.json();
   }
 
-  /** Local cache first (see MtgBulkDataService), live API only on a local miss - used everywhere the scanner needs an exact set+number hit. */
+  /** Both the unpadded number and a 4-digit zero-padded form - Scryfall's own stored collector_number isn't consistently one or the other across sets, so an OCR'd "82" should still hit a card actually stored as "0082" (or vice versa). */
+  private collectorNumberVariants(collectorNumber: string): string[] {
+    const padded = collectorNumber.padStart(4, '0');
+    return collectorNumber === padded ? [collectorNumber] : [collectorNumber, padded];
+  }
+
+  /** Local cache first (see MtgBulkDataService), live API only on a local miss - used everywhere the scanner needs an exact set+number hit. Tries both collector-number formats before giving up (see collectorNumberVariants). */
   private async lookupBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {
-    const local = await this.bulkData.findBySetAndNumber(setCode, collectorNumber);
-    if (local) return local;
-    return this.fetchCardBySetAndNumber(setCode, collectorNumber);
+    const variants = this.collectorNumberVariants(collectorNumber);
+
+    for (const variant of variants) {
+      const local = await this.bulkData.findBySetAndNumber(setCode, variant);
+      if (local) return local;
+    }
+    for (const variant of variants) {
+      const remote = await this.fetchCardBySetAndNumber(setCode, variant);
+      if (remote) return remote;
+    }
+    return null;
   }
 
   /** Fuzzy, name-only lookup (e.g. for a deck-list import line with no set code) - tolerant of minor spelling/formatting differences. */
@@ -292,8 +306,14 @@ export class MtgApiService implements CardApiService {
     const fields = extractFields(rawText, lines, validSetCodes);
     const candidates: ScryfallCandidate[] = [];
 
+    console.log('extracted setCode:', fields.setCode);
+    console.log('extracted collectorNumber:', fields.collectorNumber);
+    console.log('will do set lookup:', !!fields.setCode && fields.collectorNumber !== null);
+
     if (fields.setCode && fields.collectorNumber !== null) {
+      console.log('calling fetchCardBySetAndNumber:', fields.setCode, fields.collectorNumber);
       const bySetCode = await this.lookupBySetAndNumber(fields.setCode, String(fields.collectorNumber));
+      console.log('fetchCardBySetAndNumber result:', bySetCode ? bySetCode.name : null);
       if (bySetCode) candidates.push({ card: bySetCode, source: 'exact' });
     }
 

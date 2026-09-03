@@ -17,7 +17,11 @@ const SET_CODE_TOKEN_PATTERN = /\b([A-Z]{2,6})\b/g;
 // 3-5 digits, no leading-zero requirement - matches Scryfall's actual
 // collector_number range (many modern cards print an unpadded 3-digit
 // number, which a stricter "always 4 digits" pattern would never catch).
-const COLLECTOR_NUMBER_PATTERN = /\b(\d{3,5})\b/;
+// Excludes a number directly after a ©/™ symbol - the card's copyright
+// line ("© 2025 Wizards of the Coast") sits right next to the actual
+// set-code/collector-number line and its year is exactly as plausible-
+// looking a 4-digit match, but is never the real collector number.
+const COLLECTOR_NUMBER_PATTERN = /(?<![©™]\s*)\b(\d{3,5})\b/;
 // Fallback only, used when the real Scryfall set-code list (see
 // MtgApiService.getValidSetCodes) hasn't loaded yet or failed to fetch -
 // common uppercase English/German words and rules-text keywords/
@@ -69,6 +73,27 @@ export function extractCollectorNumber(rawText: string): number | null {
   return numMatch ? parseInt(numMatch[1], 10) : null;
 }
 
+// Tesseract frequently splits a card's tiny bottom info strip (rarity
+// symbol, set code, collector number, language code, copyright line) into
+// more OCR lines than just "the set code's line and its immediate
+// neighbor" - a ±1-line window missed the number entirely whenever it
+// landed 2+ lines away, silently killing the exact lookup even though both
+// "MSH" and "0082" were clearly present in the frame. This wider tail
+// window is only tried as a second pass, after the tight one below comes
+// up empty, so the original problem this guarded against (grabbing an
+// unrelated number from mid-frame rules text) still can't win when the
+// number legitimately is right next to the set code.
+const COLLECTOR_NUMBER_TAIL_LINES = 6;
+// The real info line ("MSH · DE U 0329") is always a handful of short
+// tokens, never a sentence - excluding longer, prose-like lines from the
+// wider tail pass keeps it from picking up a number out of an
+// unfortunately-nearby rules-text line (e.g. "...deals 400 damage...") on
+// a short card where that line still falls within the tail window.
+const MAX_WORDS_FOR_INFO_LINE = 6;
+function isCompactInfoLine(line: string): boolean {
+  return line.split(/\s+/).filter(Boolean).length <= MAX_WORDS_FOR_INFO_LINE;
+}
+
 /**
  * `validSetCodes`: the real, current Scryfall set-code list (uppercase),
  * when available - matched against directly instead of the much cruder
@@ -82,18 +107,27 @@ export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string>
   const setCodeMatch = setMatches?.find(isValidToken);
   if (!setCodeMatch) return null;
 
-  // The collector number is always printed right alongside the set code on
-  // the card's bottom info line - search a small window of lines around
-  // wherever that line landed in the OCR text, not the first 3-5 digit
-  // number anywhere in the whole blob. The latter can just as easily grab
-  // an unrelated number from garbled rules text earlier in the frame (e.g.
-  // a mangled ability cost), causing a confident-looking but wrong exact
-  // lookup that 404s and silently falls through to the fuzzy fallback.
-  const lines = rawText.split('\n');
+  const lines = rawText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
   const setCodeLineIndex = lines.findIndex((line) => line.includes(setCodeMatch));
+
+  // Pass 1: the set code's own line and its immediate neighbor - covers the
+  // common case (same line, or split across exactly two) without touching
+  // anything further away.
   const nearbyLines =
     setCodeLineIndex === -1 ? lines : lines.slice(Math.max(0, setCodeLineIndex - 1), setCodeLineIndex + 2);
-  const collectorNum = extractCollectorNumber(nearbyLines.join(' '));
+  let collectorNum = extractCollectorNumber(nearbyLines.join(' '));
+
+  // Pass 2: only if that came up empty - widen to the last few lines of the
+  // whole frame, where this info strip always prints (same reasoning as
+  // extractPowerToughness's tail-lines restriction), rather than the entire
+  // OCR blob.
+  if (collectorNum === null) {
+    const tailLines = lines.slice(-COLLECTOR_NUMBER_TAIL_LINES).filter(isCompactInfoLine);
+    collectorNum = extractCollectorNumber(tailLines.join(' '));
+  }
 
   if (collectorNum === null) return null;
   return { setCode: setCodeMatch.toLowerCase(), collectorNumber: String(collectorNum) };
