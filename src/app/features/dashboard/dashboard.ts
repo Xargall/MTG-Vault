@@ -30,6 +30,8 @@ export class Dashboard {
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
+  // Placeholder count for the loading skeleton grid - purely cosmetic, not tied to real data.
+  protected readonly skeletonPlaceholders = Array.from({ length: 7 });
   private readonly entries = signal<CollectionEntry[]>([]);
 
   protected readonly hasCards = computed(() => this.entries().length > 0);

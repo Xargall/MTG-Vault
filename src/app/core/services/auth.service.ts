@@ -32,6 +32,18 @@ export class AuthService {
   /** Whether this user has ever explicitly picked a game (see GameService.chooseGame) - persisted in Supabase Auth user_metadata so it carries across devices, not just this browser's localStorage. */
   readonly hasChosenGame = computed(() => !!this.session()?.user.user_metadata?.['active_game']);
 
+  // Supabase fires SIGNED_IN the instant signInAnonymously()'s network call
+  // resolves - well before signInAsGuest() below goes on to await the demo
+  // seed. Without this flag, the listener below would navigate to the
+  // dashboard immediately, mounting it against an empty collection, then
+  // demo-seeding's own internal game switches (see DemoSeedService.seed())
+  // would re-trigger its data load two more times as it seeds each game in
+  // turn - visibly flashing "no cards" (or the wrong game's cards) before
+  // settling once seeding actually finishes. signInAsGuest() already
+  // navigates itself once seeding is fully done, so this listener has
+  // nothing useful to do for that path anyway.
+  private suppressNextSignInNavigate = false;
+
   constructor() {
     // Catches the OAuth (Google) redirect back into the app: that's a fresh
     // page load at /auth/callback, not a navigation triggered by our own
@@ -41,6 +53,10 @@ export class AuthService {
     // decides where to go (see finalizeGoogleSignIn).
     this.supabase.client.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session && window.location.pathname !== '/auth/callback') {
+        if (this.suppressNextSignInNavigate) {
+          this.suppressNextSignInNavigate = false;
+          return;
+        }
         const redirectTo = new URLSearchParams(window.location.search).get('redirectTo') || '/';
         this.router.navigateByUrl(redirectTo);
       }
@@ -126,8 +142,12 @@ export class AuthService {
   }
 
   async signInAsGuest() {
+    this.suppressNextSignInNavigate = true;
     const { data, error } = await this.supabase.client.auth.signInAnonymously();
-    if (error) throw error;
+    if (error) {
+      this.suppressNextSignInNavigate = false;
+      throw error;
+    }
 
     if (data.user) {
       await this.demoSeed.seed();

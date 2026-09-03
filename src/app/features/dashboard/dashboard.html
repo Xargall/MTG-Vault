@@ -2,7 +2,11 @@
   <h1>{{ 'dashboard.welcome' | translate }}</h1>
 
   @if (loading()) {
-    <p class="state-message">{{ 'dashboard.loading' | translate }}</p>
+    <div class="skeleton-grid">
+      @for (item of skeletonPlaceholders; track $index) {
+        <div class="skeleton-card"></div>
+      }
+    </div>
   } @else if (errorMessage()) {
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else if (hasCards()) {
