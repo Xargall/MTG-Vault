@@ -66,13 +66,20 @@
   flex-direction: column;
   gap: var(--spacing-sm);
   flex: 1;
-  min-width: 160px;
+  min-width: 200px;
+  width: 100%;
 }
 
+// Grid, not flex: a label long enough in one language (e.g. "Zauber/Falle"
+// vs "Spell/Trap") no longer pushes the value out of alignment between
+// rows - the label column only grows down to its minmax() floor, the
+// spacer column absorbs the rest, and the value always lands in the same
+// place (see the explicit grid-column below).
 .legend-row {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 10px minmax(70px, auto) 1fr minmax(45px, auto);
   gap: var(--spacing-sm);
+  align-items: center;
   padding: 2px 4px;
   border-radius: 4px;
   transition: background 0.15s ease;
@@ -92,10 +99,15 @@
 .legend-label {
   color: var(--color-text);
   font-size: 0.85rem;
-  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; // fallback if it's still too tight
 }
 
 .legend-value {
+  grid-column: 4;
   color: var(--color-text-muted);
   font-size: 0.8rem;
+  text-align: right;
+  white-space: nowrap; // e.g. "78 · 43%" always stays on one line
 }
