@@ -35,10 +35,12 @@ const MAX_OCR_WIDTH = 1280;
 const MIN_CONFIDENCE_FOR_SET_CODE = 50;
 const MIN_CONFIDENCE_FOR_NAME = 65;
 const NO_MATCH_STREAK_FOR_TOAST = 8;
-// MTG's multi-field scoring is a per-frame best guess, not a certainty - an
-// OCR outlier on one frame could still score above the match threshold, so
-// the same oracle_id must win 3 frames in a row before it's confirmed.
-const CONSECUTIVE_MATCHES_REQUIRED = 3;
+// MTG's multi-field scoring is a per-frame best guess, not a certainty - a
+// sliding window over the last few frames confirms a result once the same
+// oracle_id wins enough of them, tolerating a single noisy/no-match frame
+// in between instead of resetting the whole streak over one outlier.
+const FRAME_HISTORY_SIZE = 3;
+const CONSISTENT_MATCHES_REQUIRED = 2;
 // A filter-sourced top score at or above this auto-confirms just like an
 // exact set+number match; below it, MtgApiService already sized `runners`
 // to the right picker tier (5 for medium confidence, 10 for low).
@@ -98,8 +100,9 @@ export class Scanner {
   private autoResumeTimeout: ReturnType<typeof setTimeout> | null = null;
   private isScanning = false;
   private noMatchStreak = 0;
-  private lastOracleId: string | null = null;
-  private consecutiveMatches = 0;
+  // Rolling window of the last few frames' top candidates (null for a frame
+  // with no result at all) - see getConsistentResult().
+  private frameHistory: Array<{ oracleId: string; result: MtgIdentificationResult } | null> = [];
   private rateLimitedUntil = 0;
 
   protected readonly status = signal<ScannerStatus>('starting');
@@ -351,36 +354,55 @@ export class Scanner {
   private async handleMtgFrame(ocrResult: { text: string; lines: OcrLine[] }): Promise<boolean> {
     const result = await this.mtgApi.identifyCardWithScoring(ocrResult.text, ocrResult.lines);
 
-    if (!result) {
-      this.lastOracleId = null;
-      this.consecutiveMatches = 0;
-      return false;
-    }
+    this.pushFrameHistory(result ? { oracleId: result.topCandidate.oracleId, result } : null);
+    if (!result) return false;
 
-    if (result.topCandidate.oracleId === this.lastOracleId) {
-      this.consecutiveMatches++;
-    } else {
-      this.lastOracleId = result.topCandidate.oracleId;
-      this.consecutiveMatches = 1;
-    }
+    const confirmed = this.getConsistentResult();
+    if (!confirmed) return false;
 
-    if (this.consecutiveMatches < CONSECUTIVE_MATCHES_REQUIRED) {
-      return false;
-    }
+    this.frameHistory = [];
 
-    this.lastOracleId = null;
-    this.consecutiveMatches = 0;
-
-    if (result.source === 'exact' || result.confidence >= AUTO_CONFIRM_THRESHOLD) {
+    if (confirmed.source === 'exact' || confirmed.confidence >= AUTO_CONFIRM_THRESHOLD) {
       // Exact set+number match, or a confident enough filter-search guess.
-      this.onMatch(result.topCandidate);
+      this.onMatch(confirmed.topCandidate);
     } else {
       // The filter-search fallback has no name check, so a similar real
       // card can score close behind the top pick - let the user pick
       // manually instead of silently trusting a weak guess.
-      this.onAmbiguousMatch(result);
+      this.onAmbiguousMatch(confirmed);
     }
     return true;
+  }
+
+  private pushFrameHistory(entry: { oracleId: string; result: MtgIdentificationResult } | null) {
+    this.frameHistory.push(entry);
+    if (this.frameHistory.length > FRAME_HISTORY_SIZE) this.frameHistory.shift();
+  }
+
+  /** Sliding-window consistency check: within the last FRAME_HISTORY_SIZE frames, the same oracle_id must appear at least CONSISTENT_MATCHES_REQUIRED times - tolerates a single noisy/no-match frame in between two real hits instead of a strict streak. */
+  private getConsistentResult(): MtgIdentificationResult | null {
+    const entries = this.frameHistory.filter(
+      (entry): entry is { oracleId: string; result: MtgIdentificationResult } => entry !== null,
+    );
+
+    const counts = new Map<string, number>();
+    for (const entry of entries) counts.set(entry.oracleId, (counts.get(entry.oracleId) ?? 0) + 1);
+
+    let topId: string | null = null;
+    let topCount = 0;
+    for (const [oracleId, count] of counts) {
+      if (count > topCount) {
+        topId = oracleId;
+        topCount = count;
+      }
+    }
+
+    if (!topId || topCount < CONSISTENT_MATCHES_REQUIRED) return null;
+
+    // Use the most recent frame that agreed, not the oldest - its OCR read
+    // (and derived confidence/candidate list) is the freshest one.
+    const latest = [...entries].reverse().find((entry) => entry.oracleId === topId);
+    return latest?.result ?? null;
   }
 
   private async tryIdentifyByName(lines: OcrLine[]): Promise<CardIdentification | null> {
@@ -520,8 +542,7 @@ export class Scanner {
       clearTimeout(this.autoResumeTimeout);
       this.autoResumeTimeout = null;
     }
-    this.lastOracleId = null;
-    this.consecutiveMatches = 0;
+    this.frameHistory = [];
     this.detectedCard.set(null);
     this.candidateChoices.set(null);
     this.status.set('scanning');
