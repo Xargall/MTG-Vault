@@ -83,8 +83,17 @@ function escapeRegExp(value: string): string {
 const CARD_ENDPOINT = 'https://api.scryfall.com/cards';
 const COLLECTION_ENDPOINT = 'https://api.scryfall.com/cards/collection';
 const SEARCH_ENDPOINT = 'https://api.scryfall.com/cards/search';
+const SETS_ENDPOINT = 'https://api.scryfall.com/sets';
 const BATCH_SIZE = 75;
 const SCRYFALL_USER_AGENT = 'TCGVault/1.0 (mathias-mayer.de)';
+
+// Real set codes vary in length and can coincide with ordinary words (e.g.
+// "war" for War of the Spark) - matching the scanner's set-code guesses
+// against this actual list (see MtgApiService.getValidSetCodes) beats any
+// fixed-length/ignore-list heuristic. Refetched at most once a day.
+const SET_CODES_STORAGE_KEY = 'tcgvault.scryfallSetCodes';
+const SET_CODES_TIMESTAMP_KEY = 'tcgvault.scryfallSetCodesTimestamp';
+const SET_CODES_TTL_MS = 24 * 60 * 60 * 1000;
 
 @Injectable({ providedIn: 'root' })
 export class MtgApiService implements CardApiService {
@@ -92,6 +101,38 @@ export class MtgApiService implements CardApiService {
   // Scryfall's documented limit) and carries an identifying User-Agent -
   // both required to avoid the 403s a bursty, unidentified scanner triggers.
   private readonly queue = new ScryfallQueue();
+
+  // Cached for the life of the service (and 24h across sessions via
+  // localStorage) - null only means "no real list available", which callers
+  // treat as "fall back to the cruder ignore-list heuristic", never as "no
+  // set codes are valid".
+  private validSetCodesPromise: Promise<Set<string> | null> | null = null;
+
+  private getValidSetCodes(): Promise<Set<string> | null> {
+    return (this.validSetCodesPromise ??= this.loadValidSetCodes());
+  }
+
+  private async loadValidSetCodes(): Promise<Set<string> | null> {
+    const cachedTimestamp = localStorage.getItem(SET_CODES_TIMESTAMP_KEY);
+    const cachedJson = localStorage.getItem(SET_CODES_STORAGE_KEY);
+    if (cachedJson && cachedTimestamp && Date.now() - parseInt(cachedTimestamp, 10) < SET_CODES_TTL_MS) {
+      return new Set(JSON.parse(cachedJson));
+    }
+
+    try {
+      const response = await this.scryfallFetch(SETS_ENDPOINT);
+      if (!response.ok) throw new Error(`Scryfall-Anfrage fehlgeschlagen (${response.status})`);
+      const body: { data: Array<{ code: string }> } = await response.json();
+      const codes = body.data.map((set) => set.code.toUpperCase());
+      localStorage.setItem(SET_CODES_STORAGE_KEY, JSON.stringify(codes));
+      localStorage.setItem(SET_CODES_TIMESTAMP_KEY, Date.now().toString());
+      return new Set(codes);
+    } catch {
+      // A stale cache is still far more accurate than the ignore-list
+      // fallback - only give up on it entirely if there's nothing cached.
+      return cachedJson ? new Set(JSON.parse(cachedJson)) : null;
+    }
+  }
 
   private scryfallFetch(url: string, init?: RequestInit): Promise<Response> {
     return this.queue.add(async () => {
@@ -221,7 +262,8 @@ export class MtgApiService implements CardApiService {
    * found at all.
    */
   async identifyCardWithScoring(rawText: string, lines: OcrLineLike[]): Promise<MtgIdentificationResult | null> {
-    const fields = extractFields(rawText, lines);
+    const validSetCodes = await this.getValidSetCodes();
+    const fields = extractFields(rawText, lines, validSetCodes);
     const candidates: ScryfallCandidate[] = [];
 
     if (fields.setCode && fields.collectorNumber !== null) {

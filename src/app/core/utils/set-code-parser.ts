@@ -7,14 +7,22 @@ export interface SetCodeMatch {
 // the previous approach's false positives (e.g. uppercasing the whole text
 // first turned "Spider-Man" into "SPIDER-MAN", making "MAN" match as a
 // bogus set code) - a real printed name's mixed case never matches this.
-// Exactly 3 letters - real Scryfall set codes are (near-)universally 3
-// characters, and a looser 2-4 range let far too many ordinary English/
-// German three-letter words through as bogus "set codes".
-const SET_CODE_TOKEN_PATTERN = /\b([A-Z]{3})\b/g;
-const COLLECTOR_NUMBER_PATTERN = /\b(0\d{3}|\d{4})\b/;
-// Common uppercase three-letter English/German words and rules-text
-// keywords/abbreviations that OCR frequently produces and that would
-// otherwise false-positive as a set code.
+// 2-6 letters - real Scryfall set codes aren't all exactly 3 characters
+// (older/promo sets run 2-6) - callers are expected to validate a match
+// against the real Scryfall set-code list (see MtgApiService), which
+// disambiguates far better than any fixed length ever could. A token like
+// "WAR" (War of the Spark - a genuine set code that's also an ordinary
+// English word) only works with that real check, not a length restriction.
+const SET_CODE_TOKEN_PATTERN = /\b([A-Z]{2,6})\b/g;
+// 3-5 digits, no leading-zero requirement - matches Scryfall's actual
+// collector_number range (many modern cards print an unpadded 3-digit
+// number, which a stricter "always 4 digits" pattern would never catch).
+const COLLECTOR_NUMBER_PATTERN = /\b(\d{3,5})\b/;
+// Fallback only, used when the real Scryfall set-code list (see
+// MtgApiService.getValidSetCodes) hasn't loaded yet or failed to fetch -
+// common uppercase English/German words and rules-text keywords/
+// abbreviations that OCR frequently produces and that would otherwise
+// false-positive as a set code.
 const IGNORED_SET_TOKENS = [
   'EN', 'U', 'X', 'M', 'A', 'EZ', 'DD',
   'ENG', 'DEU', 'GER', 'THE', 'AND',
@@ -55,11 +63,19 @@ export function extractCollectorNumber(rawText: string): number | null {
   return numMatch ? parseInt(numMatch[1], 10) : null;
 }
 
-export function parseSetCode(rawText: string): SetCodeMatch | null {
+/**
+ * `validSetCodes`: the real, current Scryfall set-code list (uppercase),
+ * when available - matched against directly instead of the much cruder
+ * IGNORED_SET_TOKENS heuristic. Pass null to fall back to that heuristic
+ * (e.g. before the real list has finished loading for the first time).
+ */
+export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string> | null): SetCodeMatch | null {
   const setMatches = rawText.match(SET_CODE_TOKEN_PATTERN);
   const collectorNum = extractCollectorNumber(rawText);
 
-  const setCode = setMatches?.find((s) => !IGNORED_SET_TOKENS.includes(s))?.toLowerCase();
+  const isValidToken = (token: string) =>
+    validSetCodes ? validSetCodes.has(token) : !IGNORED_SET_TOKENS.includes(token);
+  const setCode = setMatches?.find(isValidToken)?.toLowerCase();
 
   if (!setCode || collectorNum === null) return null;
   return { setCode, collectorNumber: String(collectorNum) };

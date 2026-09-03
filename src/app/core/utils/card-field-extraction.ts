@@ -93,8 +93,12 @@ export function extractCleanName(lines: OcrLineLike[]): string | null {
  * Scryfall's fuzzy lookup alongside the structural filter search, not
  * trusted on its own) precisely because it's the field OCR mangles most.
  */
-export function extractFields(text: string, lines: OcrLineLike[]): ExtractedFields {
-  const setCodeMatch = parseSetCode(text);
+export function extractFields(
+  text: string,
+  lines: OcrLineLike[],
+  validSetCodes: ReadonlySet<string> | null,
+): ExtractedFields {
+  const setCodeMatch = parseSetCode(text, validSetCodes);
 
   const hasKeyword = {} as ExtractedKeywords;
   for (const key of Object.keys(KEYWORD_PATTERNS) as (keyof ExtractedKeywords)[]) {
