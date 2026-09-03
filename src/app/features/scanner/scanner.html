@@ -21,6 +21,12 @@
     <div class="scan-pulse" aria-hidden="true"></div>
   }
 
+  @if (gameService.currentSlug() === 'mtg' && bulkData.loading() && !bulkData.ready()) {
+    <p class="bulk-data-hint">
+      {{ 'scanner.bulkDataLoading' | translate: { percent: bulkData.progress() } }}
+    </p>
+  }
+
   @if (availableCameras().length > 1) {
     <select
       class="camera-select"

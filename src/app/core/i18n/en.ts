@@ -207,6 +207,7 @@ export const en: typeof de = {
   scanner: {
     close: 'Close',
     starting: 'Starting camera…',
+    bulkDataLoading: 'Loading card database... {{percent}}%',
     cameraPermissionDenied: 'Camera access denied. Please allow it in your browser settings.',
     noCameraFound: 'No camera found.',
     backToCollection: '← Back to collection',

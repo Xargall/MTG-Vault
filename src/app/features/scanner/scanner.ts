@@ -16,6 +16,7 @@ import { CardIdentification, MtgIdentificationResult, ScoredCandidate } from '..
 import { CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
+import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
 import { OcrLine, OcrService } from '../../core/services/ocr.service';
 import { ScryfallRateLimitError } from '../../core/utils/scryfall-queue';
 import { extractNameFromLines } from '../../core/utils/string-similarity';
@@ -82,6 +83,7 @@ interface FocusRange {
 export class Scanner {
   protected readonly gameService = inject(GameService);
   private readonly mtgApi = inject(MtgApiService);
+  protected readonly bulkData = inject(MtgBulkDataService);
   private readonly collectionService = inject(CollectionService);
   private readonly ocrService = inject(OcrService);
   private readonly translate = inject(TranslateService);

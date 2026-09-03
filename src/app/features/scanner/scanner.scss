@@ -42,6 +42,19 @@
   font-size: 0.85rem;
 }
 
+.bulk-data-hint {
+  position: absolute;
+  top: var(--spacing-md);
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px 12px;
+  border-radius: var(--radius);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
 .camera-select {
   position: absolute;
   top: calc(var(--spacing-md) + 36px + var(--spacing-sm));

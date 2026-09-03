@@ -1,17 +1,22 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 import { Card, MtgCard } from '../models/card.model';
 import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
 import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
 import { OcrLineLike, cleanOcrText, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification, MtgIdentificationResult, ScoredCandidate } from './card-api.interface';
+import { MtgBulkDataService } from './mtg-bulk-data.service';
 
-interface ScryfallCardFace {
+// Exported so MtgBulkDataService (the local IndexedDB card cache) can trim
+// down and store bulk-data records in exactly this shape - anything read
+// back out of the local cache then plugs directly into toCard()/
+// scoreCandidate() below with no adapter needed.
+export interface ScryfallCardFace {
   image_uris?: { normal: string; small: string; art_crop: string };
   mana_cost?: string;
 }
 
-interface ScryfallRawCard {
+export interface ScryfallRawCard {
   id: string;
   oracle_id: string;
   name: string;
@@ -106,6 +111,11 @@ const SET_CODES_TTL_MS = 24 * 60 * 60 * 1000;
 
 @Injectable({ providedIn: 'root' })
 export class MtgApiService implements CardApiService {
+  // Local IndexedDB card cache the scanner checks before ever touching the
+  // network - see MtgBulkDataService. This is a one-directional dependency
+  // (that service never depends back on this one).
+  private readonly bulkData = inject(MtgBulkDataService);
+
   // Every Scryfall call funnels through this queue (max 10 req/s, per
   // Scryfall's documented limit) and carries an identifying User-Agent -
   // both required to avoid the 403s a bursty, unidentified scanner triggers.
@@ -201,6 +211,13 @@ export class MtgApiService implements CardApiService {
     return response.json();
   }
 
+  /** Local cache first (see MtgBulkDataService), live API only on a local miss - used everywhere the scanner needs an exact set+number hit. */
+  private async lookupBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {
+    const local = await this.bulkData.findBySetAndNumber(setCode, collectorNumber);
+    if (local) return local;
+    return this.fetchCardBySetAndNumber(setCode, collectorNumber);
+  }
+
   /** Fuzzy, name-only lookup (e.g. for a deck-list import line with no set code) - tolerant of minor spelling/formatting differences. */
   async getCardByFuzzyName(name: string): Promise<Card | null> {
     const raw = await this.fetchCardByFuzzyName(name);
@@ -276,7 +293,7 @@ export class MtgApiService implements CardApiService {
     const candidates: ScryfallCandidate[] = [];
 
     if (fields.setCode && fields.collectorNumber !== null) {
-      const bySetCode = await this.fetchCardBySetAndNumber(fields.setCode, String(fields.collectorNumber));
+      const bySetCode = await this.lookupBySetAndNumber(fields.setCode, String(fields.collectorNumber));
       if (bySetCode) candidates.push({ card: bySetCode, source: 'exact' });
     }
 
@@ -285,12 +302,22 @@ export class MtgApiService implements CardApiService {
     // Marvel-line sets directly - stops at the first one that resolves.
     if (candidates.length === 0 && fields.collectorNumber !== null && rawText.includes('MARVEL')) {
       for (const setCode of MARVEL_FALLBACK_SET_CODES) {
-        const card = await this.fetchCardBySetAndNumber(setCode, String(fields.collectorNumber));
+        const card = await this.lookupBySetAndNumber(setCode, String(fields.collectorNumber));
         if (card) {
           candidates.push({ card, source: 'exact' });
           break;
         }
       }
+    }
+
+    // Still no set code, but a collector number was read - the local bulk
+    // cache can cheaply check every printing at that number across every
+    // set (no equivalent cheap query exists against the live API), letting
+    // scoring pick the right one instead of guessing via a vague filter
+    // search. Only ever contributes candidates when the cache is warm.
+    if (candidates.length === 0 && fields.collectorNumber !== null && !fields.setCode) {
+      const localByNumber = await this.bulkData.findAllByCollectorNumber(String(fields.collectorNumber));
+      candidates.push(...localByNumber.map((card): ScryfallCandidate => ({ card, source: 'filter' })));
     }
 
     if (candidates.length === 0) {
@@ -318,7 +345,7 @@ export class MtgApiService implements CardApiService {
       // it - neither is trusted alone, both just feed the same scoring pool
       // (a cleaned-up name is still the OCR field most prone to noise).
       const [byName, filterResults] = await Promise.all([
-        fields.name ? this.fetchCardByFuzzyName(fields.name).catch(() => null) : Promise.resolve(null),
+        fields.name ? this.lookupByFuzzyName(fields.name) : Promise.resolve(null),
         filters.length >= MIN_FILTERS_FOR_SEARCH
           ? // unique=prints, not unique=cards: every printing/variant of a
             // card comes back separately (regular, extended art, showcase,
@@ -406,6 +433,13 @@ export class MtgApiService implements CardApiService {
       throw new Error(`Scryfall-Anfrage fehlgeschlagen (${response.status})`);
     }
     return response.json();
+  }
+
+  /** Local cache first (see MtgBulkDataService), live API only on a local miss - used by the scanner's name-based fallback. */
+  private async lookupByFuzzyName(name: string): Promise<ScryfallRawCard | null> {
+    const local = await this.bulkData.findBestFuzzyNameMatch(name);
+    if (local) return local;
+    return this.fetchCardByFuzzyName(name).catch(() => null);
   }
 
   private bestMatch(

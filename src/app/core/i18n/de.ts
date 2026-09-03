@@ -205,6 +205,7 @@ export const de = {
   scanner: {
     close: 'Schließen',
     starting: 'Kamera wird gestartet…',
+    bulkDataLoading: 'Kartendatenbank wird geladen... {{percent}}%',
     cameraPermissionDenied: 'Kamerazugriff verweigert. Bitte in den Browser-Einstellungen erlauben.',
     noCameraFound: 'Keine Kamera gefunden.',
     backToCollection: '← Zurück zur Sammlung',
