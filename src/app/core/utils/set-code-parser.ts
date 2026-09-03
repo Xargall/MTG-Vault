@@ -25,7 +25,9 @@ const COLLECTOR_NUMBER_PATTERN = /\b(\d{3,5})\b/;
 // false-positive as a set code.
 const IGNORED_SET_TOKENS = [
   'EN', 'U', 'X', 'M', 'A', 'EZ', 'DD',
-  'ENG', 'DEU', 'GER', 'THE', 'AND',
+  // Bare 2-letter language codes printed next to the set code:
+  'DE', 'FR', 'ES', 'IT', 'PT', 'JA', 'KO', 'RU', 'ZH',
+  'ENG', 'DEU', 'GER', 'FRA', 'ITA', 'ESP', 'POR', 'THE', 'AND',
   'FOR', 'YOU', 'HIS', 'HER', 'ITS', 'ARE',
   'NOT', 'BUT', 'ALL', 'CAN', 'HAD', 'HIM',
   'HAS', 'WAS', 'ONE', 'OUR', 'OUT', 'WHO',
@@ -55,6 +57,10 @@ const IGNORED_SET_TOKENS = [
   // Printed on every card of a licensed/crossover product line, not a set code:
   'MARVEL', 'WIZARDS', 'COAST', 'HASBRO',
   'FOIL', 'RARE', 'MYTHIC', 'COMMON',
+  // Rarity abbreviations and further common OCR noise around the
+  // set-code/collector-number line:
+  'COM', 'UNC', 'RAR', 'MYT', 'DES', 'ANS', 'INS',
+  'EEN', 'ADI', 'SBE', 'PRE', 'EEE', 'NSA', 'NSS', 'SRE', 'LRE', 'TAA',
 ];
 
 /** Standalone collector-number extraction, independent of finding a valid set code alongside it - lets a caller still use the number for scoring even when the set code couldn't be read. */
@@ -71,12 +77,24 @@ export function extractCollectorNumber(rawText: string): number | null {
  */
 export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string> | null): SetCodeMatch | null {
   const setMatches = rawText.match(SET_CODE_TOKEN_PATTERN);
-  const collectorNum = extractCollectorNumber(rawText);
-
   const isValidToken = (token: string) =>
     validSetCodes ? validSetCodes.has(token) : !IGNORED_SET_TOKENS.includes(token);
-  const setCode = setMatches?.find(isValidToken)?.toLowerCase();
+  const setCodeMatch = setMatches?.find(isValidToken);
+  if (!setCodeMatch) return null;
 
-  if (!setCode || collectorNum === null) return null;
-  return { setCode, collectorNumber: String(collectorNum) };
+  // The collector number is always printed right alongside the set code on
+  // the card's bottom info line - search a small window of lines around
+  // wherever that line landed in the OCR text, not the first 3-5 digit
+  // number anywhere in the whole blob. The latter can just as easily grab
+  // an unrelated number from garbled rules text earlier in the frame (e.g.
+  // a mangled ability cost), causing a confident-looking but wrong exact
+  // lookup that 404s and silently falls through to the fuzzy fallback.
+  const lines = rawText.split('\n');
+  const setCodeLineIndex = lines.findIndex((line) => line.includes(setCodeMatch));
+  const nearbyLines =
+    setCodeLineIndex === -1 ? lines : lines.slice(Math.max(0, setCodeLineIndex - 1), setCodeLineIndex + 2);
+  const collectorNum = extractCollectorNumber(nearbyLines.join(' '));
+
+  if (collectorNum === null) return null;
+  return { setCode: setCodeMatch.toLowerCase(), collectorNumber: String(collectorNum) };
 }
