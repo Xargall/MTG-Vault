@@ -2,11 +2,18 @@ import { Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
 import { decksSupportedGuard } from './core/guards/decks-supported.guard';
+import { selectGameGuard } from './core/guards/select-game.guard';
 
 export const routes: Routes = [
   {
     path: 'login',
     loadComponent: () => import('./features/auth/login/login').then((m) => m.Login),
+  },
+  {
+    path: 'select-game',
+    canActivate: [selectGameGuard],
+    loadComponent: () =>
+      import('./features/auth/select-game/select-game').then((m) => m.SelectGame),
   },
   {
     path: 'invite',

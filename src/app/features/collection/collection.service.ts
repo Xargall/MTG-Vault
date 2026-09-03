@@ -77,6 +77,22 @@ export class CollectionService {
     return totals;
   }
 
+  /** Card totals across every game at once (not scoped to the currently active game) - used by the game-selection screen to show "X Karten in Sammlung" per tile. */
+  async getQuantityTotalsByGame(): Promise<Map<string, number>> {
+    const { data, error } = await this.supabase.client
+      .from('collection_cards')
+      .select('game_id, quantity')
+      .returns<Array<{ game_id: string; quantity: number }>>();
+
+    if (error) throw error;
+
+    const totals = new Map<string, number>();
+    for (const row of data ?? []) {
+      totals.set(row.game_id, (totals.get(row.game_id) ?? 0) + row.quantity);
+    }
+    return totals;
+  }
+
   async addCard(input: AddCardInput): Promise<void> {
     return this.upsertOne(input);
   }

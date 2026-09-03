@@ -16,6 +16,9 @@ export const authGuard: CanActivateFn = async (_route, state) => {
       await authService.signOut();
       return router.createUrlTree(['/login'], { queryParams: { error: 'demoExpired' } });
     }
+    if (!authService.hasChosenGame()) {
+      return router.createUrlTree(['/select-game'], { queryParams: { redirectTo: state.url } });
+    }
     return true;
   }
 

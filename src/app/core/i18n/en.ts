@@ -249,6 +249,14 @@ export const en: typeof de = {
     banlistLimited: 'Limited',
     banlistSemiLimited: 'Semi-Limited',
   },
+  selectGame: {
+    title: 'Choose your game',
+    subtitle: 'You can switch anytime in the header',
+    cardsInCollection: '{{count}} cards in collection',
+    moreGames: '+ More games',
+    switchLink: 'Switch game',
+    chooseFailed: 'Game could not be chosen.',
+  },
   deckImport: {
     openButton: '📋 Import deck',
     title: 'Import Deck',

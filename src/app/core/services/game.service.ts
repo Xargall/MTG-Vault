@@ -59,6 +59,13 @@ export class GameService {
     localStorage.setItem(GAME_STORAGE_KEY, slug);
   }
 
+  /** Explicit game pick from the select-game screen (or the header's "switch game" link) - unlike setGame(), also records the choice in Supabase so AuthService.hasChosenGame() is true from then on, on any device. */
+  async chooseGame(slug: GameSlug): Promise<void> {
+    this.setGame(slug);
+    const { error } = await this.supabase.client.auth.updateUser({ data: { active_game: slug } });
+    if (error) throw error;
+  }
+
   private async loadGames() {
     const { data, error } = await this.supabase.client
       .from('games')

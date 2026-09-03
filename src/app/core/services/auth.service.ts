@@ -29,6 +29,9 @@ export class AuthService {
     return expiresAt !== null && expiresAt.getTime() <= Date.now();
   });
 
+  /** Whether this user has ever explicitly picked a game (see GameService.chooseGame) - persisted in Supabase Auth user_metadata so it carries across devices, not just this browser's localStorage. */
+  readonly hasChosenGame = computed(() => !!this.session()?.user.user_metadata?.['active_game']);
+
   constructor() {
     // Catches the OAuth (Google) redirect back into the app: that's a fresh
     // page load at /auth/callback, not a navigation triggered by our own

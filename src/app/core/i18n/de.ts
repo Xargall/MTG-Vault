@@ -247,6 +247,14 @@ export const de = {
     banlistLimited: 'Limitiert',
     banlistSemiLimited: 'Semi-limitiert',
   },
+  selectGame: {
+    title: 'Wähle dein Spiel',
+    subtitle: 'Du kannst jederzeit im Header wechseln',
+    cardsInCollection: '{{count}} Karten in Sammlung',
+    moreGames: '+ Weiteres Spiel',
+    switchLink: 'Spiel wechseln',
+    chooseFailed: 'Spiel konnte nicht gewählt werden.',
+  },
   deckImport: {
     openButton: '📋 Deck importieren',
     title: 'Deck importieren',

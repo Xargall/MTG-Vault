@@ -1,0 +1,61 @@
+<div class="select-game-page">
+  <header class="select-game-header">
+    <svg class="brand-logo" width="28" height="28" viewBox="0 0 120 120" aria-hidden="true">
+      <circle cx="60" cy="60" r="56" fill="#241a12" stroke="#c9a24a" stroke-width="3" />
+      <polygon points="60,32 84,60 60,88 36,60" fill="#3d6f96" stroke="#e8cd7a" stroke-width="3" />
+      <polygon points="60,44 72,60 60,76 48,60" fill="#efe6cd" opacity="0.55" />
+    </svg>
+    <span class="brand-title">TCG Vault</span>
+  </header>
+
+  <main class="select-game-body">
+    <h1>{{ 'selectGame.title' | translate }}</h1>
+    <p class="subtitle">{{ 'selectGame.subtitle' | translate }}</p>
+
+    @if (errorMessage()) {
+      <p class="error-message">{{ errorMessage() }}</p>
+    }
+
+    <div class="game-grid">
+      <button
+        type="button"
+        class="game-tile"
+        [class.is-active]="gameService.currentSlug() === 'mtg'"
+        [disabled]="choosing() !== null"
+        (click)="choose('mtg')"
+      >
+        <span class="game-badge">MTG</span>
+        <span class="game-name">{{ 'games.mtg' | translate }}</span>
+        <span class="game-count">
+          {{ 'selectGame.cardsInCollection' | translate: { count: loading() ? '…' : cardCountFor('mtg') } }}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        class="game-tile"
+        [class.is-active]="gameService.currentSlug() === 'yugioh'"
+        [disabled]="choosing() !== null"
+        (click)="choose('yugioh')"
+      >
+        <span class="game-badge">YGO</span>
+        <span class="game-name">{{ 'games.yugioh' | translate }}</span>
+        <span class="game-count">
+          {{ 'selectGame.cardsInCollection' | translate: { count: loading() ? '…' : cardCountFor('yugioh') } }}
+        </span>
+      </button>
+
+      <div class="game-tile is-disabled">
+        <span class="coming-soon-badge">{{ 'games.comingSoon' | translate }}</span>
+        <span class="game-badge">PKM</span>
+        <span class="game-name">{{ 'games.pokemon' | translate }}</span>
+      </div>
+
+      <div class="game-tile is-disabled">
+        <span class="game-badge">+</span>
+        <span class="game-name">{{ 'selectGame.moreGames' | translate }}</span>
+        <span class="coming-soon-badge">{{ 'games.comingSoon' | translate }}</span>
+      </div>
+    </div>
+  </main>
+</div>
