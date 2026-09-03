@@ -254,7 +254,6 @@ export const en: typeof de = {
     subtitle: 'You can switch anytime in the header',
     cardsInCollection: '{{count}} cards in collection',
     moreGames: '+ More games',
-    switchLink: 'Switch game',
     chooseFailed: 'Game could not be chosen.',
   },
   deckImport: {

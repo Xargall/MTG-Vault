@@ -31,10 +31,6 @@ export class AppShell {
     this.gameService.setGame(slug as GameSlug);
   }
 
-  openSelectGame() {
-    this.router.navigate(['/select-game'], { queryParams: { redirectTo: this.router.url } });
-  }
-
   async logout() {
     await this.authService.signOut();
     await this.router.navigateByUrl('/login');
