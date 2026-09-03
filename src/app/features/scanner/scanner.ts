@@ -141,10 +141,10 @@ function processFoilCropPixels(data: Uint8ClampedArray): void {
   }
 }
 
-/** How closely OCR'd text matches the expected "[rarity] collector-number" shape - a clean match (100) accepts the crop outright, a loose one (70) still moves on to try the next crop strategy rather than risking a wrong exact lookup. */
+/** How closely OCR'd text matches the expected "[rarity] collector-number" shape - a clean match (100) accepts the crop outright, a loose one (70) still moves on to try the next crop strategy rather than risking a wrong exact lookup. U/C/R/M are the normal rarities; T marks a token card, S a Scryfall "special" rarity (un-sets/masterpieces) - both print the same way. */
 function scoreCollectorNumberText(text: string): number {
   const trimmed = text.trim();
-  if (/^[UCRM]?\s*\d{3,4}$/.test(trimmed)) return 100;
+  if (/^[UCRMTS]?\s*\d{3,4}$/.test(trimmed)) return 100;
   if (/\d{3,4}/.test(trimmed)) return 70;
   return 0;
 }

@@ -210,10 +210,33 @@ export class MtgApiService implements CardApiService {
    * since a tight crop of that corner never has those fields in it anyway.
    */
   async identifyByCroppedText(text: string): Promise<Card | null> {
+    // Token cards print a "T" marker next to the collector number, but on
+    // Scryfall they live in a wholly separate set, not the parent set with
+    // a modified number - "tmsh" (Marvel Super Heroes Tokens), never "msh"
+    // card "T11" (verified against the live API: the latter 404s, the
+    // former is a real card). Used below both to retry a specific set
+    // there and to narrow the no-set-code fallback to token sets only.
+    const isToken = /\bT\s*\d/i.test(text);
+
     const validSetCodes = await this.getValidSetCodes();
     const match = parseSetCode(text, validSetCodes);
     if (match) {
-      const raw = await this.lookupBySetAndNumber(match.setCode, match.collectorNumber);
+      // The "T" marker is a deliberate signal printed specifically to tell
+      // a token apart from a same-numbered regular card in the same set
+      // (verified: "msh" 11 is itself a real card, "Captain Marvel, Earth's
+      // Protector" - trying the plain set first would silently return that
+      // instead of the token whenever both happen to exist). So when OCR
+      // showed that marker, the token set is tried first, with the plain
+      // set only as a fallback in case "T" was actually a misread rarity
+      // letter.
+      const setCodesToTry =
+        isToken && !match.setCode.startsWith('t') ? [`t${match.setCode}`, match.setCode] : [match.setCode];
+
+      let raw: ScryfallRawCard | null = null;
+      for (const setCode of setCodesToTry) {
+        raw = await this.lookupBySetAndNumber(setCode, match.collectorNumber);
+        if (raw) break;
+      }
       if (raw) return this.toCard(raw);
     }
 
@@ -223,11 +246,15 @@ export class MtgApiService implements CardApiService {
     // fall back to every locally-known printing at that number, but only
     // when there's exactly one. With no other field left to score against,
     // a tie can't be resolved safely, so it's treated as no match rather
-    // than guessing.
+    // than guessing. When a token marker was read, narrow that search to
+    // token sets only first - the plain fallback is otherwise hopeless for
+    // tokens specifically (a bare number recurs across hundreds of sets,
+    // but far fewer token sets share it).
     const bareNumber = extractCollectorNumber(text);
     if (bareNumber === null) return null;
 
-    const candidates = await this.bulkData.findAllByCollectorNumber(String(bareNumber));
+    const allMatches = await this.bulkData.findAllByCollectorNumber(String(bareNumber));
+    const candidates = isToken ? allMatches.filter((card) => card.set.startsWith('t')) : allMatches;
     return candidates.length === 1 ? this.toCard(candidates[0]) : null;
   }
 
