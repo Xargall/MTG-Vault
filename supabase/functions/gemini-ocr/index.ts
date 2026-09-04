@@ -12,9 +12,7 @@
 // so any logged-in or guest Supabase session already gates access; there is
 // no need to re-check auth manually here.
 
-// gemini-1.5-flash was retired from the API - gemini-3.8-flash is the
-// current stable, vision-capable Flash model as of September 2026.
-const GEMINI_MODEL = 'gemini-3.8-flash';
+const GEMINI_MODEL = 'gemini-3.5-flash';
 // Bounded well under Supabase's own platform-level request timeout (150s) -
 // if Gemini itself hangs or is slow, the PLATFORM's timeout response carries
 // no CORS headers at all, which the browser reports as a misleading "CORS
