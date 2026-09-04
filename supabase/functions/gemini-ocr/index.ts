@@ -15,12 +15,14 @@
 // gemini-1.5-flash was retired from the API - gemini-3.8-flash is the
 // current stable, vision-capable Flash model as of September 2026.
 const GEMINI_MODEL = 'gemini-3.8-flash';
-// Bounded well under Supabase's own platform-level request timeout - if
-// Gemini itself hangs or is slow, the PLATFORM's timeout response carries no
-// CORS headers at all, which the browser reports as a misleading "CORS
+// Bounded well under Supabase's own platform-level request timeout (150s) -
+// if Gemini itself hangs or is slow, the PLATFORM's timeout response carries
+// no CORS headers at all, which the browser reports as a misleading "CORS
 // policy" error instead of the real timeout. Failing fast here guarantees
-// the client always gets an actual, CORS-safe response instead.
-const GEMINI_TIMEOUT_MS = 15000;
+// the client always gets an actual, CORS-safe response instead. 25s (rather
+// than the earlier 15s) gives real camera images - much larger than a tiny
+// test payload - realistic headroom for Gemini's actual vision processing time.
+const GEMINI_TIMEOUT_MS = 25000;
 const PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Magic: The Gathering Karte mit der Set-Code/Sammlenummer-Zeile.
 Antworte NUR mit "SETCODE NUMMER" (z.B. "MSH 82"), wenn du beides klar erkennen kannst.
 Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
@@ -53,6 +55,9 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    console.log('Calling Gemini with model:', GEMINI_MODEL);
+    console.log('API Key present:', !!apiKey);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
