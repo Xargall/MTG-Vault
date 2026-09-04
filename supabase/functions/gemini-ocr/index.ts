@@ -13,6 +13,12 @@
 // no need to re-check auth manually here.
 
 const GEMINI_MODEL = 'gemini-1.5-flash';
+// Bounded well under Supabase's own platform-level request timeout - if
+// Gemini itself hangs or is slow, the PLATFORM's timeout response carries no
+// CORS headers at all, which the browser reports as a misleading "CORS
+// policy" error instead of the real timeout. Failing fast here guarantees
+// the client always gets an actual, CORS-safe response instead.
+const GEMINI_TIMEOUT_MS = 15000;
 const PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Magic: The Gathering Karte mit der Set-Code/Sammlenummer-Zeile.
 Antworte NUR mit "SETCODE NUMMER" (z.B. "MSH 82"), wenn du beides klar erkennen kannst.
 Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
@@ -45,20 +51,36 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } }, { text: PROMPT }],
-            },
-          ],
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+    let geminiResponse: Response;
+    try {
+      geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } }, { text: PROMPT }],
+              },
+            ],
+          }),
+          signal: controller.signal,
+        },
+      );
+    } catch (fetchError) {
+      const timedOut = fetchError instanceof Error && fetchError.name === 'AbortError';
+      return new Response(
+        JSON.stringify({
+          error: timedOut ? 'Gemini-Anfrage hat zu lange gedauert' : 'Netzwerkfehler bei Gemini-Anfrage',
         }),
-      },
-    );
+        { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!geminiResponse.ok) {
       const detail = await geminiResponse.text();
