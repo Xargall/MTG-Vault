@@ -1,12 +1,19 @@
 import { Injectable, inject } from '@angular/core';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { SupabaseService } from './supabase.service';
 
-// Gemini free tier caps requests at 15/min - this paces the client's own
-// call frequency; it's not a security boundary (that's the Edge Function's
-// job), just good citizenship so the shared quota isn't burned by rapid
-// scan ticks.
-const MIN_CALL_INTERVAL_MS = 4000;
+// Gemini's actual free-tier RPM limit for this model turned out lower than
+// initially assumed (confirmed via a real 429 in production) - this paces
+// the client's own call frequency; it's not a security boundary (that's the
+// Edge Function's job), just good citizenship so the shared quota isn't
+// burned by rapid scan ticks.
+const MIN_CALL_INTERVAL_MS = 10000;
+// After a real 429, wait longer than the normal pace before trying Gemini
+// again for a subsequent frame - mirrors the same cool-off pattern the
+// scanner already uses for Scryfall's rate limit (see ScryfallRateLimitError
+// handling in scanner.ts).
+const RATE_LIMIT_COOLDOWN_MS = 15000;
 
 /**
  * Thin client for the `gemini-ocr` Supabase Edge Function. The Gemini API
@@ -34,7 +41,14 @@ export class GeminiVisionService {
       { body: { imageBase64 } },
     );
     console.log('Supabase function invoke finished:', { data, error });
-    if (error) throw error;
+    if (error) {
+      if (error instanceof FunctionsHttpError && error.context?.status === 429) {
+        console.warn('Gemini Rate Limit — warte 15 Sekunden vor dem nächsten Versuch');
+        this.lastCallAt = Date.now() + RATE_LIMIT_COOLDOWN_MS - MIN_CALL_INTERVAL_MS;
+        return null;
+      }
+      throw error;
+    }
 
     const text = data?.text?.trim();
     if (!text || text === 'UNKNOWN') return null;
