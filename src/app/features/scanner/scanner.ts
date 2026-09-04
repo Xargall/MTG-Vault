@@ -499,16 +499,20 @@ export class Scanner {
   }
 
   private async tryGeminiPath(videoEl: HTMLVideoElement): Promise<Card | null> {
+    console.log('Attempting Gemini scan...');
     try {
       const rawFrame = this.captureRawFrame(videoEl);
       if (!rawFrame) return null;
 
       const cropped = cropCollectorArea(rawFrame);
       const text = await this.geminiVision.recognizeCollectorText(cropped);
-      if (!text) return null;
+      console.log('Gemini result:', text);
+      if (!text) {
+        console.log('Gemini returned null, falling back to Tesseract');
+        return null;
+      }
 
       this.ocrEngine.set('gemini');
-      console.log('Gemini OCR result:', text);
       return await this.mtgApi.identifyByCroppedText(text);
     } catch (error) {
       console.warn('Gemini Vision fehlgeschlagen, Tesseract-Fallback:', error);
