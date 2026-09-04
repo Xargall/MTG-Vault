@@ -56,6 +56,17 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    console.log('Testing connectivity...');
+    try {
+      const testResponse = await fetch('https://generativelanguage.googleapis.com', {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000),
+      });
+      console.log('Connectivity test status:', testResponse.status);
+    } catch (connectivityError) {
+      console.log('Connectivity test failed:', connectivityError);
+    }
+
     console.log('Calling Gemini with model:', GEMINI_MODEL);
     console.log('API Key present:', !!apiKey);
 
