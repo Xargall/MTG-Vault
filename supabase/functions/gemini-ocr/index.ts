@@ -99,6 +99,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const data = await geminiResponse.json();
+    console.log('Gemini raw response:', JSON.stringify(data));
     const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     return new Response(JSON.stringify({ text: text?.trim() ?? 'UNKNOWN' }), {
