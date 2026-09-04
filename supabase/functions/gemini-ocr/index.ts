@@ -12,7 +12,7 @@
 // so any logged-in or guest Supabase session already gates access; there is
 // no need to re-check auth manually here.
 
-const GEMINI_MODEL = 'gemini-3.5-flash';
+const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 // Bounded well under Supabase's own platform-level request timeout (150s) -
 // if Gemini itself hangs or is slow, the PLATFORM's timeout response carries
 // no CORS headers at all, which the browser reports as a misleading "CORS
