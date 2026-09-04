@@ -69,7 +69,13 @@ const IGNORED_SET_TOKENS = [
 
 /** Standalone collector-number extraction, independent of finding a valid set code alongside it - lets a caller still use the number for scoring even when the set code couldn't be read. */
 export function extractCollectorNumber(rawText: string): number | null {
-  const numMatch = COLLECTOR_NUMBER_PATTERN.exec(rawText);
+  // Gemini prints a token's rarity letter directly against the digits with
+  // no space ("T0003") - a letter and a digit are both "word" characters,
+  // so COLLECTOR_NUMBER_PATTERN's \b never matches between them. Insert a
+  // space so Gemini's compact format parses through the exact same path as
+  // Tesseract's spaced-out OCR ("T 0003") instead of needing its own parser.
+  const normalized = rawText.replace(/\b([UCRMTS])(\d{3,5})\b/g, '$1 $2');
+  const numMatch = COLLECTOR_NUMBER_PATTERN.exec(normalized);
   return numMatch ? parseInt(numMatch[1], 10) : null;
 }
 
