@@ -4,16 +4,26 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { AuthService } from '../../../core/services/auth.service';
 import { GameService } from '../../../core/services/game.service';
 import { AddCardDialog } from '../add-card/add-card-dialog';
 import { CardDetailDialog } from '../card-detail/card-detail-dialog';
+import { DemoScanBlockedDialog } from '../demo-scan-blocked-dialog/demo-scan-blocked-dialog';
 import { categoryKeyFor, getCategoriesForGame } from '../card-category-stats';
 import { getManaCurve } from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
 
 @Component({
   selector: 'app-collection-overview',
-  imports: [BarChart, CardTile, AddCardDialog, CardDetailDialog, RouterLink, TranslatePipe],
+  imports: [
+    BarChart,
+    CardTile,
+    AddCardDialog,
+    CardDetailDialog,
+    DemoScanBlockedDialog,
+    RouterLink,
+    TranslatePipe,
+  ],
   templateUrl: './collection-overview.html',
   styleUrl: './collection-overview.scss',
 })
@@ -22,6 +32,7 @@ export class CollectionOverview {
   private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
   protected readonly gameService = inject(GameService);
+  protected readonly authService = inject(AuthService);
 
   protected readonly categories = computed(() => getCategoriesForGame(this.gameService.currentSlug()));
 
@@ -32,6 +43,7 @@ export class CollectionOverview {
   protected readonly searchQuery = signal('');
   protected readonly selectedCategory = signal<string | null>(null);
   protected readonly showAddDialog = signal(false);
+  protected readonly showDemoScanBlocked = signal(false);
   protected readonly selectedEntry = signal<CollectionEntry | null>(null);
 
   protected readonly hasAnyCards = computed(() => this.entries().length > 0);
@@ -63,6 +75,13 @@ export class CollectionOverview {
 
   toggleCategory(key: string) {
     this.selectedCategory.set(this.selectedCategory() === key ? null : key);
+  }
+
+  protected onScanButtonClick(event: MouseEvent) {
+    if (this.authService.isGuest()) {
+      event.preventDefault();
+      this.showDemoScanBlocked.set(true);
+    }
   }
 
   protected onEntryDeleted() {

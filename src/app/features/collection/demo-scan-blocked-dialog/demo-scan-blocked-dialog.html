@@ -1,0 +1,12 @@
+<div class="backdrop" (click)="close.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <header class="dialog-header">
+      <h2>{{ 'demoScanBlocked.title' | translate }}</h2>
+      <button type="button" class="icon-button" (click)="close.emit()" [attr.aria-label]="'demoScanBlocked.close' | translate">✕</button>
+    </header>
+
+    <p class="message">{{ 'demoScanBlocked.message' | translate }}</p>
+
+    <a routerLink="/invite" class="cta-button">{{ 'demoScanBlocked.cta' | translate }}</a>
+  </div>
+</div>

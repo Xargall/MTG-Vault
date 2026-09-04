@@ -27,9 +27,11 @@
             +
           </button>
           <a
-            routerLink="/scan"
+            [routerLink]="authService.isGuest() ? null : '/scan'"
             class="scan-button"
-            [attr.aria-label]="'collection.scanCardAria' | translate"
+            [class.scan-button--demo-locked]="authService.isGuest()"
+            [attr.aria-label]="(authService.isGuest() ? 'collection.scanCardDemoAria' : 'collection.scanCardAria') | translate"
+            (click)="onScanButtonClick($event)"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
@@ -40,6 +42,9 @@
               />
               <circle cx="12" cy="13.5" r="3.2" stroke="currentColor" stroke-width="1.6" />
             </svg>
+            @if (authService.isGuest()) {
+              <span class="scan-button-lock" aria-hidden="true">🔒</span>
+            }
           </a>
         </div>
 
@@ -101,4 +106,8 @@
     (close)="selectedEntry.set(null)"
     (deleted)="onEntryDeleted()"
   />
+}
+
+@if (showDemoScanBlocked()) {
+  <app-demo-scan-blocked-dialog (close)="showDemoScanBlocked.set(false)" />
 }

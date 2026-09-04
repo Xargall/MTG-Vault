@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
 import { decksSupportedGuard } from './core/guards/decks-supported.guard';
+import { demoScanGuard } from './core/guards/demo-scan.guard';
 import { selectGameGuard } from './core/guards/select-game.guard';
 
 export const routes: Routes = [
@@ -52,6 +53,7 @@ export const routes: Routes = [
       },
       {
         path: 'scan',
+        canActivate: [demoScanGuard],
         loadComponent: () => import('./features/scanner/scanner').then((m) => m.Scanner),
       },
     ],

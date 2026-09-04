@@ -97,6 +97,8 @@ export const en: typeof de = {
     searchPlaceholder: 'Search cards in your collection…',
     addCardAria: 'Add card',
     scanCardAria: 'Scan a card with the camera',
+    scanCardDemoAria: 'Scanner (locked in demo mode)',
+    demoBadge: 'Demo',
     all: 'All',
     manaCurve: 'Mana Curve',
     emptyCollection: 'No cards in your collection yet. Add your first card!',
@@ -226,6 +228,12 @@ export const en: typeof de = {
     manualScanButton: '📷 Scan now',
     manualScanNotRecognized: 'Card not recognized — please reposition it',
     addFailed: 'Card could not be added.',
+  },
+  demoScanBlocked: {
+    title: 'Scanner locked in demo mode',
+    message: 'The scanner isn\'t available in demo mode. Please sign up for full access.',
+    cta: 'Sign up now',
+    close: 'Close',
   },
   addWishlist: {
     title: 'Add to Wishlist',

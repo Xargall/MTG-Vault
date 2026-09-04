@@ -95,6 +95,8 @@ export const de = {
     searchPlaceholder: 'Karte in der Sammlung suchen…',
     addCardAria: 'Karte hinzufügen',
     scanCardAria: 'Karte per Kamera scannen',
+    scanCardDemoAria: 'Scanner (im Demo-Modus gesperrt)',
+    demoBadge: 'Demo',
     all: 'Alle',
     manaCurve: 'Mana-Kurve',
     emptyCollection: 'Noch keine Karten in deiner Sammlung. Füge deine erste Karte hinzu!',
@@ -224,6 +226,12 @@ export const de = {
     manualScanButton: '📷 Jetzt scannen',
     manualScanNotRecognized: 'Karte nicht erkannt — bitte neu ausrichten',
     addFailed: 'Karte konnte nicht hinzugefügt werden.',
+  },
+  demoScanBlocked: {
+    title: 'Scanner im Demo-Modus gesperrt',
+    message: 'Der Scanner ist im Demo-Modus nicht verfügbar. Bitte registriere dich für vollen Zugriff.',
+    cta: 'Jetzt registrieren',
+    close: 'Schließen',
   },
   addWishlist: {
     title: 'Zur Wunschliste hinzufügen',
