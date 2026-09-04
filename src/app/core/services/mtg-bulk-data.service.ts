@@ -165,14 +165,13 @@ export class MtgBulkDataService {
         if (count > 0) {
           this.cardCount.set(count);
           this.ready.set(true);
-          console.log('Bulk-Data geladen:', count, 'Karten (aus Cache)');
           return;
         }
       }
 
       await this.download(db);
     } catch (error) {
-      console.warn('Bulk-Data konnte nicht geladen werden:', error);
+      console.error('Bulk-Data konnte nicht geladen werden:', error);
       this.errorMessage.set(error instanceof Error ? error.message : 'Bulk-Data konnte nicht geladen werden.');
       // Not fatal - MtgApiService falls back to the live API for everything
       // when this cache isn't ready, exactly like before this feature existed.
@@ -278,13 +277,11 @@ export class MtgBulkDataService {
     this.progress.set(100);
     this.ready.set(true);
     this.nameIndexPromise = null; // rebuild lazily against the fresh data next time it's needed
-    console.log('Bulk-Data geladen:', total, 'Karten');
   }
 
   /** Exact local lookup by set code (any case) + collector number - the scanner's primary, most reliable identification path. */
   async findBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {
     if (!this.ready()) return null;
-    console.log('Lokaler Lookup für:', setCode, collectorNumber);
     const db = await this.getDb();
     const key = `${setCode.toLowerCase()}/${collectorNumber.toLowerCase()}`;
     const result = (await idbGetByIndex(db, STORE_CARDS, INDEX_SET_NUMBER, key)) as StoredCard | undefined;

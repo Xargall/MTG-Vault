@@ -362,14 +362,8 @@ export class MtgApiService implements CardApiService {
     const fields = extractFields(rawText, lines, validSetCodes);
     const candidates: ScryfallCandidate[] = [];
 
-    console.log('extracted setCode:', fields.setCode);
-    console.log('extracted collectorNumber:', fields.collectorNumber);
-    console.log('will do set lookup:', !!fields.setCode && fields.collectorNumber !== null);
-
     if (fields.setCode && fields.collectorNumber !== null) {
-      console.log('calling fetchCardBySetAndNumber:', fields.setCode, fields.collectorNumber);
       const bySetCode = await this.lookupBySetAndNumber(fields.setCode, String(fields.collectorNumber));
-      console.log('fetchCardBySetAndNumber result:', bySetCode ? bySetCode.name : null);
       if (bySetCode) candidates.push({ card: bySetCode, source: 'exact' });
     }
 

@@ -406,7 +406,6 @@ export class Scanner {
   }
 
   private async captureAndAnalyze() {
-    console.log('analyzing frame');
     if (!this.isScanning || this.status() !== 'scanning') return;
 
     // Non-blocking rate-limit cool-off: a prior 403 set a "retry after"
@@ -432,7 +431,6 @@ export class Scanner {
       }
     } catch (error) {
       if (error instanceof ScryfallRateLimitError) {
-        console.warn('Scryfall Rate-Limit — pausiere 5 Sekunden');
         this.rateLimitedUntil = Date.now() + RATE_LIMIT_PAUSE_MS;
         this.showToast(this.translate.instant('scanner.rateLimited'), 'warning', RATE_LIMIT_TOAST_DURATION_MS);
       }
@@ -468,7 +466,6 @@ export class Scanner {
     if (!canvas) return false;
 
     const ocrResult = await this.ocrService.recognizeText(canvas);
-    console.log('OCR result:', ocrResult.text, 'confidence:', ocrResult.confidence);
     if (ocrResult.confidence < MIN_CONFIDENCE_FOR_SET_CODE) return false;
 
     if (ocrResult.confidence >= MIN_CONFIDENCE_FOR_NAME) {
@@ -525,23 +522,18 @@ export class Scanner {
   }
 
   private async tryGeminiPath(videoEl: HTMLVideoElement): Promise<Card | null> {
-    console.log('Attempting Gemini scan...');
     try {
       const rawFrame = this.captureRawFrame(videoEl);
       if (!rawFrame) return null;
 
       const cropped = cropCollectorArea(rawFrame);
       const text = await this.geminiVision.recognizeCollectorText(cropped);
-      console.log('Gemini result:', text);
-      if (!text) {
-        console.log('Gemini returned null, falling back to Tesseract');
-        return null;
-      }
+      if (!text) return null;
 
       this.ocrEngine.set('gemini');
       return await this.mtgApi.identifyByCroppedText(text);
     } catch (error) {
-      console.warn('Gemini Vision fehlgeschlagen, Tesseract-Fallback:', error);
+      console.error('Gemini Vision fehlgeschlagen, Tesseract-Fallback:', error);
       return null;
     }
   }
@@ -581,13 +573,6 @@ export class Scanner {
         charWhitelist: COLLECTOR_NUMBER_CHAR_WHITELIST,
       });
       const score = scoreCollectorNumberText(ocrResult.text);
-      console.log(
-        `Collector-number OCR [${strategy.name}, ${isFoilImage(stats) ? 'foil' : 'normal'}]:`,
-        JSON.stringify(ocrResult.text),
-        'score:',
-        score,
-      );
-
       if (score < MIN_SCORE_TO_ACCEPT) continue;
 
       card = await this.mtgApi.identifyByCroppedText(ocrResult.text);

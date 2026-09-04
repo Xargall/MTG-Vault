@@ -29,21 +29,17 @@ export class GeminiVisionService {
   private lastCallAt = 0;
 
   async recognizeCollectorText(canvas: HTMLCanvasElement): Promise<string | null> {
-    console.log('GeminiVisionService.recognizeCollectorText called');
     await this.waitForRateLimit();
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
     const imageBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
 
-    console.log('Supabase function invoke starting...');
     const { data, error } = await this.supabase.client.functions.invoke<{ text?: string; error?: string }>(
       'gemini-ocr',
       { body: { imageBase64 } },
     );
-    console.log('Supabase function invoke finished:', { data, error });
     if (error) {
       if (error instanceof FunctionsHttpError && error.context?.status === 429) {
-        console.warn('Gemini Rate Limit — warte 15 Sekunden vor dem nächsten Versuch');
         this.lastCallAt = Date.now() + RATE_LIMIT_COOLDOWN_MS - MIN_CALL_INTERVAL_MS;
         return null;
       }
