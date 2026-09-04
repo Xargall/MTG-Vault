@@ -108,6 +108,22 @@
   }
 }
 
+.ocr-engine-badge {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  color: #1a1a1a;
+  background: rgba(230, 200, 60, 0.9);
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+
+  &--gemini {
+    color: #fff;
+    background: rgba(61, 122, 61, 0.9);
+  }
+}
+
 .focus-slider {
   position: absolute;
   bottom: var(--spacing-md);

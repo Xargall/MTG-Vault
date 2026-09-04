@@ -16,6 +16,7 @@ import { Card } from '../../core/models/card.model';
 import { CardIdentification, MtgIdentificationResult, ScoredCandidate } from '../../core/services/card-api.interface';
 import { CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
+import { GeminiVisionService } from '../../core/services/gemini-vision.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
 import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
 import { OcrLine, OcrService } from '../../core/services/ocr.service';
@@ -61,6 +62,18 @@ const CROP_STRATEGIES: CropStrategy[] = [
 // risking a wrong exact lookup.
 const MIN_SCORE_TO_ACCEPT = 80;
 const COLLECTOR_NUMBER_CHAR_WHITELIST = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/*-';
+
+/** Gemini's own crop for its collector-number guess - deliberately looser than CROP_STRATEGIES (a vision model reads a wider region fine) and left as unfiltered color, since Gemini isn't Tesseract's binarize-first pipeline. */
+function cropCollectorArea(source: HTMLCanvasElement): HTMLCanvasElement {
+  const crop = document.createElement('canvas');
+  const h = Math.floor(source.height * 0.2);
+  const y = source.height - h;
+  crop.width = Math.floor(source.width * 0.6);
+  crop.height = h;
+  const ctx = crop.getContext('2d');
+  ctx?.drawImage(source, 0, y, crop.width, h, 0, 0, crop.width, h);
+  return crop;
+}
 
 interface ImageCharacteristics {
   colorVariance: number;
@@ -201,11 +214,13 @@ export class Scanner {
   protected readonly bulkData = inject(MtgBulkDataService);
   private readonly collectionService = inject(CollectionService);
   private readonly ocrService = inject(OcrService);
+  private readonly geminiVision = inject(GeminiVisionService);
   private readonly translate = inject(TranslateService);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
   private readonly captureCanvas = document.createElement('canvas');
+  private readonly rawFrameCanvas = document.createElement('canvas');
   private stream: MediaStream | null = null;
   private videoTrack: MediaStreamTrack | null = null;
   private timerHandle: ReturnType<typeof setTimeout> | null = null;
@@ -227,6 +242,9 @@ export class Scanner {
   protected readonly focusRange = signal<FocusRange>({ min: 0, max: 1, step: 0.05 });
   protected readonly focusDistance = signal(0.5);
 
+  // Which engine most recently produced an OCR reading - drives the small
+  // "🤖 Gemini" / "📝 Tesseract" indicator; null while nothing has read yet.
+  protected readonly ocrEngine = signal<'gemini' | 'tesseract' | null>(null);
   protected readonly detectedCard = signal<Card | null>(null);
   protected readonly candidateChoices = signal<ScoredCandidate[] | null>(null);
   // Which heading/copy the picker shows - 'medium' (5 options, fairly
@@ -462,6 +480,43 @@ export class Scanner {
   }
 
   /**
+   * Gemini Vision is tried first on every frame (one attempt, its own wider
+   * unfiltered crop) - on success its raw text feeds into the exact same
+   * MtgApiService.identifyByCroppedText pipeline Tesseract uses, so none of
+   * the set-code/token/bare-number lookup logic is duplicated. Any failure
+   * (thrown error, "UNKNOWN", or no resolvable card) falls through to the
+   * existing mtgscan-derived crop-strategy loop below, unchanged.
+   */
+  private async handleMtgFrame(videoEl: HTMLVideoElement): Promise<boolean> {
+    const geminiCard = await this.tryGeminiPath(videoEl);
+    const card = geminiCard ?? (await this.tryTesseractPath(videoEl));
+
+    const confirmed = this.confirmMtgCard(card);
+    if (!confirmed) return false;
+
+    this.onMatch({ card: confirmed, confidence: 1 });
+    return true;
+  }
+
+  private async tryGeminiPath(videoEl: HTMLVideoElement): Promise<Card | null> {
+    try {
+      const rawFrame = this.captureRawFrame(videoEl);
+      if (!rawFrame) return null;
+
+      const cropped = cropCollectorArea(rawFrame);
+      const text = await this.geminiVision.recognizeCollectorText(cropped);
+      if (!text) return null;
+
+      this.ocrEngine.set('gemini');
+      console.log('Gemini OCR result:', text);
+      return await this.mtgApi.identifyByCroppedText(text);
+    } catch (error) {
+      console.warn('Gemini Vision fehlgeschlagen, Tesseract-Fallback:', error);
+      return null;
+    }
+  }
+
+  /**
    * Crop-based collector-number scan (mtgscan-derived): tries each of
    * CROP_STRATEGIES's bottom-left corner windows in turn, foil-detects the
    * crop to pick the right adaptive preprocessing pass, OCRs it with a
@@ -471,7 +526,8 @@ export class Scanner {
    * toughness/keyword fallback, since a crop this tight never has those
    * fields in it anyway.
    */
-  private async handleMtgFrame(videoEl: HTMLVideoElement): Promise<boolean> {
+  private async tryTesseractPath(videoEl: HTMLVideoElement): Promise<Card | null> {
+    this.ocrEngine.set('tesseract');
     let card: Card | null = null;
 
     for (const strategy of CROP_STRATEGIES) {
@@ -508,11 +564,7 @@ export class Scanner {
       break;
     }
 
-    const confirmed = this.confirmMtgCard(card);
-    if (!confirmed) return false;
-
-    this.onMatch({ card: confirmed, confidence: 1 });
-    return true;
+    return card;
   }
 
   private pushFrameHistory(entry: { id: string; card: Card } | null) {
@@ -548,6 +600,21 @@ export class Scanner {
 
     this.frameHistory = [];
     return latest.card;
+  }
+
+  /** Full, unfiltered color frame for Gemini - unlike captureFrame() below, no grayscale/contrast pass, since that's a Tesseract-specific preprocessing step a general vision model doesn't need. */
+  private captureRawFrame(videoEl: HTMLVideoElement): HTMLCanvasElement | null {
+    const width = videoEl.videoWidth;
+    const height = videoEl.videoHeight;
+    if (width < 10 || height < 10) return null;
+
+    this.rawFrameCanvas.width = width;
+    this.rawFrameCanvas.height = height;
+    const ctx = this.rawFrameCanvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(videoEl, 0, 0, width, height);
+    return this.rawFrameCanvas;
   }
 
   private cropToStrategy(videoEl: HTMLVideoElement, strategy: CropStrategy): HTMLCanvasElement | null {

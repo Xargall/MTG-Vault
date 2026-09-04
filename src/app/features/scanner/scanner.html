@@ -21,6 +21,12 @@
     <div class="scan-pulse" aria-hidden="true"></div>
   }
 
+  @if (gameService.currentSlug() === 'mtg' && ocrEngine(); as engine) {
+    <span class="ocr-engine-badge" [class.ocr-engine-badge--gemini]="engine === 'gemini'">
+      {{ engine === 'gemini' ? '🤖 Gemini' : '📝 Tesseract' }}
+    </span>
+  }
+
   @if (gameService.currentSlug() === 'mtg' && bulkData.loading() && !bulkData.ready()) {
     <p class="bulk-data-hint">
       {{ 'scanner.bulkDataLoading' | translate: { percent: bulkData.progress() } }}
