@@ -175,13 +175,14 @@ const SUCCESS_TOAST_DURATION_MS = 3000;
 const FAILURE_TOAST_DURATION_MS = 2000;
 const AUTO_RESUME_DELAY_MS = 2000;
 const RATE_LIMIT_TOAST_DURATION_MS = 3000;
+const LIMIT_TOAST_DURATION_MS = 6000;
 // Non-blocking: a 403 sets a "cool off until" timestamp rather than
 // awaiting a delay inline, so the loop (and the UI) never freezes for it.
 const RATE_LIMIT_PAUSE_MS = 5000;
 const RATE_LIMIT_RETRY_DELAY_MS = 1000;
 
 type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'choosing' | 'error';
-type ScannerToast = { message: string; variant: 'success' | 'warning' };
+type ScannerToast = { title?: string; message: string; variant: 'success' | 'warning' };
 
 // Manual focus / points-of-interest aren't in TS's bundled DOM types yet,
 // though Chromium-based browsers on Android support them.
@@ -243,8 +244,13 @@ export class Scanner {
   protected readonly focusDistance = signal(0.5);
 
   // Which engine most recently produced an OCR reading - drives the small
-  // "🤖 Gemini" / "📝 Tesseract" indicator; null while nothing has read yet.
-  protected readonly ocrEngine = signal<'gemini' | 'tesseract' | null>(null);
+  // "🤖 Gemini" / "📝 Tesseract" / "⚠️ Limit" indicator; null while nothing
+  // has read yet.
+  protected readonly ocrEngine = signal<'gemini' | 'tesseract' | 'limit' | null>(null);
+  // Gemini's 429 is shown to the user only the first time per session -
+  // it's already handled gracefully (falls back silently otherwise), so
+  // repeating the same explanation every subsequent hit would just be noise.
+  private limitWarningShown = false;
   // True while the manual "Jetzt scannen" button's single Gemini call is in
   // flight - drives the button's disabled state and spinner.
   protected readonly geminiLoading = signal(false);
@@ -513,7 +519,7 @@ export class Scanner {
       const card = await this.tryGeminiPath(videoEl);
       if (card) {
         this.onMatch({ card, confidence: 1 });
-      } else {
+      } else if (this.ocrEngine() !== 'limit') {
         this.showToast(this.translate.instant('scanner.manualScanNotRecognized'), 'warning', FAILURE_TOAST_DURATION_MS);
       }
     } finally {
@@ -528,6 +534,21 @@ export class Scanner {
 
       const cropped = cropCollectorArea(rawFrame);
       const text = await this.geminiVision.recognizeCollectorText(cropped);
+
+      if (this.geminiVision.rateLimited()) {
+        this.ocrEngine.set('limit');
+        if (!this.limitWarningShown) {
+          this.limitWarningShown = true;
+          this.showToast(
+            this.translate.instant('scanner.limitMessage'),
+            'warning',
+            LIMIT_TOAST_DURATION_MS,
+            this.translate.instant('scanner.limitTitle'),
+          );
+        }
+        return null;
+      }
+
       if (!text) return null;
 
       this.ocrEngine.set('gemini');
@@ -549,7 +570,6 @@ export class Scanner {
    * fields in it anyway.
    */
   private async tryTesseractPath(videoEl: HTMLVideoElement): Promise<Card | null> {
-    this.ocrEngine.set('tesseract');
     let card: Card | null = null;
 
     for (const strategy of CROP_STRATEGIES) {
@@ -575,6 +595,11 @@ export class Scanner {
       const score = scoreCollectorNumberText(ocrResult.text);
       if (score < MIN_SCORE_TO_ACCEPT) continue;
 
+      // Only claim the badge once Tesseract actually found something -
+      // this runs continuously in the background, so setting it unconditionally
+      // at the top of this method would immediately overwrite a "gemini" badge
+      // from the very next tick, regardless of whether this attempt succeeds.
+      this.ocrEngine.set('tesseract');
       card = await this.mtgApi.identifyByCroppedText(ocrResult.text);
       break;
     }
@@ -744,9 +769,9 @@ export class Scanner {
     this.scheduleNextCapture();
   }
 
-  private showToast(message: string, variant: ScannerToast['variant'], durationMs: number) {
+  private showToast(message: string, variant: ScannerToast['variant'], durationMs: number, title?: string) {
     if (this.toastTimeout) clearTimeout(this.toastTimeout);
-    this.toast.set({ message, variant });
+    this.toast.set({ title, message, variant });
     this.toastTimeout = setTimeout(() => this.toast.set(null), durationMs);
   }
 

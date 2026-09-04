@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { SupabaseService } from './supabase.service';
@@ -28,7 +28,13 @@ export class GeminiVisionService {
   private readonly supabase = inject(SupabaseService);
   private lastCallAt = 0;
 
+  // Reflects only the most recent call - reset at the start of each call so
+  // a caller can check it right after awaiting to tell a real 429 apart
+  // from any other reason recognizeCollectorText returned null.
+  readonly rateLimited = signal(false);
+
   async recognizeCollectorText(canvas: HTMLCanvasElement): Promise<string | null> {
+    this.rateLimited.set(false);
     await this.waitForRateLimit();
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
@@ -41,6 +47,7 @@ export class GeminiVisionService {
     if (error) {
       if (error instanceof FunctionsHttpError && error.context?.status === 429) {
         this.lastCallAt = Date.now() + RATE_LIMIT_COOLDOWN_MS - MIN_CALL_INTERVAL_MS;
+        this.rateLimited.set(true);
         return null;
       }
       throw error;

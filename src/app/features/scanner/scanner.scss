@@ -112,15 +112,21 @@
   position: absolute;
   top: var(--spacing-md);
   right: var(--spacing-md);
-  color: #1a1a1a;
-  background: rgba(230, 200, 60, 0.9);
+  color: #fff;
   padding: 4px 10px;
   border-radius: var(--radius);
   font-size: 0.8rem;
 
   &--gemini {
-    color: #fff;
-    background: rgba(61, 122, 61, 0.9);
+    background: #16a34a;
+  }
+
+  &--tesseract {
+    background: #d97706;
+  }
+
+  &--limit {
+    background: #dc2626;
   }
 }
 
@@ -169,6 +175,11 @@
   left: var(--spacing-md);
   right: var(--spacing-md);
   width: auto;
+}
+
+.scanner-toast-title {
+  display: block;
+  margin-bottom: 2px;
 }
 
 .scanner-toast {

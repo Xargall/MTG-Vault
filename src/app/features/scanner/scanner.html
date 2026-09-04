@@ -22,9 +22,13 @@
   }
 
   @if (gameService.currentSlug() === 'mtg' && ocrEngine(); as engine) {
-    <span class="ocr-engine-badge" [class.ocr-engine-badge--gemini]="engine === 'gemini'">
-      {{ engine === 'gemini' ? '🤖 Gemini' : '📝 Tesseract' }}
-    </span>
+    @if (engine === 'gemini') {
+      <span class="ocr-engine-badge ocr-engine-badge--gemini">🤖 Gemini</span>
+    } @else if (engine === 'limit') {
+      <span class="ocr-engine-badge ocr-engine-badge--limit">⚠️ Limit erreicht</span>
+    } @else {
+      <span class="ocr-engine-badge ocr-engine-badge--tesseract">📝 Tesseract</span>
+    }
   }
 
   @if (gameService.currentSlug() === 'mtg' && bulkData.loading() && !bulkData.ready()) {
@@ -72,7 +76,12 @@
   }
 
   @if (toast(); as t) {
-    <div class="scanner-toast" [class.scanner-toast--warning]="t.variant === 'warning'">{{ t.message }}</div>
+    <div class="scanner-toast" [class.scanner-toast--warning]="t.variant === 'warning'">
+      @if (t.title) {
+        <strong class="scanner-toast-title">{{ t.title }}</strong>
+      }
+      {{ t.message }}
+    </div>
   }
 
   @if (status() === 'choosing' && candidateChoices(); as choices) {

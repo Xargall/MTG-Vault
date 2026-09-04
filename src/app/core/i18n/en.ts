@@ -228,6 +228,8 @@ export const en: typeof de = {
     manualScanButton: '📷 Scan now',
     manualScanNotRecognized: 'Card not recognized — please reposition it',
     addFailed: 'Card could not be added.',
+    limitTitle: '⚠️ Daily limit reached',
+    limitMessage: 'The daily scan limit for AI recognition is used up. The scanner automatically switches to basic mode. The limit resets at midnight.',
   },
   demoScanBlocked: {
     title: 'Scanner locked in demo mode',
