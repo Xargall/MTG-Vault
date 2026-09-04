@@ -61,6 +61,16 @@
     />
   }
 
+  @if (gameService.currentSlug() === 'mtg' && status() === 'scanning') {
+    <button type="button" class="manual-scan-button" [disabled]="geminiLoading()" (click)="onManualScan()">
+      @if (geminiLoading()) {
+        <span class="manual-scan-spinner" aria-hidden="true"></span>
+      } @else {
+        {{ 'scanner.manualScanButton' | translate }}
+      }
+    </button>
+  }
+
   @if (toast(); as t) {
     <div class="scanner-toast" [class.scanner-toast--warning]="t.variant === 'warning'">{{ t.message }}</div>
   }

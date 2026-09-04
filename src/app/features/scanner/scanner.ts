@@ -245,6 +245,9 @@ export class Scanner {
   // Which engine most recently produced an OCR reading - drives the small
   // "🤖 Gemini" / "📝 Tesseract" indicator; null while nothing has read yet.
   protected readonly ocrEngine = signal<'gemini' | 'tesseract' | null>(null);
+  // True while the manual "Jetzt scannen" button's single Gemini call is in
+  // flight - drives the button's disabled state and spinner.
+  protected readonly geminiLoading = signal(false);
   protected readonly detectedCard = signal<Card | null>(null);
   protected readonly candidateChoices = signal<ScoredCandidate[] | null>(null);
   // Which heading/copy the picker shows - 'medium' (5 options, fairly
@@ -480,22 +483,45 @@ export class Scanner {
   }
 
   /**
-   * Gemini Vision is tried first on every frame (one attempt, its own wider
-   * unfiltered crop) - on success its raw text feeds into the exact same
-   * MtgApiService.identifyByCroppedText pipeline Tesseract uses, so none of
-   * the set-code/token/bare-number lookup logic is duplicated. Any failure
-   * (thrown error, "UNKNOWN", or no resolvable card) falls through to the
-   * existing mtgscan-derived crop-strategy loop below, unchanged.
+   * Gemini is no longer part of this automatic per-tick loop - it only runs
+   * on the user's explicit "Jetzt scannen" tap (see onManualScan). The
+   * background loop stays Tesseract-only, unchanged otherwise.
    */
   private async handleMtgFrame(videoEl: HTMLVideoElement): Promise<boolean> {
-    const geminiCard = await this.tryGeminiPath(videoEl);
-    const card = geminiCard ?? (await this.tryTesseractPath(videoEl));
+    const card = await this.tryTesseractPath(videoEl);
 
     const confirmed = this.confirmMtgCard(card);
     if (!confirmed) return false;
 
     this.onMatch({ card: confirmed, confidence: 1 });
     return true;
+  }
+
+  /**
+   * Manual, single-shot Gemini scan triggered by the "Jetzt scannen"
+   * button - reuses tryGeminiPath as-is (same crop, same rate limiting,
+   * same identifyByCroppedText pipeline). A deliberate one-frame user
+   * action is trusted immediately on success rather than routed through
+   * confirmMtgCard's 2-of-3 sliding window, which exists to smooth out
+   * noise across the *automatic* stream of frames - not applicable here.
+   * The background Tesseract loop keeps running unaffected.
+   */
+  protected async onManualScan(): Promise<void> {
+    if (this.geminiLoading()) return;
+    const videoEl = this.video()?.nativeElement;
+    if (!videoEl || videoEl.readyState < 2) return;
+
+    this.geminiLoading.set(true);
+    try {
+      const card = await this.tryGeminiPath(videoEl);
+      if (card) {
+        this.onMatch({ card, confidence: 1 });
+      } else {
+        this.showToast(this.translate.instant('scanner.manualScanNotRecognized'), 'warning', FAILURE_TOAST_DURATION_MS);
+      }
+    } finally {
+      this.geminiLoading.set(false);
+    }
   }
 
   private async tryGeminiPath(videoEl: HTMLVideoElement): Promise<Card | null> {

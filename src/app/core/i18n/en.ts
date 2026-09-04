@@ -223,6 +223,8 @@ export const en: typeof de = {
     addedToast: '✓ {{name}} added to collection',
     notRecognized: 'Card not recognized — please hold the card more clearly in front of the camera',
     rateLimited: 'Too many requests — taking a short break…',
+    manualScanButton: '📷 Scan now',
+    manualScanNotRecognized: 'Card not recognized — please reposition it',
     addFailed: 'Card could not be added.',
   },
   addWishlist: {

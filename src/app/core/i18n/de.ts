@@ -221,6 +221,8 @@ export const de = {
     addedToast: '✓ {{name}} zur Sammlung hinzugefügt',
     notRecognized: 'Karte nicht erkannt — bitte Karte deutlicher vor die Kamera halten',
     rateLimited: 'Zu viele Anfragen — kurze Pause…',
+    manualScanButton: '📷 Jetzt scannen',
+    manualScanNotRecognized: 'Karte nicht erkannt — bitte neu ausrichten',
     addFailed: 'Karte konnte nicht hinzugefügt werden.',
   },
   addWishlist: {
