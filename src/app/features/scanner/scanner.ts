@@ -426,9 +426,14 @@ export class Scanner {
     const start = Date.now();
     try {
       const matched = await this.analyzeFrame();
+      // MTG's automatic loop is Tesseract-only now (Gemini only runs on the
+      // manual "Jetzt scannen" tap, which already gives its own feedback on
+      // a miss) - it runs silently in the background with no "not
+      // recognized" noise. Yu-Gi-Oh has no manual alternative, so it keeps
+      // this streak-based toast as its only feedback.
       if (matched) {
         this.noMatchStreak = 0;
-      } else {
+      } else if (this.gameService.currentSlug() !== 'mtg') {
         this.noMatchStreak++;
         if (this.noMatchStreak >= NO_MATCH_STREAK_FOR_TOAST) {
           this.showToast(this.translate.instant('scanner.notRecognized'), 'warning', FAILURE_TOAST_DURATION_MS);
