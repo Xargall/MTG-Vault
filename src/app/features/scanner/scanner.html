@@ -21,7 +21,7 @@
     <div class="scan-pulse" aria-hidden="true"></div>
   }
 
-  @if (gameService.currentSlug() === 'mtg' && ocrEngine(); as engine) {
+  @if (ocrEngine(); as engine) {
     @if (engine === 'gemini') {
       <span class="ocr-engine-badge ocr-engine-badge--gemini">🤖 Gemini</span>
     } @else if (engine === 'limit') {
@@ -65,7 +65,7 @@
     />
   }
 
-  @if (gameService.currentSlug() === 'mtg' && status() === 'scanning') {
+  @if (status() === 'scanning') {
     <button type="button" class="manual-scan-button" [disabled]="geminiLoading()" (click)="onManualScan()">
       @if (geminiLoading()) {
         <span class="manual-scan-spinner" aria-hidden="true"></span>

@@ -36,6 +36,10 @@ interface YgoRawCard {
 
 const CARD_INFO_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
 const ARCHETYPES_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/archetypes.php';
+// Dedicated endpoint for an exact print-code lookup (e.g. "SDAZ-DE001") -
+// cardinfo.php itself has no such parameter (confirmed: it 400s on
+// "setcode"/"cardsets", its actual param list has neither).
+const CARD_SETS_INFO_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardsetsinfo.php';
 
 @Injectable({ providedIn: 'root' })
 export class YugiohApiService implements CardApiService {
@@ -63,6 +67,23 @@ export class YugiohApiService implements CardApiService {
     // one canonical entry, so there's nothing meaningful to pick between.
     const raw = await this.fetchCardInfo({ name });
     return raw.length > 0 ? [this.toCard(raw[0])] : [];
+  }
+
+  /**
+   * Resolves an exact print code read off a physical card (e.g. from the
+   * camera scanner's Gemini path - "SDAZ-DE001") straight to its card, via
+   * cardsetsinfo.php's setcode lookup. Unlike identifyCard's fuzzy
+   * name search, a print code either matches exactly or it doesn't -
+   * there's no confidence score or ambiguity to resolve.
+   */
+  async identifyByPrintCode(code: string): Promise<Card | null> {
+    const response = await fetch(`${CARD_SETS_INFO_ENDPOINT}?setcode=${encodeURIComponent(code)}`);
+    if (!response.ok) return null;
+
+    const body: { id: number; name: string } | { error: string } = await response.json();
+    if ('error' in body) return null;
+
+    return this.getCard(String(body.id));
   }
 
   async identifyCard(rawText: string): Promise<CardIdentification | null> {

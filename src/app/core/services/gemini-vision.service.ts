@@ -19,9 +19,10 @@ const RATE_LIMIT_COOLDOWN_MS = 15000;
  * Thin client for the `gemini-ocr` Supabase Edge Function. The Gemini API
  * key never reaches this file or the browser bundle - it lives only in the
  * Edge Function's server-side secrets. This service just ships a cropped
- * JPEG to that function and hands back the raw recognized text (or null),
- * so callers can feed it into the exact same MtgApiService.identifyByCroppedText
- * pipeline Tesseract's output already goes through.
+ * JPEG (plus which game is active, so the Edge Function picks the matching
+ * prompt) to that function and hands back the raw recognized text (or null),
+ * so callers can resolve it via the matching per-game lookup - MTG's
+ * identifyByCroppedText, Yu-Gi-Oh's identifyByPrintCode.
  */
 @Injectable({ providedIn: 'root' })
 export class GeminiVisionService {
@@ -33,7 +34,7 @@ export class GeminiVisionService {
   // from any other reason recognizeCollectorText returned null.
   readonly rateLimited = signal(false);
 
-  async recognizeCollectorText(canvas: HTMLCanvasElement): Promise<string | null> {
+  async recognizeCollectorText(canvas: HTMLCanvasElement, game: 'mtg' | 'yugioh'): Promise<string | null> {
     this.rateLimited.set(false);
     await this.waitForRateLimit();
 
@@ -42,7 +43,7 @@ export class GeminiVisionService {
 
     const { data, error } = await this.supabase.client.functions.invoke<{ text?: string; error?: string }>(
       'gemini-ocr',
-      { body: { imageBase64 } },
+      { body: { imageBase64, game } },
     );
     if (error) {
       if (error instanceof FunctionsHttpError && error.context?.status === 429) {

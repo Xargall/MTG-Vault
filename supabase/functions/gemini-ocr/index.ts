@@ -21,7 +21,11 @@ const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 // than the earlier 15s) gives real camera images - much larger than a tiny
 // test payload - realistic headroom for Gemini's actual vision processing time.
 const GEMINI_TIMEOUT_MS = 25000;
-const PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Magic: The Gathering Karte mit der Set-Code/Sammlenummer-Zeile.
+// Chosen per-request by `game` (see below) - each prompt only ever mentions
+// the one card format actually relevant, rather than asking Gemini to also
+// figure out which TCG it's looking at. Keeps the already-tuned MTG prompt
+// untouched.
+const MTG_PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Magic: The Gathering Karte mit der Set-Code/Sammlenummer-Zeile.
 Lies NUR den Set-Code (3 Großbuchstaben) und die Collector Number unten links dieser Karte.
 
 Wichtig: Token-Karten haben ein "T" vor der Nummer (z.B. "T 0003" oder "T003"). Gib das T mit aus, wenn es vorhanden ist.
@@ -29,6 +33,16 @@ Wichtig: Token-Karten haben ein "T" vor der Nummer (z.B. "T 0003" oder "T003"). 
 Antworte NUR in diesem Format:
 - Normale Karte: "MSH 82"
 - Token-Karte: "MSH T3"
+
+Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
+Keine weiteren Erklärungen, kein zusätzlicher Text.`;
+
+const YUGIOH_PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Yu-Gi-Oh! Karte mit dem Karten-Code unten links oder unten rechts.
+Der Code hat das Format "SETCODE-SPRACHE-NUMMER", z.B. "SDAZ-DE001" oder "LOB-EN001".
+
+Lies NUR diesen Code, exakt wie aufgedruckt (Bindestrich, Sprachkürzel und führende Nullen der Nummer beibehalten).
+
+Antworte NUR mit dem Code, z.B.: "SDAZ-DE001"
 
 Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
 Keine weiteren Erklärungen, kein zusätzlicher Text.`;
@@ -45,13 +59,14 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { imageBase64 } = (await req.json()) as { imageBase64?: string };
+    const { imageBase64, game } = (await req.json()) as { imageBase64?: string; game?: string };
     if (!imageBase64) {
       return new Response(JSON.stringify({ error: 'imageBase64 fehlt' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    const prompt = game === 'yugioh' ? YUGIOH_PROMPT : MTG_PROMPT;
 
     const apiKey = Deno.env.get('GEMINI_API_KEY');
     if (!apiKey) {
@@ -87,7 +102,7 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             contents: [
               {
-                parts: [{ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } }, { text: PROMPT }],
+                parts: [{ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } }, { text: prompt }],
               },
             ],
           }),

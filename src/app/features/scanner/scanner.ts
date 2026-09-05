@@ -20,6 +20,7 @@ import { GeminiVisionService } from '../../core/services/gemini-vision.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
 import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
 import { OcrLine, OcrService } from '../../core/services/ocr.service';
+import { YugiohApiService } from '../../core/services/yugioh-api.service';
 import { ScryfallRateLimitError } from '../../core/utils/scryfall-queue';
 import { extractNameFromLines } from '../../core/utils/string-similarity';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
@@ -62,6 +63,9 @@ const CROP_STRATEGIES: CropStrategy[] = [
 // risking a wrong exact lookup.
 const MIN_SCORE_TO_ACCEPT = 80;
 const COLLECTOR_NUMBER_CHAR_WHITELIST = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/*-';
+// Yu-Gi-Oh print code as it appears on the card, e.g. "SDAZ-DE001" or
+// "LOB-EN001" - set code, two-letter language, then a 2-4 digit number.
+const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]{2,6}-[A-Z]{2}\d{2,4}$/;
 
 /** Gemini's own crop for its collector-number guess - deliberately looser than CROP_STRATEGIES (a vision model reads a wider region fine) and left as unfiltered color, since Gemini isn't Tesseract's binarize-first pipeline. */
 function cropCollectorArea(source: HTMLCanvasElement): HTMLCanvasElement {
@@ -212,6 +216,7 @@ interface FocusRange {
 export class Scanner {
   protected readonly gameService = inject(GameService);
   private readonly mtgApi = inject(MtgApiService);
+  private readonly yugiohApi = inject(YugiohApiService);
   protected readonly bulkData = inject(MtgBulkDataService);
   private readonly collectionService = inject(CollectionService);
   private readonly ocrService = inject(OcrService);
@@ -537,8 +542,9 @@ export class Scanner {
       const rawFrame = this.captureRawFrame(videoEl);
       if (!rawFrame) return null;
 
+      const game = this.gameService.currentSlug() === 'yugioh' ? 'yugioh' : 'mtg';
       const cropped = cropCollectorArea(rawFrame);
-      const text = await this.geminiVision.recognizeCollectorText(cropped);
+      const text = await this.geminiVision.recognizeCollectorText(cropped, game);
 
       if (this.geminiVision.rateLimited()) {
         this.ocrEngine.set('limit');
@@ -557,6 +563,13 @@ export class Scanner {
       if (!text) return null;
 
       this.ocrEngine.set('gemini');
+
+      if (game === 'yugioh') {
+        const code = text.toUpperCase().trim();
+        if (!YUGIOH_PRINT_CODE_PATTERN.test(code)) return null;
+        return await this.yugiohApi.identifyByPrintCode(code);
+      }
+
       return await this.mtgApi.identifyByCroppedText(text);
     } catch (error) {
       console.error('Gemini Vision fehlgeschlagen, Tesseract-Fallback:', error);
