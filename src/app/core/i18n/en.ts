@@ -191,6 +191,12 @@ export const en: typeof de = {
     cardsCount: '{{matched}} / {{total}} cards',
     missingTag: 'Commander missing from collection',
     loadFailed: 'Recommendations could not be loaded.',
+    backToList: '← Back to list',
+    ownedSection: 'Already owned ({{count}})',
+    missingSection: 'Still missing ({{count}})',
+    detailFailed: 'Card list could not be loaded.',
+    addDeckFailed: 'Deck could not be added.',
+    deckAdded: 'Added to your decks.',
   },
   wishlist: {
     title: 'Wishlist',

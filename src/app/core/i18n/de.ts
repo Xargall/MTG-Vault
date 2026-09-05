@@ -189,6 +189,12 @@ export const de = {
     cardsCount: '{{matched}} / {{total}} Karten',
     missingTag: 'Commander fehlt in Sammlung',
     loadFailed: 'Empfehlungen konnten nicht geladen werden.',
+    backToList: '← Zurück zur Liste',
+    ownedSection: 'Bereits vorhanden ({{count}})',
+    missingSection: 'Noch fehlend ({{count}})',
+    detailFailed: 'Kartenliste konnte nicht geladen werden.',
+    addDeckFailed: 'Deck konnte nicht hinzugefügt werden.',
+    deckAdded: 'Zur Deckliste hinzugefügt.',
   },
   wishlist: {
     title: 'Wunschliste',

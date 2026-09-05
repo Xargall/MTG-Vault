@@ -189,6 +189,54 @@ export class DeckService {
     }
   }
 
+  /** Deck built from an EDHREC average-decklist (see CommanderRecommendationsDialog) - same shape/side effects as importDeck (grants any missing cards into the collection), just tagged with a fixed 'Commander' format instead of a free-text one. */
+  async addEdhrecDeck(commanderName: string, cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
+    await this.gameService.ready;
+    const userId = this.supabase.session()?.user.id;
+    if (!userId) throw new Error('Nicht eingeloggt.');
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) throw new Error('Kein aktives Spiel.');
+
+    const { data: deck, error: deckError } = await this.supabase.client
+      .from('decks')
+      .insert({
+        user_id: userId,
+        game_id: gameId,
+        name: commanderName,
+        format: 'Commander',
+        is_precon: false,
+        release_date: null,
+        mtgjson_file_name: null,
+      })
+      .select('id')
+      .single<{ id: string }>();
+
+    if (deckError) throw deckError;
+
+    const { error: cardsError } = await this.supabase.client.from('deck_cards').insert(
+      cards.map((card) => ({
+        deck_id: deck.id,
+        card_id: card.cardId,
+        quantity: card.quantity,
+      })),
+    );
+    if (cardsError) throw cardsError;
+
+    const owned = await this.collectionService.getQuantitiesByCardId();
+    const collectionInputs: AddCardInput[] = cards
+      .map((card) => ({
+        cardId: card.cardId,
+        quantity: card.quantity - (owned.get(card.cardId) ?? 0),
+        foil: false,
+        condition: 'NM',
+      }))
+      .filter((input) => input.quantity > 0);
+
+    if (collectionInputs.length > 0) {
+      await this.collectionService.addCards(collectionInputs);
+    }
+  }
+
   async deleteDeck(deckId: string): Promise<void> {
     const { error } = await this.supabase.client.from('decks').delete().eq('id', deckId);
     if (error) throw error;

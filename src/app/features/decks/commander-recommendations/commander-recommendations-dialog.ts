@@ -1,10 +1,20 @@
 import { Component, computed, inject, output, signal } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { Card } from '../../../core/models/card.model';
 import { EdhrecService } from '../../../core/services/edhrec.service';
 import { MtgApiService } from '../../../core/services/mtg-api.service';
+import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
+import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
+import { getCardOwnedStatus } from '../deck-stats';
+import { DeckService } from '../deck.service';
 import { buildOwnedByNameMap, getEdhrecMatch, isLand, isLegendaryCreature } from './commander-recommendations-stats';
+
+export interface CommanderDeckCard {
+  card: Card;
+  quantity: number;
+}
 
 const BATCH_SIZE = 5;
 // Bounds how many not-yet-owned candidate commanders get a full average-deck
@@ -38,7 +48,7 @@ function dedupeByCardName(entries: CollectionEntry[]): CollectionEntry[] {
 
 @Component({
   selector: 'app-commander-recommendations-dialog',
-  imports: [TranslatePipe],
+  imports: [TranslatePipe, CardTile],
   templateUrl: './commander-recommendations-dialog.html',
   styleUrl: './commander-recommendations-dialog.scss',
 })
@@ -46,9 +56,12 @@ export class CommanderRecommendationsDialog {
   private readonly collectionService = inject(CollectionService);
   private readonly mtgApi = inject(MtgApiService);
   private readonly edhrec = inject(EdhrecService);
+  private readonly deckService = inject(DeckService);
+  private readonly wishlistService = inject(WishlistService);
   private readonly translate = inject(TranslateService);
 
   readonly close = output<void>();
+  readonly added = output<void>();
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
@@ -56,10 +69,34 @@ export class CommanderRecommendationsDialog {
   protected readonly checked = signal(0);
   protected readonly total = signal(0);
   protected readonly recommendations = signal<CommanderRecommendation[]>([]);
+  private readonly collectionEntries = signal<CollectionEntry[]>([]);
 
   protected readonly hasNoResults = computed(
     () => !this.loading() && !this.errorMessage() && this.recommendations().length === 0,
   );
+
+  // Detail (single commander's average decklist) - shown once a
+  // recommendation row is clicked, replacing the list the same way
+  // BrowseDecksDialog toggles between search results and a deck preview.
+  protected readonly selectedRecommendation = signal<CommanderRecommendation | null>(null);
+  protected readonly loadingDetail = signal(false);
+  protected readonly detailError = signal<string | null>(null);
+  protected readonly ownedCards = signal<CommanderDeckCard[]>([]);
+  protected readonly missingCards = signal<CommanderDeckCard[]>([]);
+
+  protected readonly detailMatchPercent = computed(() => {
+    const owned = this.ownedCards().length;
+    const total = owned + this.missingCards().length;
+    return total > 0 ? Math.round((owned / total) * 100) : 0;
+  });
+
+  protected readonly addingDeck = signal(false);
+  protected readonly addDeckError = signal<string | null>(null);
+  protected readonly deckAdded = signal(false);
+
+  protected readonly addingToWishlist = signal(false);
+  protected readonly wishlistError = signal<string | null>(null);
+  protected readonly wishlistAdded = signal(false);
 
   constructor() {
     this.load();
@@ -73,6 +110,7 @@ export class CommanderRecommendationsDialog {
       const collection = (await this.collectionService.getCollectionWithCardData()).filter(
         (entry) => entry.card.game === 'mtg',
       );
+      this.collectionEntries.set(collection);
       const ownedByName = buildOwnedByNameMap(collection);
 
       const ownedCommanders = dedupeByCardName(
@@ -156,6 +194,98 @@ export class CommanderRecommendationsDialog {
       );
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  async selectRecommendation(rec: CommanderRecommendation) {
+    this.selectedRecommendation.set(rec);
+    this.detailError.set(null);
+    this.deckAdded.set(false);
+    this.addDeckError.set(null);
+    this.wishlistAdded.set(false);
+    this.wishlistError.set(null);
+    this.ownedCards.set([]);
+    this.missingCards.set([]);
+
+    this.loadingDetail.set(true);
+    try {
+      const deckCards = await this.edhrec.getAverageDeck(rec.name);
+      const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name));
+      const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
+      const ownedByName = buildOwnedByNameMap(this.collectionEntries());
+
+      const owned: CommanderDeckCard[] = [];
+      const missing: CommanderDeckCard[] = [];
+      for (const { name, quantity } of deckCards) {
+        const card = cardsByName.get(name.toLowerCase());
+        if (!card) continue;
+        const ownedQty = ownedByName.get(name.toLowerCase()) ?? 0;
+        const entry: CommanderDeckCard = { card, quantity };
+        (getCardOwnedStatus(quantity, ownedQty) === 'owned' ? owned : missing).push(entry);
+      }
+      owned.sort((a, b) => a.card.name.localeCompare(b.card.name));
+      missing.sort((a, b) => a.card.name.localeCompare(b.card.name));
+
+      this.ownedCards.set(owned);
+      this.missingCards.set(missing);
+    } catch (error) {
+      this.detailError.set(
+        error instanceof Error ? error.message : this.translate.instant('commanderRecs.detailFailed'),
+      );
+    } finally {
+      this.loadingDetail.set(false);
+    }
+  }
+
+  backToList() {
+    this.selectedRecommendation.set(null);
+  }
+
+  async addDeck() {
+    const rec = this.selectedRecommendation();
+    if (!rec) return;
+
+    this.addingDeck.set(true);
+    this.addDeckError.set(null);
+    try {
+      const cards = [...this.ownedCards(), ...this.missingCards()].map(({ card, quantity }) => ({
+        cardId: card.id,
+        quantity,
+      }));
+      await this.deckService.addEdhrecDeck(rec.name, cards);
+      this.deckAdded.set(true);
+      this.added.emit();
+    } catch (error) {
+      this.addDeckError.set(
+        error instanceof Error ? error.message : this.translate.instant('commanderRecs.addDeckFailed'),
+      );
+    } finally {
+      this.addingDeck.set(false);
+    }
+  }
+
+  async addMissingToWishlist() {
+    const rec = this.selectedRecommendation();
+    if (!rec) return;
+
+    this.addingToWishlist.set(true);
+    this.wishlistError.set(null);
+    try {
+      const existing = await this.wishlistService.getCardIds();
+      const inputs: UpsertWishlistInput[] = this.missingCards()
+        .filter(({ card }) => !existing.has(card.id))
+        .map(({ card }) => ({ cardId: card.id, priority: 2, notes: this.translate.instant('common.forDeck', { name: rec.name }) }));
+
+      if (inputs.length > 0) {
+        await this.wishlistService.upsertMany(inputs);
+      }
+      this.wishlistAdded.set(true);
+    } catch (error) {
+      this.wishlistError.set(
+        error instanceof Error ? error.message : this.translate.instant('deckDetail.wishlistFailed'),
+      );
+    } finally {
+      this.addingToWishlist.set(false);
     }
   }
 }

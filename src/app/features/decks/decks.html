@@ -121,7 +121,7 @@
 }
 
 @if (showCommanderRecs()) {
-  <app-commander-recommendations-dialog (close)="showCommanderRecs.set(false)" />
+  <app-commander-recommendations-dialog (close)="showCommanderRecs.set(false)" (added)="onDeckAdded()" />
 }
 
 @if (showArchetypeBrowser()) {
