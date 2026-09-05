@@ -30,6 +30,9 @@
     <div class="divider"><span>{{ 'auth.or' | translate }}</span></div>
 
     <button type="button" class="guest-button" [disabled]="isSubmitting()" (click)="signInAsGuest()">
+      @if (isSeedingDemo()) {
+        <span class="loading-rune" aria-hidden="true"></span>
+      }
       {{ (isSeedingDemo() ? 'auth.demoSeeding' : 'auth.tryDemo') | translate }}
     </button>
     <p class="guest-hint">{{ (isSeedingDemo() ? 'auth.demoSeedingHint' : 'auth.demoHint') | translate }}</p>

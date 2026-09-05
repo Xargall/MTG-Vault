@@ -117,3 +117,48 @@ a {
 *::-webkit-scrollbar-thumb:hover {
   background: var(--color-accent);
 }
+
+// Shared page-load reveal: a single staggered fade+rise applied to the
+// dashboard's top-row panels, its color-category grid, and card tiles
+// everywhere they appear (collection grid, search results, deck previews).
+// One choreographed reveal reads as more premium than scattered
+// micro-interactions - see design-audit Phase 3.
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes reveal-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .overview-card,
+  .category-card,
+  app-card-tile {
+    animation: reveal-rise 0.4s ease-out both;
+  }
+
+  .overview-card:nth-of-type(2) {
+    animation-delay: 0.08s;
+  }
+  .overview-card:nth-of-type(3) {
+    animation-delay: 0.16s;
+  }
+
+  .category-card,
+  app-card-tile {
+    @for $i from 1 through 20 {
+      $step: $i;
+      @if $i > 8 {
+        $step: 8;
+      }
+
+      &:nth-child(#{$i}) {
+        animation-delay: #{$step * 0.04}s;
+      }
+    }
+  }
+}
