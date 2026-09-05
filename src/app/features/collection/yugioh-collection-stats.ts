@@ -21,17 +21,18 @@ function yugiohEntries(entries: CollectionEntry[]): YugiohEntry[] {
 
 // `label` holds an i18n key, same convention as MTG's COLOR_CATEGORIES.
 // Colors reused from the app's shared 7-slot themed chart palette
-// (--chart-1..7 in styles.scss, same slot order as COLOR_CATEGORIES) - only
-// the semantic mapping (attribute instead of mana color) changes, not the
-// palette itself.
+// (--chart-1..7 in styles.scss) - but assigned by actual attribute meaning
+// (fire is warm/red, water is blue, ...) rather than by raw slot order,
+// which is what MTG's COLOR_CATEGORIES uses since mana colors don't share
+// a slot-for-slot correspondence with these attributes.
 export const ATTRIBUTE_CATEGORIES: Array<{ key: AttributeCategory; label: string; color: string }> = [
-  { key: 'FIRE', label: 'yugioh.attributeFire', color: 'var(--chart-1)' },
-  { key: 'WATER', label: 'yugioh.attributeWater', color: 'var(--chart-2)' },
-  { key: 'EARTH', label: 'yugioh.attributeEarth', color: 'var(--chart-3)' },
-  { key: 'WIND', label: 'yugioh.attributeWind', color: 'var(--chart-4)' },
-  { key: 'LIGHT', label: 'yugioh.attributeLight', color: 'var(--chart-5)' },
-  { key: 'DARK', label: 'yugioh.attributeDark', color: 'var(--chart-6)' },
-  { key: 'SPELL_TRAP', label: 'yugioh.spellTrap', color: 'var(--chart-7)' },
+  { key: 'FIRE', label: 'yugioh.attributeFire', color: 'var(--chart-2)' }, // ember rust
+  { key: 'WATER', label: 'yugioh.attributeWater', color: 'var(--chart-1)' }, // tarnished steel-blue
+  { key: 'EARTH', label: 'yugioh.attributeEarth', color: 'var(--chart-3)' }, // oxidized bronze-green
+  { key: 'WIND', label: 'yugioh.attributeWind', color: 'var(--chart-5)' }, // weathered moss
+  { key: 'LIGHT', label: 'yugioh.attributeLight', color: 'var(--chart-4)' }, // aged gold
+  { key: 'DARK', label: 'yugioh.attributeDark', color: 'var(--chart-6)' }, // faded amethyst
+  { key: 'SPELL_TRAP', label: 'yugioh.spellTrap', color: 'var(--chart-7)' }, // dried-blood red
 ];
 
 export function attributeCategoryFor(card: YugiohCard): AttributeCategory {
