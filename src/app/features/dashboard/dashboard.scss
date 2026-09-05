@@ -27,7 +27,12 @@ h1 {
   aspect-ratio: 0.72;
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
-  background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-surface-alt) 50%, var(--color-surface) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-solid) 25%,
+    var(--color-surface-alt) 50%,
+    var(--color-surface-solid) 75%
+  );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s infinite;
 }
@@ -72,10 +77,14 @@ h1 {
   overflow: hidden;
   text-decoration: none;
   color: inherit;
-  transition: border-color 0.15s ease;
+  // Subtle, permanent gold glow (see .overview-card) rather than a hover-only
+  // effect - a light touch of "these are the premium panels" throughout.
+  box-shadow: 0 0 14px rgba(201, 162, 74, 0.16);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
   &:hover {
     border-color: var(--color-accent);
+    box-shadow: 0 0 18px rgba(201, 162, 74, 0.28);
   }
 }
 
@@ -141,6 +150,9 @@ h1 {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  // Subtle, permanent gold glow - edels touch, not a hover effect - on all
+  // three top-row panels (color chart, popular cards, price chart).
+  box-shadow: 0 0 14px rgba(201, 162, 74, 0.16);
   padding: var(--spacing-lg);
   margin: 0 auto;
   width: fit-content;

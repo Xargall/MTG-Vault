@@ -2,14 +2,25 @@
 
 :root {
   --color-bg: #17110b;
-  // A subtle repeating seal motif (diamond + 4 compass ticks, matching the
-  // logo) baked into --color-surface itself so every existing
-  // `background: var(--color-surface)` declaration gets the texture for
-  // free, at no per-component cost. Opacity is baked into the SVG's own
-  // stroke color (0.11 here) rather than a separate `opacity`, so it never
-  // fades the panel's actual content that sits on top of it.
-  --color-surface: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(201,162,74,0.11)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E")
-    0 0 / 80px 80px repeat, #241a12;
+  // Aged-wood grain (soft horizontal streaks + fine turbulence noise) baked
+  // into --color-surface itself so every existing `background:
+  // var(--color-surface)` declaration - every card, panel and dialog -
+  // picks up the texture for free, distinct from the body's own seal
+  // pattern. --color-surface-solid holds the same base color with no
+  // texture, for the rare spot (a gradient color-stop) that needs a plain
+  // <color> rather than a full background-layer list.
+  --color-surface-solid: #241a12;
+  --color-surface: repeating-linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.07) 0px,
+      rgba(0, 0, 0, 0.02) 2px,
+      transparent 4px,
+      rgba(0, 0, 0, 0.05) 7px,
+      transparent 9px
+    ),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.008 0.3' numOctaves='2' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix in='t' type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E")
+      0 0 / 240px 240px repeat,
+    var(--color-surface-solid);
   --color-surface-alt: #3c1712;
   --color-border: #55231b;
   // Reserved for interactive boundaries (inputs, selects, buttons) that must
