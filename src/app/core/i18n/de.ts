@@ -203,6 +203,7 @@ export const de = {
     loadError: 'Wunschliste konnte nicht geladen werden.',
     empty: 'Noch keine Karten auf der Wunschliste.',
     totalValue: 'Gesamtwert: {{value}}',
+    quantityNeeded: '{{count}}x benötigt',
     cardmarketLink: 'Auf Cardmarket ansehen',
     priorityLow: 'Niedrig',
     priorityMid: 'Mittel',

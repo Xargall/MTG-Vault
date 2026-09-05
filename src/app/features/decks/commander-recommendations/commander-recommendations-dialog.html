@@ -27,7 +27,7 @@
           </div>
 
           @if (ownedCards().length > 0) {
-            <h4>{{ 'commanderRecs.ownedSection' | translate: { count: ownedCards().length } }}</h4>
+            <h4>{{ 'commanderRecs.ownedSection' | translate: { count: ownedQuantityTotal() } }}</h4>
             <div class="results-grid">
               @for (entry of ownedCards(); track entry.card.id) {
                 <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
@@ -36,7 +36,7 @@
           }
 
           @if (missingCards().length > 0) {
-            <h4>{{ 'commanderRecs.missingSection' | translate: { count: missingCards().length } }}</h4>
+            <h4>{{ 'commanderRecs.missingSection' | translate: { count: missingQuantityTotal() } }}</h4>
             <div class="results-grid">
               @for (entry of missingCards(); track entry.card.id) {
                 <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="missing" />
@@ -44,7 +44,7 @@
             </div>
 
             <div class="wishlist-row">
-              <span>{{ 'deckDetail.missingCards' | translate: { count: missingCards().length } }}</span>
+              <span>{{ 'deckDetail.missingCards' | translate: { count: missingQuantityTotal() } }}</span>
               @if (wishlistError()) {
                 <span class="state-message error">{{ wishlistError() }}</span>
               } @else if (wishlistAdded()) {

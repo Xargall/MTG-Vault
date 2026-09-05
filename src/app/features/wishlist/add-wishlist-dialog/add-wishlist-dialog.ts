@@ -110,6 +110,7 @@ export class AddWishlistDialog {
         cardId: card.id,
         priority: this.priority(),
         notes: this.notes().trim() || null,
+        quantity: 1,
       });
       this.added.emit();
       this.close.emit();

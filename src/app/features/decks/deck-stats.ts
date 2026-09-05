@@ -38,6 +38,11 @@ export function getCardOwnedStatus(neededQty: number, ownedQty: number): CardOwn
   return 'missing';
 }
 
+/** How many more copies of this card are needed - 0 for a fully-owned card. This is the number that belongs in any "N cards missing" display or wishlist quantity, never a count of missing card *types*. */
+export function getMissingQuantity(neededQty: number, ownedQty: number): number {
+  return Math.max(0, neededQty - ownedQty);
+}
+
 export function getDeckShowcase(deckEntry: DeckEntry): DeckCardEntry | null {
   return deckEntry.cards.reduce<DeckCardEntry | null>((best, entry) => {
     const price = entry.card.prices.eur ?? entry.card.prices.usd ?? 0;

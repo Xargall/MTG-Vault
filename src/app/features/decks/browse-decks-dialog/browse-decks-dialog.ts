@@ -10,12 +10,13 @@ import { YugiohPreconIndexService } from '../../../core/services/yugioh-precon-i
 import { CardOwnedStatus, CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { CollectionEntry } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
-import { buildOwnedMap, getCardOwnedStatus, getPreconMatch } from '../deck-stats';
+import { buildOwnedMap, getCardOwnedStatus, getMissingQuantity, getPreconMatch } from '../deck-stats';
 import { DeckService } from '../deck.service';
 
 export interface PreconDetailCard {
   card: Card;
   quantity: number;
+  ownedQty: number;
   status: CardOwnedStatus;
 }
 
@@ -71,8 +72,18 @@ export class BrowseDecksDialog {
     return getPreconMatch(detail.cards, buildOwnedMap(this.collectionEntries()));
   });
 
+  /** Total copies in the deck (sum of quantities) - never the number of distinct cards, which is what `detail().cards.length` would give. */
+  protected readonly totalCardCount = computed(
+    () => this.detail()?.cards.reduce((sum, card) => sum + card.quantity, 0) ?? 0,
+  );
+
   protected readonly missingCards = computed(
     () => this.detailCards()?.filter((entry) => entry.status !== 'owned') ?? [],
+  );
+
+  /** Total missing *copies* (needed minus owned, summed across all cards) - see missingCards' own doc comment for why this isn't missingCards().length. */
+  protected readonly missingQuantityTotal = computed(() =>
+    this.missingCards().reduce((sum, entry) => sum + getMissingQuantity(entry.quantity, entry.ownedQty), 0),
   );
 
   protected readonly submitting = signal(false);
@@ -187,7 +198,7 @@ export class BrowseDecksDialog {
           const card = cardsById.get(entry.cardId);
           if (!card) return null;
           const ownedQty = owned.get(entry.cardId) ?? 0;
-          return { card, quantity: entry.quantity, status: getCardOwnedStatus(entry.quantity, ownedQty) };
+          return { card, quantity: entry.quantity, ownedQty, status: getCardOwnedStatus(entry.quantity, ownedQty) };
         })
         .filter((entry): entry is PreconDetailCard => entry !== null)
         .sort((a, b) => a.card.name.localeCompare(b.card.name));
@@ -218,7 +229,12 @@ export class BrowseDecksDialog {
       const existing = await this.wishlistService.getCardIds();
       const inputs: UpsertWishlistInput[] = this.missingCards()
         .filter(({ card }) => !existing.has(card.id))
-        .map(({ card }) => ({ cardId: card.id, priority: 2, notes: this.translate.instant('common.forDeck', { name: deck.name }) }));
+        .map(({ card, quantity, ownedQty }) => ({
+          cardId: card.id,
+          priority: 2,
+          notes: this.translate.instant('common.forDeck', { name: deck.name }),
+          quantity: getMissingQuantity(quantity, ownedQty),
+        }));
 
       if (inputs.length > 0) {
         await this.wishlistService.upsertMany(inputs);

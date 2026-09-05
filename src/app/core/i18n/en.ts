@@ -205,6 +205,7 @@ export const en: typeof de = {
     loadError: 'Wishlist could not be loaded.',
     empty: 'No cards on the wishlist yet.',
     totalValue: 'Total value: {{value}}',
+    quantityNeeded: '{{count}}x needed',
     cardmarketLink: 'View on Cardmarket',
     priorityLow: 'Low',
     priorityMid: 'Medium',

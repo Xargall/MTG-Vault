@@ -2,11 +2,23 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { CardOwnedStatus, CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { CollectionEntry } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
-import { buildOwnedMap, getDeckCardCount, getDeckShowcase, getDeckTotalValue } from '../deck-stats';
+import {
+  buildOwnedMap,
+  getCardOwnedStatus,
+  getDeckCardCount,
+  getDeckShowcase,
+  getDeckTotalValue,
+  getMissingQuantity,
+} from '../deck-stats';
 import { DeckCardEntry, DeckEntry, DeckService } from '../deck.service';
+
+export interface DeckCardWithStatus {
+  entry: DeckCardEntry;
+  status: CardOwnedStatus;
+}
 
 @Component({
   selector: 'app-deck-detail-dialog',
@@ -36,9 +48,28 @@ export class DeckDetailDialog {
     [...this.entry().cards].sort((a, b) => a.card.name.localeCompare(b.card.name)),
   );
 
+  private readonly ownedMap = computed(() => buildOwnedMap(this.collectionEntries()));
+
+  /** Every deck card paired with its owned/partial/missing status, for the status-badged card grid - so an incomplete deck shows exactly *which* cards are missing, not just a count. */
+  protected readonly cardsWithStatus = computed<DeckCardWithStatus[]>(() =>
+    this.sortedCards().map((entry) => ({
+      entry,
+      status: getCardOwnedStatus(entry.row.quantity, this.ownedMap().get(entry.row.card_id) ?? 0),
+    })),
+  );
+
   protected readonly missingCards = computed<DeckCardEntry[]>(() => {
-    const owned = buildOwnedMap(this.collectionEntries());
+    const owned = this.ownedMap();
     return this.entry().cards.filter(({ row }) => (owned.get(row.card_id) ?? 0) < row.quantity);
+  });
+
+  /** Total missing *copies* (needed minus owned, summed) - not the number of distinct cards that are short, which is what missingCards().length would give. */
+  protected readonly missingQuantityTotal = computed(() => {
+    const owned = this.ownedMap();
+    return this.entry().cards.reduce(
+      (sum, { row }) => sum + getMissingQuantity(row.quantity, owned.get(row.card_id) ?? 0),
+      0,
+    );
   });
 
   protected readonly confirmingDelete = signal(false);
@@ -55,9 +86,15 @@ export class DeckDetailDialog {
     try {
       const existing = await this.wishlistService.getCardIds();
       const deckName = this.entry().deck.name;
+      const owned = this.ownedMap();
       const inputs: UpsertWishlistInput[] = this.missingCards()
         .filter(({ row }) => !existing.has(row.card_id))
-        .map(({ row }) => ({ cardId: row.card_id, priority: 2, notes: this.translate.instant('common.forDeck', { name: deckName }) }));
+        .map(({ row }) => ({
+          cardId: row.card_id,
+          priority: 2,
+          notes: this.translate.instant('common.forDeck', { name: deckName }),
+          quantity: getMissingQuantity(row.quantity, owned.get(row.card_id) ?? 0),
+        }));
 
       if (inputs.length > 0) {
         await this.wishlistService.upsertMany(inputs);

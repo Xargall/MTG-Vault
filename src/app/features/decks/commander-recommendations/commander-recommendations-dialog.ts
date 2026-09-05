@@ -7,13 +7,14 @@ import { MtgApiService } from '../../../core/services/mtg-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
-import { getCardOwnedStatus } from '../deck-stats';
+import { getCardOwnedStatus, getMissingQuantity } from '../deck-stats';
 import { DeckService } from '../deck.service';
 import { buildOwnedByNameMap, getEdhrecMatch, isLand, isLegendaryCreature } from './commander-recommendations-stats';
 
 export interface CommanderDeckCard {
   card: Card;
   quantity: number;
+  ownedQty: number;
 }
 
 const BATCH_SIZE = 5;
@@ -84,10 +85,20 @@ export class CommanderRecommendationsDialog {
   protected readonly ownedCards = signal<CommanderDeckCard[]>([]);
   protected readonly missingCards = signal<CommanderDeckCard[]>([]);
 
+  /** Total copies, not distinct cards - a card needing 2 counts as 2 toward this. */
+  protected readonly ownedQuantityTotal = computed(() =>
+    this.ownedCards().reduce((sum, c) => sum + c.quantity, 0),
+  );
+  protected readonly missingQuantityTotal = computed(() =>
+    this.missingCards().reduce((sum, c) => sum + getMissingQuantity(c.quantity, c.ownedQty), 0),
+  );
+  private readonly totalQuantityNeeded = computed(
+    () => this.ownedQuantityTotal() + this.missingCards().reduce((sum, c) => sum + c.quantity, 0),
+  );
+
   protected readonly detailMatchPercent = computed(() => {
-    const owned = this.ownedCards().length;
-    const total = owned + this.missingCards().length;
-    return total > 0 ? Math.round((owned / total) * 100) : 0;
+    const total = this.totalQuantityNeeded();
+    return total > 0 ? Math.round((this.ownedQuantityTotal() / total) * 100) : 0;
   });
 
   protected readonly addingDeck = signal(false);
@@ -220,7 +231,7 @@ export class CommanderRecommendationsDialog {
         const card = cardsByName.get(name.toLowerCase());
         if (!card) continue;
         const ownedQty = ownedByName.get(name.toLowerCase()) ?? 0;
-        const entry: CommanderDeckCard = { card, quantity };
+        const entry: CommanderDeckCard = { card, quantity, ownedQty };
         (getCardOwnedStatus(quantity, ownedQty) === 'owned' ? owned : missing).push(entry);
       }
       owned.sort((a, b) => a.card.name.localeCompare(b.card.name));
@@ -274,7 +285,12 @@ export class CommanderRecommendationsDialog {
       const existing = await this.wishlistService.getCardIds();
       const inputs: UpsertWishlistInput[] = this.missingCards()
         .filter(({ card }) => !existing.has(card.id))
-        .map(({ card }) => ({ cardId: card.id, priority: 2, notes: this.translate.instant('common.forDeck', { name: rec.name }) }));
+        .map(({ card, quantity, ownedQty }) => ({
+          cardId: card.id,
+          priority: 2,
+          notes: this.translate.instant('common.forDeck', { name: rec.name }),
+          quantity: getMissingQuantity(quantity, ownedQty),
+        }));
 
       if (inputs.length > 0) {
         await this.wishlistService.upsertMany(inputs);

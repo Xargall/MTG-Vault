@@ -32,7 +32,12 @@
           }
 
           <div class="entry-info">
-            <p class="entry-name">{{ entry.card.name }}</p>
+            <p class="entry-name">
+              {{ entry.card.name }}
+              @if (entry.row.quantity > 1) {
+                <span class="entry-qty">— {{ 'wishlist.quantityNeeded' | translate: { count: entry.row.quantity } }}</span>
+              }
+            </p>
             <p class="entry-price">{{ getEntryPrice(entry) | number: '1.2-2' }} €</p>
             @if (entry.card.game === 'mtg' && entry.card.cardmarketUrl; as url) {
               <a class="cardmarket-link" [href]="url" target="_blank" rel="noopener">
