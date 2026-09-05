@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { AuthService } from '../../../core/services/auth.service';
@@ -12,7 +12,7 @@ const LANG_STORAGE_KEY = 'mtg-vault-lang';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterLink, RouterOutlet, AppFooter, GuestBanner, TranslatePipe],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, AppFooter, GuestBanner, TranslatePipe],
   templateUrl: './app-shell.html',
   styleUrl: './app-shell.scss',
 })

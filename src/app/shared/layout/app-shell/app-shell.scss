@@ -9,10 +9,23 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: linear-gradient(180deg, #55231b 0%, #3c1712 100%);
-  border-bottom: 2px solid var(--color-accent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  padding: var(--spacing-md) var(--spacing-lg) calc(var(--spacing-md) + 6px);
+  // Tooled-leather plaque: a warm highlight bleeding down from the top edge,
+  // a fine diagonal grain (like tooling lines pressed into leather), over a
+  // richer, more saturated version of the original flat two-tone gradient.
+  background:
+    radial-gradient(ellipse 140% 100% at 50% -40%, rgba(232, 205, 122, 0.16) 0%, transparent 60%),
+    repeating-linear-gradient(115deg, rgba(0, 0, 0, 0.05) 0px, rgba(0, 0, 0, 0.05) 1px, transparent 1px, transparent 5px),
+    linear-gradient(180deg, #6b2a1e 0%, #3c1712 100%);
+  // A gilt double-edge (like a book's gold-tooled edge) instead of a single
+  // flat rule, plus a real cast shadow so the header reads as a mounted
+  // plaque sitting above the page rather than a flat color band.
+  border-bottom: 1px solid var(--color-accent-hover);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 3px 0 var(--color-bg),
+    0 4px 0 var(--color-accent),
+    0 10px 24px rgba(0, 0, 0, 0.55);
   overflow: hidden;
 }
 
@@ -46,6 +59,8 @@
   position: absolute;
   top: 0;
   pointer-events: none;
+  fill: var(--color-accent);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
 
   &--left {
     left: 0;
@@ -69,8 +84,19 @@
 }
 
 .shell-title {
+  font-family: var(--font-heading);
   font-weight: 700;
-  color: var(--color-accent);
+  font-size: 1.2rem;
+  letter-spacing: 1px;
+  // Engraved gold-foil effect: a metallic gradient clipped to the text plus
+  // a dark drop-shadow beneath it (the shadow still renders even though the
+  // fill itself is transparent) so the wordmark reads as struck/embossed
+  // metal rather than flat colored type.
+  background: linear-gradient(180deg, #f6e2a8 0%, #c9a24a 45%, #8a6a2c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7));
 }
 
 .shell-nav {
@@ -80,17 +106,50 @@
   gap: var(--spacing-sm) var(--spacing-lg);
 
   a {
+    position: relative;
+    display: inline-block;
     color: var(--color-text);
     text-decoration: none;
     font-size: 0.9rem;
+    padding-bottom: 4px;
     // Stable minimum box per link so switching between DE/EN (different
     // label lengths) doesn't reflow the whole nav row.
     min-width: 80px;
     text-align: center;
     white-space: nowrap;
 
+    // A gold underline that grows in from the center on hover, and sits
+    // permanently (with a soft glow) under the active route - replaces the
+    // old plain color-only hover/active state, which gave no sense of
+    // "where am I" in the nav at all.
+    &::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: 0;
+      height: 2px;
+      background: var(--color-accent);
+      transform: translateX(-50%);
+      transition: width 0.2s ease-out;
+    }
+
     &:hover {
-      color: var(--color-accent);
+      color: var(--color-accent-hover);
+
+      &::after {
+        width: 60%;
+      }
+    }
+
+    &.is-active {
+      color: var(--color-accent-hover);
+      text-shadow: 0 0 10px rgba(232, 205, 122, 0.45);
+
+      &::after {
+        width: 100%;
+        box-shadow: 0 0 6px var(--color-accent);
+      }
     }
   }
 }
@@ -99,6 +158,9 @@
   background: transparent;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius);
+  // A carved-in look (like a slot cut into the leather) rather than a flat
+  // outline, matching the header's new depth.
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
   color: var(--color-text);
   padding: var(--spacing-sm) 10px;
   font-size: 0.75rem;
@@ -143,8 +205,9 @@
     }
 
     &.is-active {
-      background: var(--color-accent);
+      background: linear-gradient(180deg, var(--color-accent-hover) 0%, var(--color-accent) 100%);
       color: var(--color-bg);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
     }
 
     & + button {

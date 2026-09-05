@@ -12,10 +12,10 @@
   } @else if (hasCards()) {
     <div class="top-row">
       <section class="overview-card">
-        <span class="corner corner--tl"></span>
-        <span class="corner corner--tr"></span>
-        <span class="corner corner--bl"></span>
-        <span class="corner corner--br"></span>
+        <svg class="corner corner--tl" aria-hidden="true"><use href="#flourish-vine" /></svg>
+        <svg class="corner corner--tr" aria-hidden="true"><use href="#flourish-vine" /></svg>
+        <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
+        <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <h2>{{ categoryHeading() | translate }}</h2>
         <app-donut-chart [data]="colorDistribution()" />
       </section>
@@ -37,10 +37,10 @@
       }
 
       <section class="overview-card price-card">
-        <span class="corner corner--tl"></span>
-        <span class="corner corner--tr"></span>
-        <span class="corner corner--bl"></span>
-        <span class="corner corner--br"></span>
+        <svg class="corner corner--tl" aria-hidden="true"><use href="#flourish-vine" /></svg>
+        <svg class="corner corner--tr" aria-hidden="true"><use href="#flourish-vine" /></svg>
+        <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
+        <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <h2>{{ 'dashboard.priceDistribution' | translate }}</h2>
         <p class="total-value">{{ totalValue() | number: '1.2-2' }} €</p>
         <app-bar-chart [data]="priceDistribution()" />

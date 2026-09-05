@@ -1,12 +1,10 @@
 <div class="shell">
   <header class="shell-header">
-    <svg class="corner-flourish corner-flourish--left" width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
-      <path d="M0 22 Q0 0 22 0" stroke="#c9a24a" fill="none" stroke-width="1.5" />
-      <circle cx="4" cy="18" r="1.4" fill="#c9a24a" />
+    <svg class="corner-flourish corner-flourish--left" width="48" height="48" aria-hidden="true">
+      <use href="#flourish-swirl" />
     </svg>
-    <svg class="corner-flourish corner-flourish--right" width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
-      <path d="M0 22 Q0 0 22 0" stroke="#c9a24a" fill="none" stroke-width="1.5" />
-      <circle cx="4" cy="18" r="1.4" fill="#c9a24a" />
+    <svg class="corner-flourish corner-flourish--right" width="48" height="48" aria-hidden="true">
+      <use href="#flourish-swirl" />
     </svg>
 
     <div class="shell-top">
@@ -54,12 +52,14 @@
     </div>
 
     <nav class="shell-nav">
-      <a routerLink="/">{{ 'nav.overview' | translate }}</a>
-      <a routerLink="/collection">{{ 'nav.collection' | translate }}</a>
+      <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">
+        {{ 'nav.overview' | translate }}
+      </a>
+      <a routerLink="/collection" routerLinkActive="is-active">{{ 'nav.collection' | translate }}</a>
       @if (gameService.decksSupported()) {
-        <a routerLink="/decks">{{ 'nav.decks' | translate }}</a>
+        <a routerLink="/decks" routerLinkActive="is-active">{{ 'nav.decks' | translate }}</a>
       }
-      <a routerLink="/wishlist">{{ 'nav.wishlist' | translate }}</a>
+      <a routerLink="/wishlist" routerLinkActive="is-active">{{ 'nav.wishlist' | translate }}</a>
     </nav>
   </header>
 
