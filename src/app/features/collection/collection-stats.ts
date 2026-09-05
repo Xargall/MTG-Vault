@@ -25,17 +25,21 @@ function mtgEntries(entries: CollectionEntry[]): MtgEntry[] {
 // shown), not literal text - so this data can flow straight into chart
 // components (which just interpolate `.label`) without threading a
 // translate function through every stats function.
+//
+// Colors reference the app's shared 7-slot themed chart palette
+// (--chart-1..7 in styles.scss) rather than hardcoded hex, so chart data
+// stays inside the dark-fantasy palette instead of the old generic SaaS hues.
 export const COLOR_CATEGORIES: Array<{ key: ColorCategory; label: string; color: string }> = [
-  { key: 'U', label: 'colors.blue', color: '#3987e5' },
-  { key: 'M', label: 'colors.multicolor', color: '#d95926' },
-  { key: 'C', label: 'colors.colorless', color: '#199e70' },
-  { key: 'W', label: 'colors.white', color: '#c98500' },
-  { key: 'G', label: 'colors.green', color: '#008300' },
-  { key: 'B', label: 'colors.black', color: '#9085e9' },
-  { key: 'R', label: 'colors.red', color: '#e66767' },
+  { key: 'U', label: 'colors.blue', color: 'var(--chart-1)' },
+  { key: 'M', label: 'colors.multicolor', color: 'var(--chart-2)' },
+  { key: 'C', label: 'colors.colorless', color: 'var(--chart-3)' },
+  { key: 'W', label: 'colors.white', color: 'var(--chart-4)' },
+  { key: 'G', label: 'colors.green', color: 'var(--chart-5)' },
+  { key: 'B', label: 'colors.black', color: 'var(--chart-6)' },
+  { key: 'R', label: 'colors.red', color: 'var(--chart-7)' },
 ];
 
-const MANA_CURVE_COLOR = '#3987e5';
+const MANA_CURVE_COLOR = 'var(--color-bronze)';
 const MANA_CURVE_BUCKETS = ['0', '1', '2', '3', '4', '5', '6', '7+'];
 
 export function colorCategoryFor(colorIdentity: string[]): ColorCategory {

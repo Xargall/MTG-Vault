@@ -1,7 +1,7 @@
 import { BarChartDatum } from '../../shared/charts/bar-chart/bar-chart';
 import { CollectionEntry } from './collection.service';
 
-const PRICE_BRACKET_COLOR = '#3987e5';
+const PRICE_BRACKET_COLOR = 'var(--color-bronze)';
 
 const PRICE_BRACKETS: Array<{ label: string; upperBound: number | null }> = [
   { label: '<1', upperBound: 1 },

@@ -97,7 +97,7 @@
 
 .game-switch {
   background: transparent;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius);
   color: var(--color-text);
   padding: var(--spacing-sm) 10px;
@@ -124,7 +124,7 @@
 .lang-switch {
   display: flex;
   flex-shrink: 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius);
   overflow: hidden;
 
@@ -155,7 +155,7 @@
 
 .logout-button {
   background: transparent;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   color: var(--color-text-muted);
   border-radius: var(--radius);
   padding: var(--spacing-sm) var(--spacing-md);

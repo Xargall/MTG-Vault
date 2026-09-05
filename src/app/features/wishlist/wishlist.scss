@@ -116,7 +116,7 @@
 .priority-select {
   padding: 4px 8px;
   border-radius: var(--radius);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   background: var(--color-bg);
   color: var(--color-text);
   font-size: 0.85rem;
@@ -137,10 +137,11 @@
 
 .notes-input {
   flex: 1 1 180px;
+  max-width: 320px;
   min-width: 120px;
   padding: 4px 8px;
   border-radius: var(--radius);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   background: var(--color-bg);
   color: var(--color-text);
   font-size: 0.85rem;

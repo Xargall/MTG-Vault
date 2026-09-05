@@ -12,11 +12,39 @@
     0 0 / 80px 80px repeat, #241a12;
   --color-surface-alt: #3c1712;
   --color-border: #55231b;
+  // Reserved for interactive boundaries (inputs, selects, buttons) that must
+  // read as actionable at a glance - 3.2:1 against --color-bg/--color-surface,
+  // clearing the WCAG 1.4.11 non-text contrast minimum that --color-border
+  // (1.2-1.5:1) falls well short of. --color-border itself stays dim and is
+  // reserved for purely decorative framing (panels, dialogs, dividers).
+  --color-border-strong: #8a5a3a;
   --color-text: #ecdcb8;
   --color-text-muted: #c9b78f;
   --color-accent: #c9a24a;
   --color-accent-hover: #e8cd7a;
-  --color-danger: #a34a34;
+  // Brightened from the original #a34a34 so error/destructive text clears
+  // WCAG AA (4.5:1) on both --color-bg and --color-surface-alt - the old
+  // value sat at 2.7-3.2:1, making error copy the least legible text in the
+  // app. Fills/borders pairing this with --color-bg text (delete-button
+  // hover, priority-select) only gain contrast from the brighter value, so
+  // no separate "muted" variant is needed.
+  --color-danger: #d9704f;
+  // One shared 7-slot categorical palette for chart data (MTG color pips,
+  // Yu-Gi-Oh attributes) - see collection-stats.ts / yugioh-collection-stats.ts.
+  // Replaces the earlier generic SaaS-chart hues (bright blue/orange/teal...)
+  // with desaturated jewel tones that sit inside the parchment/gold/blood-red
+  // palette instead of fighting it, while keeping the original palette's
+  // hue/lightness spacing so categories stay distinguishable (including CVD).
+  --chart-1: #5b87a3; // tarnished steel-blue
+  --chart-2: #b06a35; // ember rust
+  --chart-3: #5c8a6c; // oxidized bronze-green
+  --chart-4: #b8934a; // aged gold
+  --chart-5: #7a8f42; // weathered moss
+  --chart-6: #8b76ab; // faded amethyst
+  --chart-7: #a8524a; // dried-blood red
+  // Single-series accent (mana curve, price histogram) and the scrollbar
+  // thumb - both were the same hardcoded #8a6a2c before, now one token.
+  --color-bronze: #8a6a2c;
 
   // Same seal motif, fainter (0.06), for the page background itself.
   --pattern-seal-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(201,162,74,0.06)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E");
@@ -69,7 +97,7 @@ a {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #8a6a2c var(--color-bg);
+  scrollbar-color: var(--color-bronze) var(--color-bg);
 }
 
 *::-webkit-scrollbar {
@@ -82,7 +110,7 @@ a {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #8a6a2c;
+  background: var(--color-bronze);
   border-radius: 3px;
 }
 

@@ -20,17 +20,18 @@ function yugiohEntries(entries: CollectionEntry[]): YugiohEntry[] {
 }
 
 // `label` holds an i18n key, same convention as MTG's COLOR_CATEGORIES.
-// Colors reused from the app's already CVD-validated 7-slot categorical
-// palette (same hex values/order as COLOR_CATEGORIES) - only the semantic
-// mapping (attribute instead of mana color) changes, not the palette itself.
+// Colors reused from the app's shared 7-slot themed chart palette
+// (--chart-1..7 in styles.scss, same slot order as COLOR_CATEGORIES) - only
+// the semantic mapping (attribute instead of mana color) changes, not the
+// palette itself.
 export const ATTRIBUTE_CATEGORIES: Array<{ key: AttributeCategory; label: string; color: string }> = [
-  { key: 'FIRE', label: 'yugioh.attributeFire', color: '#3987e5' },
-  { key: 'WATER', label: 'yugioh.attributeWater', color: '#d95926' },
-  { key: 'EARTH', label: 'yugioh.attributeEarth', color: '#199e70' },
-  { key: 'WIND', label: 'yugioh.attributeWind', color: '#c98500' },
-  { key: 'LIGHT', label: 'yugioh.attributeLight', color: '#008300' },
-  { key: 'DARK', label: 'yugioh.attributeDark', color: '#9085e9' },
-  { key: 'SPELL_TRAP', label: 'yugioh.spellTrap', color: '#e66767' },
+  { key: 'FIRE', label: 'yugioh.attributeFire', color: 'var(--chart-1)' },
+  { key: 'WATER', label: 'yugioh.attributeWater', color: 'var(--chart-2)' },
+  { key: 'EARTH', label: 'yugioh.attributeEarth', color: 'var(--chart-3)' },
+  { key: 'WIND', label: 'yugioh.attributeWind', color: 'var(--chart-4)' },
+  { key: 'LIGHT', label: 'yugioh.attributeLight', color: 'var(--chart-5)' },
+  { key: 'DARK', label: 'yugioh.attributeDark', color: 'var(--chart-6)' },
+  { key: 'SPELL_TRAP', label: 'yugioh.spellTrap', color: 'var(--chart-7)' },
 ];
 
 export function attributeCategoryFor(card: YugiohCard): AttributeCategory {
