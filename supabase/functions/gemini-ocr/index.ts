@@ -22,7 +22,14 @@ const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 // test payload - realistic headroom for Gemini's actual vision processing time.
 const GEMINI_TIMEOUT_MS = 25000;
 const PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Magic: The Gathering Karte mit der Set-Code/Sammlenummer-Zeile.
-Antworte NUR mit "SETCODE NUMMER" (z.B. "MSH 82"), wenn du beides klar erkennen kannst.
+Lies NUR den Set-Code (3 Großbuchstaben) und die Collector Number unten links dieser Karte.
+
+Wichtig: Token-Karten haben ein "T" vor der Nummer (z.B. "T 0003" oder "T003"). Gib das T mit aus, wenn es vorhanden ist.
+
+Antworte NUR in diesem Format:
+- Normale Karte: "MSH 82"
+- Token-Karte: "MSH T3"
+
 Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
 Keine weiteren Erklärungen, kein zusätzlicher Text.`;
 
