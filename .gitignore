@@ -45,3 +45,11 @@ Thumbs.db
 
 # Environment secrets
 /src/environments/environment.ts
+
+# Agent skills (installed via npx skills)
+/.agents
+/.claude/skills
+skills-lock.json
+
+# Local Claude Code config (personal permissions, not shared)
+/.claude/settings.local.json
