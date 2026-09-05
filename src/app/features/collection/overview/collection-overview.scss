@@ -48,6 +48,11 @@ h1 {
 .mana-curve-card {
   flex: 1 1 460px;
   max-width: 520px;
+  // Without this, the flex item's automatic minimum size falls back to its
+  // content's min-content width (~345px here), which is wider than many
+  // phone viewports - it can't shrink below that and overflows the row
+  // instead of wrapping to it. min-width: 0 lets it actually shrink.
+  min-width: 0;
 }
 
 .toolbar-card {
