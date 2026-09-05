@@ -21,12 +21,52 @@
   font-weight: 600;
 }
 
+.status-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+
+  &--owned {
+    background: #2e7d4f;
+    color: #dff5e6;
+  }
+
+  &--partial {
+    background: var(--color-accent);
+    color: var(--color-bg);
+  }
+
+  &--missing {
+    background: var(--color-danger);
+    color: var(--color-bg);
+  }
+}
+
 .card-image {
   width: 100%;
   border-radius: 8px;
   aspect-ratio: 5 / 7;
   object-fit: cover;
   display: block;
+
+  .card-tile--missing & {
+    filter: grayscale(1);
+    opacity: 0.5;
+  }
+
+  .card-tile--partial & {
+    opacity: 0.8;
+  }
 }
 
 .card-placeholder {

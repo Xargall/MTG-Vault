@@ -104,7 +104,11 @@
 </div>
 
 @if (showBrowseDialog()) {
-  <app-browse-decks-dialog (close)="showBrowseDialog.set(false)" (added)="onDeckAdded()" />
+  <app-browse-decks-dialog
+    [collectionEntries]="collectionEntries()"
+    (close)="showBrowseDialog.set(false)"
+    (added)="onDeckAdded()"
+  />
 }
 
 @if (selectedDeck(); as deck) {

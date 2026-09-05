@@ -1,4 +1,5 @@
 import { PreconResolvedCard } from '../../core/models/precon.model';
+import { CardOwnedStatus } from '../../shared/cards/card-tile/card-tile';
 import { CollectionEntry } from '../collection/collection.service';
 import { DeckCardEntry, DeckEntry } from './deck.service';
 
@@ -28,6 +29,13 @@ export function getDeckMatch(deckEntry: DeckEntry, collectionEntries: Collection
 
 export function getPreconMatch(cards: PreconResolvedCard[], owned: Map<string, number>): number {
   return matchPercent(cards, owned);
+}
+
+/** Shared by the precon preview (BrowseDecksDialog) and the commander preview (CommanderRecommendationsDialog) - same three-way split regardless of whether cards are keyed by id or by name. */
+export function getCardOwnedStatus(neededQty: number, ownedQty: number): CardOwnedStatus {
+  if (ownedQty >= neededQty) return 'owned';
+  if (ownedQty > 0) return 'partial';
+  return 'missing';
 }
 
 export function getDeckShowcase(deckEntry: DeckEntry): DeckCardEntry | null {

@@ -57,6 +57,9 @@
           <p class="state-message error">{{ detailError() }}</p>
         } @else if (detail(); as d) {
           <p class="card-count">{{ 'browseDecks.cardsCount' | translate: { count: d.cards.length } }}</p>
+          <span class="match-badge" [class.is-complete]="matchPercent() === 100">
+            {{ 'decks.matchInCollection' | translate: { percent: matchPercent() } }}
+          </span>
           @if (d.skippedCount > 0) {
             <p class="state-message">
               {{
@@ -64,6 +67,36 @@
                   | translate: { count: d.skippedCount }
               }}
             </p>
+          }
+
+          @if (loadingDetailCards()) {
+            <p class="state-message">{{ 'browseDecks.loadingDetail' | translate }}</p>
+          } @else if (detailCards(); as cards) {
+            <div class="results-grid">
+              @for (entry of cards; track entry.card.id) {
+                <app-card-tile [card]="entry.card" [quantity]="entry.quantity" [status]="entry.status" />
+              }
+            </div>
+          }
+
+          @if (missingCards().length > 0) {
+            <div class="wishlist-row">
+              <span>{{ 'deckDetail.missingCards' | translate: { count: missingCards().length } }}</span>
+              @if (wishlistError()) {
+                <span class="state-message error">{{ wishlistError() }}</span>
+              } @else if (wishlistAdded()) {
+                <span class="wishlist-confirm">{{ 'deckDetail.onWishlist' | translate }}</span>
+              } @else {
+                <button
+                  type="button"
+                  class="wishlist-button"
+                  [disabled]="addingToWishlist()"
+                  (click)="addMissingToWishlist()"
+                >
+                  {{ 'deckDetail.wishlistButton' | translate }}
+                </button>
+              }
+            </div>
           }
 
           @if (submitError()) {

@@ -1,6 +1,18 @@
-<div class="card-tile">
+<div class="card-tile" [class.card-tile--missing]="status() === 'missing'" [class.card-tile--partial]="status() === 'partial'">
   @if (quantity() !== null) {
     <span class="quantity-badge">×{{ quantity() }}</span>
+  }
+
+  @if (status(); as s) {
+    <span class="status-badge status-badge--{{ s }}" aria-hidden="true">
+      @if (s === 'owned') {
+        ✓
+      } @else if (s === 'partial') {
+        !
+      } @else {
+        ✕
+      }
+    </span>
   }
 
   @if (card().imageUrl; as url) {

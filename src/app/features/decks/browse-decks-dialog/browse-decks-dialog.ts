@@ -1,18 +1,29 @@
-import { Component, computed, inject, output, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { Card } from '../../../core/models/card.model';
 import { PreconDetail, PreconListEntry } from '../../../core/models/precon.model';
 import { DeckCardIndexService } from '../../../core/services/deck-card-index.service';
 import { GameService } from '../../../core/services/game.service';
 import { YugiohPreconIndexService } from '../../../core/services/yugioh-precon-index.service';
+import { CardOwnedStatus, CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { CollectionEntry } from '../../collection/collection.service';
+import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
+import { buildOwnedMap, getCardOwnedStatus, getPreconMatch } from '../deck-stats';
 import { DeckService } from '../deck.service';
+
+export interface PreconDetailCard {
+  card: Card;
+  quantity: number;
+  status: CardOwnedStatus;
+}
 
 const SEARCH_DEBOUNCE_MS = 300;
 
 @Component({
   selector: 'app-browse-decks-dialog',
-  imports: [FormsModule, TranslatePipe],
+  imports: [FormsModule, TranslatePipe, CardTile],
   templateUrl: './browse-decks-dialog.html',
   styleUrl: './browse-decks-dialog.scss',
 })
@@ -21,7 +32,10 @@ export class BrowseDecksDialog {
   private readonly gameService = inject(GameService);
   private readonly deckCardIndex = inject(DeckCardIndexService);
   private readonly yugiohPreconIndex = inject(YugiohPreconIndexService);
+  private readonly wishlistService = inject(WishlistService);
   private readonly translate = inject(TranslateService);
+
+  readonly collectionEntries = input.required<CollectionEntry[]>();
 
   protected readonly deckCardIndexActive = computed(() =>
     this.gameService.currentSlug() === 'yugioh' ? this.yugiohPreconIndex : this.deckCardIndex,
@@ -45,8 +59,28 @@ export class BrowseDecksDialog {
   protected readonly loadingDetail = signal(false);
   protected readonly detailError = signal<string | null>(null);
 
+  // Resolved once `detail()`'s cardIds come back from the card API - kept
+  // separate from `detail` itself since that part requires its own network
+  // round trip and loading state.
+  protected readonly detailCards = signal<PreconDetailCard[] | null>(null);
+  protected readonly loadingDetailCards = signal(false);
+
+  protected readonly matchPercent = computed(() => {
+    const detail = this.detail();
+    if (!detail) return 0;
+    return getPreconMatch(detail.cards, buildOwnedMap(this.collectionEntries()));
+  });
+
+  protected readonly missingCards = computed(
+    () => this.detailCards()?.filter((entry) => entry.status !== 'owned') ?? [],
+  );
+
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
+
+  protected readonly addingToWishlist = signal(false);
+  protected readonly wishlistAdded = signal(false);
+  protected readonly wishlistError = signal<string | null>(null);
 
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
 
@@ -113,14 +147,14 @@ export class BrowseDecksDialog {
     this.selectedDeck.set(deck);
     this.detailError.set(null);
     this.submitError.set(null);
+    this.wishlistAdded.set(false);
+    this.wishlistError.set(null);
 
     const indexed = this.deckCardIndexActive().getEntry(deck.fileName);
     if (indexed) {
-      this.detail.set({
-        heroCardId: indexed.heroCardId,
-        cards: indexed.cards,
-        skippedCount: indexed.skippedCount,
-      });
+      const detail: PreconDetail = { heroCardId: indexed.heroCardId, cards: indexed.cards, skippedCount: indexed.skippedCount };
+      this.detail.set(detail);
+      void this.loadDetailCards(detail);
       return;
     }
 
@@ -129,7 +163,9 @@ export class BrowseDecksDialog {
 
     this.loadingDetail.set(true);
     try {
-      this.detail.set(await precon.getDeckDetail(deck.fileName));
+      const detail = await precon.getDeckDetail(deck.fileName);
+      this.detail.set(detail);
+      void this.loadDetailCards(detail);
     } catch (error) {
       this.detailError.set(error instanceof Error ? error.message : this.translate.instant('browseDecks.detailFailed'));
     } finally {
@@ -137,9 +173,64 @@ export class BrowseDecksDialog {
     }
   }
 
+  /** Resolves the precon's cardId+quantity pairs to full Card objects (for image/name) and each card's owned status, for the deck-preview card list. */
+  private async loadDetailCards(detail: PreconDetail) {
+    this.detailCards.set(null);
+    this.loadingDetailCards.set(true);
+    try {
+      const cards = await this.gameService.cardApi().getCardsByIds(detail.cards.map((c) => c.cardId));
+      const cardsById = new Map(cards.map((card) => [card.id, card]));
+      const owned = buildOwnedMap(this.collectionEntries());
+
+      const resolved: PreconDetailCard[] = detail.cards
+        .map((entry) => {
+          const card = cardsById.get(entry.cardId);
+          if (!card) return null;
+          const ownedQty = owned.get(entry.cardId) ?? 0;
+          return { card, quantity: entry.quantity, status: getCardOwnedStatus(entry.quantity, ownedQty) };
+        })
+        .filter((entry): entry is PreconDetailCard => entry !== null)
+        .sort((a, b) => a.card.name.localeCompare(b.card.name));
+
+      this.detailCards.set(resolved);
+    } catch {
+      // The card list is a nice-to-have on top of the count already shown -
+      // fail silently rather than blocking the add/submit flow over it.
+      this.detailCards.set([]);
+    } finally {
+      this.loadingDetailCards.set(false);
+    }
+  }
+
   backToSearch() {
     this.selectedDeck.set(null);
     this.detail.set(null);
+    this.detailCards.set(null);
+  }
+
+  async addMissingToWishlist() {
+    const deck = this.selectedDeck();
+    if (!deck) return;
+
+    this.addingToWishlist.set(true);
+    this.wishlistError.set(null);
+    try {
+      const existing = await this.wishlistService.getCardIds();
+      const inputs: UpsertWishlistInput[] = this.missingCards()
+        .filter(({ card }) => !existing.has(card.id))
+        .map(({ card }) => ({ cardId: card.id, priority: 2, notes: this.translate.instant('common.forDeck', { name: deck.name }) }));
+
+      if (inputs.length > 0) {
+        await this.wishlistService.upsertMany(inputs);
+      }
+      this.wishlistAdded.set(true);
+    } catch (error) {
+      this.wishlistError.set(
+        error instanceof Error ? error.message : this.translate.instant('deckDetail.wishlistFailed'),
+      );
+    } finally {
+      this.addingToWishlist.set(false);
+    }
   }
 
   async submit() {
