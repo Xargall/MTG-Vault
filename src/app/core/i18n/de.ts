@@ -264,7 +264,7 @@ export const de = {
     title: 'Wähle dein Spiel',
     subtitle: 'Du kannst jederzeit im Header wechseln',
     cardsInCollection: '{{count}} Karten in Sammlung',
-    moreGames: '+ Weiteres Spiel',
+    moreGames: 'Weiteres Spiel',
     chooseFailed: 'Spiel konnte nicht gewählt werden.',
   },
   deckImport: {

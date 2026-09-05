@@ -266,7 +266,7 @@ export const en: typeof de = {
     title: 'Choose your game',
     subtitle: 'You can switch anytime in the header',
     cardsInCollection: '{{count}} cards in collection',
-    moreGames: '+ More games',
+    moreGames: 'More games',
     chooseFailed: 'Game could not be chosen.',
   },
   deckImport: {

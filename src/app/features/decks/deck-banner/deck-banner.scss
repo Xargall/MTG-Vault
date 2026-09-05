@@ -42,15 +42,21 @@
   align-items: flex-end;
   justify-content: center;
   padding-bottom: var(--spacing-md);
-  background: linear-gradient(180deg, rgba(20, 20, 28, 0) 60%, rgba(20, 20, 28, 0.9) 100%);
+  // Themed scrim (was a generic cool grey rgba(20,20,28,...) that clashed
+  // with the warm parchment/gold palette) - fades up from the same dark
+  // brown as the page background so the caption reads as a designed label,
+  // not a bolted-on overlay, regardless of what's in the art underneath.
+  background: linear-gradient(180deg, transparent 45%, var(--color-bg) 95%);
   pointer-events: none;
 }
 
 .overlay-text {
-  color: var(--color-text);
+  color: var(--color-accent-hover);
+  font-family: var(--font-heading);
   font-weight: 700;
   font-size: 1.1rem;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  letter-spacing: 0.4px;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
 }
 
 @keyframes scroll {

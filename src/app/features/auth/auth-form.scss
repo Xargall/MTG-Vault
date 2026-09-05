@@ -1,12 +1,33 @@
 .auth-page {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--spacing-lg);
+  overflow: hidden;
+
+  // A large, soft echo of the app's own crest plus a warm vignette, centered
+  // behind the card - on wide viewports the login screen used to be a small
+  // card floating in an otherwise empty void; this gives it atmosphere
+  // without competing with the card for attention.
+  &::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at center, rgba(201, 162, 74, 0.1) 0%, transparent 55%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Ccircle cx='60' cy='60' r='56' fill='none' stroke='%23c9a24a' stroke-width='1.5'/%3E%3Cpolygon points='60,32 84,60 60,88 36,60' fill='none' stroke='%23c9a24a' stroke-width='1.5'/%3E%3Cpolygon points='60,44 72,60 60,76 48,60' fill='none' stroke='%23c9a24a' stroke-width='1.5'/%3E%3C/svg%3E")
+        no-repeat center / min(70vw, 620px);
+    opacity: 0.4;
+  }
 }
 
 .auth-card {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   width: 100%;
