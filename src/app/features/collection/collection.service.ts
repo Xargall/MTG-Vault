@@ -168,19 +168,23 @@ export class CollectionService {
 
     if (selectError) throw selectError;
 
+    console.log('[oracle_id debug] upsertOne received oracleId:', oracleId, 'for cardId:', cardId);
+
     if (existing) {
+      const updatePayload = { quantity: existing.quantity + quantity, oracle_id: existing.oracle_id ?? oracleId };
+      console.log('[oracle_id debug] UPDATE payload:', JSON.stringify(updatePayload), 'existing.oracle_id was:', existing.oracle_id);
       const { error } = await this.supabase.client
         .from('collection_cards')
         // Backfills oracle_id on a legacy row (added before this column
         // existed) the next time more copies of it are added, rather than
         // leaving it null forever - self-healing, no migration script needed.
-        .update({ quantity: existing.quantity + quantity, oracle_id: existing.oracle_id ?? oracleId })
+        .update(updatePayload)
         .eq('id', existing.id);
       if (error) throw error;
       return;
     }
 
-    const { error } = await this.supabase.client.from('collection_cards').insert({
+    const insertPayload = {
       user_id: userId,
       game_id: gameId,
       card_id: cardId,
@@ -190,7 +194,9 @@ export class CollectionService {
       finish,
       card_category: cardCategory,
       oracle_id: oracleId,
-    });
+    };
+    console.log('[oracle_id debug] INSERT payload:', JSON.stringify(insertPayload));
+    const { error } = await this.supabase.client.from('collection_cards').insert(insertPayload);
     if (error) throw error;
   }
 

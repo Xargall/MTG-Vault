@@ -229,7 +229,18 @@ export class DeckService {
         cards.map(async (card) => {
           // oracle_id is a Scryfall/MTG-only concept (see card.model.ts) -
           // no lookup at all for other games, same as everywhere else.
-          const oracleId = isMtg ? ((await this.mtgBulkData.findById(card.cardId))?.oracle_id ?? null) : null;
+          const bulkMatch = isMtg ? await this.mtgBulkData.findById(card.cardId) : null;
+          console.log(
+            '[oracle_id debug] bulk-data lookup for cardId:',
+            card.cardId,
+            'bulkData.ready:',
+            this.mtgBulkData.ready(),
+            'found:',
+            !!bulkMatch,
+            'oracle_id:',
+            bulkMatch?.oracle_id,
+          );
+          const oracleId = bulkMatch?.oracle_id ?? null;
           const owned = (oracleId ? (ownedByOracle.get(oracleId) ?? 0) : 0) + (ownedByCardId.get(card.cardId) ?? 0);
           const input: AddCardInput = {
             cardId: card.cardId,
