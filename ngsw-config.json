@@ -27,12 +27,13 @@
   ],
   "dataGroups": [
     {
-      "name": "scryfall-cards",
-      "urls": ["https://api.scryfall.com/cards/**"],
+      "name": "api-calls",
+      "urls": ["https://api.scryfall.com/**", "https://json.edhrec.com/**"],
       "cacheConfig": {
-        "strategy": "performance",
-        "maxSize": 100,
-        "maxAge": "1d"
+        "strategy": "freshness",
+        "maxAge": "0s",
+        "timeout": "10s",
+        "maxSize": 0
       }
     }
   ]
