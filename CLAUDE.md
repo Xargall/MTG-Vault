@@ -8,11 +8,12 @@ Motivation: volle Kontrolle über Features, Filterung und Kartenlimit (kein Payw
 
 ## Unterstützte Spiele
 
-| Spiel                | Slug    | API           | Status      |
-| -------------------- | ------- | ------------- | ----------- |
-| Magic: The Gathering | mtg     | Scryfall      | aktiv       |
-| Yu-Gi-Oh!            | yugioh  | YGOPRODeck    | aktiv       |
-| Pokémon              | pokemon | pokemontcg.io | vorbereitet |
+| Spiel                | Slug     | API           | Status      |
+| -------------------- | -------- | ------------- | ----------- |
+| Magic: The Gathering | mtg      | Scryfall      | aktiv       |
+| Yu-Gi-Oh!            | yugioh   | YGOPRODeck    | aktiv       |
+| Pokémon              | pokemon  | pokemontcg.io | vorbereitet |
+| One Piece Card Game  | onepiece | optcgapi.com  | pausiert — Plan fertig, nicht gestartet (`~/.claude/plans/quirky-twirling-toast.md`) |
 
 ## Tech-Stack
 
