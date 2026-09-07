@@ -529,10 +529,39 @@ export class Scanner {
   protected async onManualScan(): Promise<void> {
     if (this.geminiLoading()) return;
     const videoEl = this.video()?.nativeElement;
-    if (!videoEl || videoEl.readyState < 2) return;
+    if (!videoEl) return;
 
     this.geminiLoading.set(true);
     try {
+      // Mobile browsers (esp. iOS Safari) can still report readyState < 2
+      // right after the stream attaches, even though the button is already
+      // visible and tappable - previously this bailed out silently, which
+      // is exactly what made the button look dead on mobile. Give the
+      // stream a moment to deliver its first real frame before giving up.
+      if (videoEl.readyState < 2) {
+        await new Promise<void>((resolve) => {
+          videoEl.addEventListener('loadeddata', () => resolve(), { once: true });
+          setTimeout(resolve, 2000);
+        });
+      }
+
+      console.log(
+        '[Scanner] Video dimensions:',
+        videoEl.videoWidth,
+        videoEl.videoHeight,
+        'readyState:',
+        videoEl.readyState,
+      );
+
+      // videoWidth/videoHeight can still be 0 at this point on some mobile
+      // browsers - calling Gemini with an empty/near-empty crop would just
+      // waste a rate-limited call and come back as a confusing "not
+      // recognized" result, so surface the real reason instead.
+      if (videoEl.videoWidth < 10 || videoEl.videoHeight < 10) {
+        this.showToast(this.translate.instant('scanner.cameraNotReady'), 'warning', FAILURE_TOAST_DURATION_MS);
+        return;
+      }
+
       const card = await this.tryGeminiPath(videoEl);
       if (card) {
         this.onMatch({ card, confidence: 1 });
@@ -687,6 +716,7 @@ export class Scanner {
     if (!ctx) return null;
 
     ctx.drawImage(videoEl, 0, 0, width, height);
+    console.log('[Scanner] Canvas size:', this.rawFrameCanvas.width, this.rawFrameCanvas.height);
     return this.rawFrameCanvas;
   }
 

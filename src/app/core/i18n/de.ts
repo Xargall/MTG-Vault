@@ -235,6 +235,7 @@ export const de = {
     rateLimited: 'Zu viele Anfragen — kurze Pause…',
     manualScanButton: '📷 Jetzt scannen',
     manualScanNotRecognized: 'Karte nicht erkannt — bitte neu ausrichten',
+    cameraNotReady: 'Kamera noch nicht bereit — bitte nochmal versuchen',
     addFailed: 'Karte konnte nicht hinzugefügt werden.',
     limitTitle: '⚠️ Tageslimit erreicht',
     limitMessage: 'Das tägliche Scan-Limit für die KI-Erkennung ist erschöpft. Der Scanner wechselt automatisch auf den Basis-Modus. Das Limit wird um Mitternacht zurückgesetzt.',

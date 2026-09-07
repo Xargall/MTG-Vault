@@ -40,6 +40,7 @@ export class GeminiVisionService {
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
     const imageBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+    console.log('[Scanner] Base64 length:', imageBase64.length);
 
     const { data, error } = await this.supabase.client.functions.invoke<{ text?: string; error?: string }>(
       'gemini-ocr',
