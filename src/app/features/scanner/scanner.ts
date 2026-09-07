@@ -20,6 +20,7 @@ import { GeminiVisionService } from '../../core/services/gemini-vision.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
 import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
 import { OcrLine, OcrService } from '../../core/services/ocr.service';
+import { UserSecretsService } from '../../core/services/user-secrets.service';
 import { YugiohApiService } from '../../core/services/yugioh-api.service';
 import { ScryfallRateLimitError } from '../../core/utils/scryfall-queue';
 import { extractNameFromLines } from '../../core/utils/string-similarity';
@@ -221,6 +222,7 @@ export class Scanner {
   private readonly collectionService = inject(CollectionService);
   private readonly ocrService = inject(OcrService);
   private readonly geminiVision = inject(GeminiVisionService);
+  private readonly userSecrets = inject(UserSecretsService);
   private readonly translate = inject(TranslateService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -252,6 +254,10 @@ export class Scanner {
   // "🤖 Gemini" / "📝 Tesseract" / "⚠️ Limit" indicator; null while nothing
   // has read yet.
   protected readonly ocrEngine = signal<'gemini' | 'tesseract' | 'limit' | null>(null);
+  // Drives the manual "Jetzt scannen" button vs. the "set up your own key"
+  // hint - null (not checked yet) fails open and still shows the button, so
+  // a flaky/unmigrated status check never hides a working feature.
+  protected readonly hasGeminiKey = this.userSecrets.hasGeminiKey;
   // Gemini's 429 is shown to the user only the first time per session -
   // it's already handled gracefully (falls back silently otherwise), so
   // repeating the same explanation every subsequent hit would just be noise.
@@ -282,6 +288,7 @@ export class Scanner {
     });
 
     afterNextRender(() => void this.startCamera());
+    void this.userSecrets.refreshGeminiKeyStatus();
   }
 
   private async startCamera(deviceId?: string) {

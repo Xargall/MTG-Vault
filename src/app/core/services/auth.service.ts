@@ -32,6 +32,34 @@ export class AuthService {
   /** Whether this user has ever explicitly picked a game (see GameService.chooseGame) - persisted in Supabase Auth user_metadata so it carries across devices, not just this browser's localStorage. */
   readonly hasChosenGame = computed(() => !!this.session()?.user.user_metadata?.['active_game']);
 
+  /** Whether the one-time "set up your own Gemini key" onboarding hint has already been shown/dismissed - same user_metadata persistence pattern as hasChosenGame above. */
+  readonly hasSeenGeminiOnboarding = computed(
+    () => !!this.session()?.user.user_metadata?.['gemini_onboarding_seen'],
+  );
+
+  /** True for a Google-linked account - Supabase stamps the sign-in provider onto app_metadata (not user-editable, unlike user_metadata), so this can't be spoofed by a display-name/avatar edit. */
+  readonly isGoogleAccount = computed(() => this.session()?.user.app_metadata?.['provider'] === 'google');
+
+  /** display_name (our own override, set via updateDisplayName) beats Google's own full_name/name, which beats falling back to the local part of the email - guests have neither, so they get a fixed label instead. */
+  readonly displayName = computed(() => {
+    const user = this.session()?.user;
+    if (!user) return '';
+    if (user.is_anonymous) return 'Gast';
+    const meta = user.user_metadata ?? {};
+    const name = meta['display_name'] || meta['full_name'] || meta['name'];
+    if (typeof name === 'string' && name.trim()) return name;
+    return user.email?.split('@')[0] ?? 'Account';
+  });
+
+  /** Single uppercase letter for the avatar fallback when there's no picture. */
+  readonly initial = computed(() => (this.displayName()[0] ?? '?').toUpperCase());
+
+  /** Google's own profile picture, or our own Storage-hosted upload once set (see uploadAvatar) - both live in the same user_metadata.avatar_url slot, so an upload simply overrides whatever Google supplied. */
+  readonly avatarUrl = computed<string | null>(() => {
+    const url = this.session()?.user.user_metadata?.['avatar_url'];
+    return typeof url === 'string' && url ? url : null;
+  });
+
   // Supabase fires SIGNED_IN the instant signInAnonymously()'s network call
   // resolves - well before signInAsGuest() below goes on to await the demo
   // seed. Without this flag, the listener below would navigate to the
@@ -156,6 +184,37 @@ export class AuthService {
 
   async signOut() {
     const { error } = await this.supabase.client.auth.signOut();
+    if (error) throw error;
+  }
+
+  async markGeminiOnboardingSeen() {
+    await this.supabase.client.auth.updateUser({ data: { gemini_onboarding_seen: true } });
+  }
+
+  async updateDisplayName(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('name_required');
+    const { error } = await this.supabase.client.auth.updateUser({ data: { display_name: trimmed } });
+    if (error) throw error;
+  }
+
+  /** Uploads to the user's own folder in the public `avatars` bucket (see supabase/sql/013_avatar_storage.sql - storage RLS only lets a user write under their own uid), then points user_metadata.avatar_url at its public URL. Always the same path (upsert) so a re-upload replaces rather than accumulates files; the cache-busting query param keeps the browser from keeping the old image around under that same URL. */
+  async uploadAvatar(file: File) {
+    const uid = this.session()?.user.id;
+    if (!uid) throw new Error('not_authenticated');
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const path = `${uid}/avatar.${ext}`;
+
+    const { error: uploadError } = await this.supabase.client.storage
+      .from('avatars')
+      .upload(path, file, { upsert: true, cacheControl: '3600' });
+    if (uploadError) throw uploadError;
+
+    const { data } = this.supabase.client.storage.from('avatars').getPublicUrl(path);
+    const { error } = await this.supabase.client.auth.updateUser({
+      data: { avatar_url: `${data.publicUrl}?v=${Date.now()}` },
+    });
     if (error) throw error;
   }
 }

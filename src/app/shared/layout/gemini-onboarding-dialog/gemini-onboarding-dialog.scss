@@ -1,0 +1,66 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  z-index: 100;
+}
+
+.dialog {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacing-lg);
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.message {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.button-row {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.cta-button {
+  flex: 1;
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    background: var(--color-accent-hover);
+  }
+}
+
+.secondary-button {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-border);
+  }
+}

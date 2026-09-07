@@ -66,13 +66,20 @@
   }
 
   @if (status() === 'scanning') {
-    <button type="button" class="manual-scan-button" [disabled]="geminiLoading()" (click)="onManualScan()">
-      @if (geminiLoading()) {
-        <span class="manual-scan-spinner" aria-hidden="true"></span>
-      } @else {
-        {{ 'scanner.manualScanButton' | translate }}
-      }
-    </button>
+    @if (hasGeminiKey() === false) {
+      <div class="gemini-key-hint">
+        <p>{{ 'scanner.noGeminiKeyHint' | translate }}</p>
+        <a routerLink="/settings/gemini">{{ 'scanner.goToSettings' | translate }}</a>
+      </div>
+    } @else {
+      <button type="button" class="manual-scan-button" [disabled]="geminiLoading()" (click)="onManualScan()">
+        @if (geminiLoading()) {
+          <span class="manual-scan-spinner" aria-hidden="true"></span>
+        } @else {
+          {{ 'scanner.manualScanButton' | translate }}
+        }
+      </button>
+    }
   }
 
   @if (toast(); as t) {

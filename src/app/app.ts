@@ -3,8 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 
 import { MtgBulkDataService } from './core/services/mtg-bulk-data.service';
-
-const LANG_STORAGE_KEY = 'mtg-vault-lang';
+import { LANG_STORAGE_KEY } from './core/utils/language.util';
 
 @Component({
   selector: 'app-root',

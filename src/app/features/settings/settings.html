@@ -1,0 +1,32 @@
+<div class="settings">
+  <header class="page-header">
+    <h1>{{ 'settings.title' | translate }}</h1>
+  </header>
+
+  <section class="settings-section">
+    <h2>{{ 'settings.languageTitle' | translate }}</h2>
+    <div class="lang-buttons">
+      <button type="button" [class.is-active]="translate.currentLang() === 'de'" (click)="setLang('de')">
+        Deutsch
+      </button>
+      <button type="button" [class.is-active]="translate.currentLang() === 'en'" (click)="setLang('en')">
+        English
+      </button>
+    </div>
+  </section>
+
+  <section class="settings-section">
+    <h2>{{ 'settings.geminiTitle' | translate }}</h2>
+    <p class="section-hint">{{ 'settings.geminiDescription' | translate }}</p>
+
+    @if (hasGeminiKey() === true) {
+      <p class="key-status key-status--set">{{ 'geminiKey.keySet' | translate }}</p>
+    } @else if (hasGeminiKey() === false) {
+      <p class="key-status key-status--unset">{{ 'geminiKey.keyUnset' | translate }}</p>
+    }
+
+    <div class="button-row">
+      <a routerLink="/settings/gemini" class="cta-button">{{ 'settings.manageGeminiKey' | translate }}</a>
+    </div>
+  </section>
+</div>

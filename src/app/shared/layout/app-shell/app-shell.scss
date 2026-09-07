@@ -216,20 +216,6 @@
   }
 }
 
-.logout-button {
-  background: transparent;
-  border: 1px solid var(--color-border-strong);
-  color: var(--color-text-muted);
-  border-radius: var(--radius);
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-size: 0.85rem;
-
-  &:hover {
-    color: var(--color-text);
-    border-color: var(--color-accent);
-  }
-}
-
 .shell-content {
   flex: 1;
 }

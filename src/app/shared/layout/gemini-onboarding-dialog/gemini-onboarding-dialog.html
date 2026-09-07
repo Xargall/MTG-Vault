@@ -1,0 +1,18 @@
+<div class="backdrop" (click)="dismiss.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <header class="dialog-header">
+      <h2>{{ 'geminiOnboarding.title' | translate }}</h2>
+    </header>
+
+    <p class="message">{{ 'geminiOnboarding.message' | translate }}</p>
+
+    <div class="button-row">
+      <a routerLink="/settings/gemini" class="cta-button" (click)="setup.emit()">
+        {{ 'geminiOnboarding.setupNow' | translate }}
+      </a>
+      <button type="button" class="secondary-button" (click)="dismiss.emit()">
+        {{ 'geminiOnboarding.later' | translate }}
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,16 +1,25 @@
-// Server-side proxy for Gemini Vision. Keeps the Gemini API key out of the
-// Angular client bundle entirely - the key only ever lives in this
-// function's environment (set via `supabase secrets set GEMINI_API_KEY=...`
-// or the Dashboard's Edge Functions -> Secrets UI), never in any file that
-// ends up shipped to the browser.
+// Server-side proxy for Gemini Vision. Keeps every Gemini API key out of the
+// Angular client bundle entirely - a key only ever lives in Supabase Vault
+// (per-user, set via the Settings page -> set_user_secret RPC, see
+// supabase/sql/012_user_secrets.sql) or in this function's own environment
+// (the shared fallback key, set via `supabase secrets set
+// GEMINI_API_KEY=...` or the Dashboard's Edge Functions -> Secrets UI) -
+// never in any file shipped to the browser.
 //
 // Deploy: supabase functions deploy gemini-ocr
-// Secret: supabase secrets set GEMINI_API_KEY=<your-real-key>
+// Secret (optional shared fallback): supabase secrets set GEMINI_API_KEY=<your-real-key>
 //
 // `verify_jwt` is left at its default (enabled) - Supabase's edge runtime
 // rejects requests without a valid session JWT before this code even runs,
-// so any logged-in or guest Supabase session already gates access; there is
-// no need to re-check auth manually here.
+// so any logged-in or guest Supabase session already gates access. The
+// caller's JWT is also decoded below (via SUPABASE_SERVICE_ROLE_KEY, which
+// every edge function gets injected automatically) to resolve which user's
+// Vault secret to look up - service_role is required since
+// get_user_secret_for_service is deliberately not grantable to a plain
+// user's own JWT (see the SQL file).
+import { createClient } from 'npm:@supabase/supabase-js@2.112.4';
+
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com';
 
 const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 // Bounded well under Supabase's own platform-level request timeout (150s) -
@@ -53,13 +62,65 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+/** The calling user's own Vault-stored key, via a service-role client that resolves their id from the request's own JWT (get_user_secret_for_service is only grantable to service_role, never to the user's own JWT - see supabase/sql/012_user_secrets.sql). Returns null on any failure (no session, no key on file, RPC/migration not applied yet) so the caller can fall through to the shared app key. */
+async function resolveUserGeminiKey(req: Request): Promise<string | null> {
+  const jwt = req.headers.get('Authorization')?.replace(/^Bearer /i, '');
+  if (!jwt) return null;
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !serviceRoleKey) return null;
+
+  try {
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const { data: userData } = await adminClient.auth.getUser(jwt);
+    const userId = userData?.user?.id;
+    if (!userId) return null;
+
+    const { data } = await adminClient.rpc('get_user_secret_for_service', {
+      p_user_id: userId,
+      p_secret_name: 'gemini_api_key',
+    });
+    return typeof data === 'string' && data.length > 0 ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** "Key testen" in Settings: validates a not-yet-saved key by listing models - cheap (no vision payload/cost) and gives an immediate valid/invalid answer before the user commits to saving it. */
+async function testApiKey(apiKey: string): Promise<Response> {
+  try {
+    const response = await fetch(`${GEMINI_API_BASE}/v1beta/models?key=${apiKey}`, {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (response.ok) {
+      return new Response(JSON.stringify({ valid: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ valid: false, error: 'Ungültiger API Key' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch {
+    return new Response(JSON.stringify({ valid: false, error: 'Gemini konnte nicht erreicht werden' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { imageBase64, game } = (await req.json()) as { imageBase64?: string; game?: string };
+    const body = (await req.json()) as { imageBase64?: string; game?: string; testApiKey?: string };
+
+    if (body.testApiKey) {
+      return await testApiKey(body.testApiKey);
+    }
+
+    const { imageBase64, game } = body;
     if (!imageBase64) {
       return new Response(JSON.stringify({ error: 'imageBase64 fehlt' }), {
         status: 400,
@@ -68,34 +129,23 @@ Deno.serve(async (req: Request) => {
     }
     const prompt = game === 'yugioh' ? YUGIOH_PROMPT : MTG_PROMPT;
 
-    const apiKey = Deno.env.get('GEMINI_API_KEY');
+    const apiKey = (await resolveUserGeminiKey(req)) ?? Deno.env.get('GEMINI_API_KEY');
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'GEMINI_API_KEY ist nicht gesetzt' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          error: 'NO_API_KEY',
+          message: 'Bitte hinterlege deinen Gemini API Key in den Einstellungen',
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
-
-    console.log('Testing connectivity...');
-    try {
-      const testResponse = await fetch('https://generativelanguage.googleapis.com', {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000),
-      });
-      console.log('Connectivity test status:', testResponse.status);
-    } catch (connectivityError) {
-      console.log('Connectivity test failed:', connectivityError);
-    }
-
-    console.log('Calling Gemini with model:', GEMINI_MODEL);
-    console.log('API Key present:', !!apiKey);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
     let geminiResponse: Response;
     try {
       geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+        `${GEMINI_API_BASE}/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -130,7 +180,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const data = await geminiResponse.json();
-    console.log('Gemini raw response:', JSON.stringify(data));
     const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     return new Response(JSON.stringify({ text: text?.trim() ?? 'UNKNOWN' }), {

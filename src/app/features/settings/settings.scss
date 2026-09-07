@@ -1,0 +1,41 @@
+@use '../../shared/styles/settings-page';
+
+.lang-buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+
+  button {
+    flex: 1;
+    padding: var(--spacing-sm);
+    border-radius: var(--radius);
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface-alt);
+    color: var(--color-text);
+    font-size: 0.9rem;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--color-accent);
+    }
+
+    &.is-active {
+      background: linear-gradient(180deg, var(--color-accent-hover) 0%, var(--color-accent) 100%);
+      color: var(--color-bg);
+      border-color: var(--color-accent);
+      font-weight: 600;
+    }
+  }
+}
+
+.key-status {
+  margin: 0;
+  font-size: 0.85rem;
+
+  &--set {
+    color: #4caf7d;
+  }
+
+  &--unset {
+    color: var(--color-text-muted);
+  }
+}

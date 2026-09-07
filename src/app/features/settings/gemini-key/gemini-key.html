@@ -1,0 +1,57 @@
+<div class="settings">
+  <a routerLink="/settings" class="back-link">{{ 'geminiKey.backToSettings' | translate }}</a>
+
+  <header class="page-header">
+    <h1>{{ 'geminiKey.title' | translate }}</h1>
+  </header>
+
+  <section class="settings-section">
+    <p class="section-hint">
+      {{ 'geminiKey.hint' | translate }}
+      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>
+    </p>
+
+    @if (hasGeminiKey() === true) {
+      <p class="key-status key-status--set">{{ 'geminiKey.keySet' | translate }}</p>
+    } @else if (hasGeminiKey() === false) {
+      <p class="key-status key-status--unset">{{ 'geminiKey.keyUnset' | translate }}</p>
+    }
+
+    <label for="gemini-key">{{ 'geminiKey.keyLabel' | translate }}</label>
+    <input
+      id="gemini-key"
+      type="password"
+      autocomplete="off"
+      spellcheck="false"
+      [placeholder]="'geminiKey.keyPlaceholder' | translate"
+      [ngModel]="geminiKeyInput()"
+      (ngModelChange)="geminiKeyInput.set($event)"
+    />
+
+    @if (saveError()) {
+      <p class="form-error">{{ saveError() }}</p>
+    }
+    @if (saveSuccess()) {
+      <p class="form-success">{{ 'geminiKey.saveSuccess' | translate }}</p>
+    }
+    @if (testResult() === 'valid') {
+      <p class="form-success">{{ 'geminiKey.testValid' | translate }}</p>
+    } @else if (testResult() === 'invalid') {
+      <p class="form-error">{{ 'geminiKey.testInvalid' | translate }}</p>
+    }
+
+    <div class="button-row">
+      <button type="button" [disabled]="!geminiKeyInput().trim() || saving()" (click)="saveGeminiKey()">
+        {{ (saving() ? 'geminiKey.saving' : 'geminiKey.save') | translate }}
+      </button>
+      <button
+        type="button"
+        class="secondary-button"
+        [disabled]="!geminiKeyInput().trim() || testing()"
+        (click)="testGeminiKey()"
+      >
+        {{ (testing() ? 'geminiKey.testing' : 'geminiKey.testKey') | translate }}
+      </button>
+    </div>
+  </section>
+</div>

@@ -47,7 +47,7 @@
           </button>
         </div>
 
-        <button type="button" class="logout-button" (click)="logout()">{{ 'nav.logout' | translate }}</button>
+        <app-user-menu />
       </div>
     </div>
 
@@ -60,6 +60,9 @@
         <a routerLink="/decks" routerLinkActive="is-active">{{ 'nav.decks' | translate }}</a>
       }
       <a routerLink="/wishlist" routerLinkActive="is-active">{{ 'nav.wishlist' | translate }}</a>
+      @if (!authService.isGuest()) {
+        <a routerLink="/settings" routerLinkActive="is-active">{{ 'nav.settings' | translate }}</a>
+      }
     </nav>
   </header>
 
@@ -70,4 +73,11 @@
   </main>
 
   <app-footer />
+
+  @if (showGeminiOnboarding()) {
+    <app-gemini-onboarding-dialog
+      (setup)="dismissGeminiOnboarding()"
+      (dismiss)="dismissGeminiOnboarding()"
+    />
+  }
 </div>

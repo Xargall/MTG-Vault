@@ -1,0 +1,67 @@
+<div class="settings">
+  <header class="page-header">
+    <h1>{{ 'profile.title' | translate }}</h1>
+  </header>
+
+  <section class="settings-section">
+    <h2>{{ 'profile.pictureTitle' | translate }}</h2>
+    <div class="avatar-row">
+      <div class="avatar-preview">
+        @if (authService.avatarUrl(); as url) {
+          <img [src]="url" [alt]="authService.displayName()" />
+        } @else {
+          <span>{{ authService.initial() }}</span>
+        }
+      </div>
+      <div class="avatar-controls">
+        <input
+          #fileInput
+          type="file"
+          accept="image/*"
+          class="avatar-file-input"
+          (change)="onAvatarSelected($event)"
+        />
+        <button type="button" class="secondary-button" [disabled]="uploadingAvatar()" (click)="triggerFileSelect()">
+          {{ (uploadingAvatar() ? 'profile.uploading' : 'profile.uploadPicture') | translate }}
+        </button>
+        @if (avatarError()) {
+          <p class="form-error">{{ avatarError() }}</p>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="settings-section">
+    <h2>{{ 'profile.nameTitle' | translate }}</h2>
+    <label for="display-name">{{ 'profile.nameLabel' | translate }}</label>
+    <input
+      id="display-name"
+      type="text"
+      [ngModel]="nameInput()"
+      (ngModelChange)="nameInput.set($event); nameSaved.set(false)"
+    />
+
+    @if (nameError()) {
+      <p class="form-error">{{ nameError() }}</p>
+    }
+    @if (nameSaved()) {
+      <p class="form-success">{{ 'profile.nameSaved' | translate }}</p>
+    }
+
+    <div class="button-row">
+      <button type="button" [disabled]="!nameInput().trim() || savingName()" (click)="saveName()">
+        {{ (savingName() ? 'profile.saving' : 'profile.save') | translate }}
+      </button>
+    </div>
+  </section>
+
+  <section class="settings-section">
+    <h2>{{ 'profile.emailTitle' | translate }}</h2>
+    <p class="email-row">
+      {{ authService.session()?.user?.email }}
+      @if (authService.isGoogleAccount()) {
+        <span class="provider-badge">{{ 'profile.viaGoogle' | translate }}</span>
+      }
+    </p>
+  </section>
+</div>

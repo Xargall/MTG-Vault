@@ -1,0 +1,14 @@
+@use '../../../shared/styles/settings-page';
+
+.key-status {
+  margin: 0;
+  font-size: 0.85rem;
+
+  &--set {
+    color: #4caf7d;
+  }
+
+  &--unset {
+    color: var(--color-text-muted);
+  }
+}

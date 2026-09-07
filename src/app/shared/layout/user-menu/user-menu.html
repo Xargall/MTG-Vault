@@ -1,0 +1,43 @@
+<div class="user-menu">
+  <button
+    #avatarButton
+    type="button"
+    class="avatar-button"
+    (click)="toggle()"
+    [attr.aria-expanded]="open()"
+    [attr.aria-label]="authService.displayName()"
+  >
+    @if (authService.avatarUrl(); as url) {
+      <img class="avatar-img" [src]="url" [alt]="authService.displayName()" />
+    } @else {
+      <span class="avatar-fallback">{{ authService.initial() }}</span>
+    }
+  </button>
+
+  @if (open()) {
+    <div class="dropdown" [style.top.px]="menuPosition().top" [style.right.px]="menuPosition().right">
+      @if (!authService.isGuest()) {
+        <div class="dropdown-header">
+          <p class="dropdown-name">{{ authService.displayName() }}</p>
+          @if (authService.session()?.user?.email; as email) {
+            <p class="dropdown-email">{{ email }}</p>
+          }
+        </div>
+        <div class="dropdown-divider"></div>
+        <a routerLink="/profile" class="dropdown-item" (click)="close()">
+          <span class="dropdown-icon">👤</span> {{ 'userMenu.profile' | translate }}
+        </a>
+        <a routerLink="/settings" class="dropdown-item" (click)="close()">
+          <span class="dropdown-icon">⚙️</span> {{ 'userMenu.settings' | translate }}
+        </a>
+        <a routerLink="/settings/gemini" class="dropdown-item" (click)="close()">
+          <span class="dropdown-icon">🔑</span> {{ 'userMenu.geminiKey' | translate }}
+        </a>
+        <div class="dropdown-divider"></div>
+      }
+      <button type="button" class="dropdown-item dropdown-item--button" (click)="logout()">
+        <span class="dropdown-icon">🚪</span> {{ 'nav.logout' | translate }}
+      </button>
+    </div>
+  }
+</div>

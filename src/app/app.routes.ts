@@ -56,6 +56,24 @@ export const routes: Routes = [
         canActivate: [demoScanGuard],
         loadComponent: () => import('./features/scanner/scanner').then((m) => m.Scanner),
       },
+      {
+        path: 'profile',
+        loadComponent: () => import('./features/profile/profile').then((m) => m.Profile),
+      },
+      {
+        path: 'settings',
+        children: [
+          {
+            path: '',
+            loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
+          },
+          {
+            path: 'gemini',
+            loadComponent: () =>
+              import('./features/settings/gemini-key/gemini-key').then((m) => m.GeminiKey),
+          },
+        ],
+      },
     ],
   },
   { path: '**', redirectTo: '' },
