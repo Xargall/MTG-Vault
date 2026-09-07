@@ -33,6 +33,7 @@ export const en: typeof de = {
     green: 'Green',
     multicolor: 'Multicolor',
     colorless: 'Colorless',
+    special: '✨ Specials',
   },
   rarity: {
     common: 'Common',
@@ -128,6 +129,10 @@ export const en: typeof de = {
     set: 'Set',
     rarity: 'Rarity',
     foil: 'Foil',
+    finish: 'Finish',
+    finish_halo: '✨ Halo',
+    finish_foil: 'Foil',
+    finish_etched: 'Etched',
     price: 'Price',
     cardmarketLink: 'View on Cardmarket',
     deleteLink: 'Remove from collection',

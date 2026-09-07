@@ -13,9 +13,9 @@ export interface ColorCategorySummary {
   showcase: CollectionEntry | null;
 }
 
-export type ColorCategory = 'W' | 'U' | 'B' | 'R' | 'G' | 'M' | 'C';
+export type ColorCategory = 'W' | 'U' | 'B' | 'R' | 'G' | 'M' | 'C' | 'SPECIAL';
 
-type MtgEntry = CollectionEntry & { card: MtgCard };
+export type MtgEntry = CollectionEntry & { card: MtgCard };
 
 function mtgEntries(entries: CollectionEntry[]): MtgEntry[] {
   return entries.filter((entry): entry is MtgEntry => entry.card.game === 'mtg');
@@ -37,6 +37,10 @@ export const COLOR_CATEGORIES: Array<{ key: ColorCategory; label: string; color:
   { key: 'G', label: 'colors.green', color: 'var(--chart-5)' },
   { key: 'B', label: 'colors.black', color: 'var(--chart-6)' },
   { key: 'R', label: 'colors.red', color: 'var(--chart-7)' },
+  // Token/halo scans (card_category != 'normal', set at scan time - see
+  // mtg-api.service.ts) - an 8th bucket ahead of color grouping, reusing
+  // --chart-8 since MTG's own palette otherwise only needs 7 slots.
+  { key: 'SPECIAL', label: 'colors.special', color: 'var(--chart-8)' },
 ];
 
 const MANA_CURVE_COLOR = 'var(--color-bronze)';
@@ -48,6 +52,13 @@ export function colorCategoryFor(colorIdentity: string[]): ColorCategory {
   return colorIdentity[0] as ColorCategory;
 }
 
+/** Token/halo scans get the "✨ Specials" bucket ahead of the normal color grouping - card_category is set once at scan time (see mtg-api.service.ts's categoryForMatch), not recomputed from the card here. */
+export function mtgCategoryFor(entry: MtgEntry): ColorCategory {
+  return entry.row.card_category && entry.row.card_category !== 'normal'
+    ? 'SPECIAL'
+    : colorCategoryFor(entry.card.colorIdentity);
+}
+
 function manaCurveBucketFor(cmc: number): string {
   const rounded = Math.max(0, Math.floor(cmc));
   return rounded >= 7 ? '7+' : String(rounded);
@@ -55,9 +66,9 @@ function manaCurveBucketFor(cmc: number): string {
 
 export function getColorDistribution(entries: CollectionEntry[]): BarChartDatum[] {
   const counts = new Map<ColorCategory, number>();
-  for (const { row, card } of mtgEntries(entries)) {
-    const category = colorCategoryFor(card.colorIdentity);
-    counts.set(category, (counts.get(category) ?? 0) + row.quantity);
+  for (const entry of mtgEntries(entries)) {
+    const category = mtgCategoryFor(entry);
+    counts.set(category, (counts.get(category) ?? 0) + entry.row.quantity);
   }
   return COLOR_CATEGORIES.map(({ key, label, color }) => ({
     label,
@@ -69,7 +80,7 @@ export function getColorDistribution(entries: CollectionEntry[]): BarChartDatum[
 export function getColorCategorySummaries(entries: CollectionEntry[]): ColorCategorySummary[] {
   const grouped = new Map<ColorCategory, MtgEntry[]>();
   for (const entry of mtgEntries(entries)) {
-    const category = colorCategoryFor(entry.card.colorIdentity);
+    const category = mtgCategoryFor(entry);
     const list = grouped.get(category);
     if (list) {
       list.push(entry);

@@ -1,11 +1,12 @@
-import { Card, GameSlug } from '../../core/models/card.model';
+import { GameSlug } from '../../core/models/card.model';
 import { BarChartDatum } from '../../shared/charts/bar-chart/bar-chart';
 import {
   COLOR_CATEGORIES,
   ColorCategorySummary,
-  colorCategoryFor,
   getColorCategorySummaries,
   getColorDistribution,
+  MtgEntry,
+  mtgCategoryFor,
 } from './collection-stats';
 import { CollectionEntry } from './collection.service';
 import {
@@ -36,10 +37,11 @@ export function getCategoriesForGame(game: GameSlug): CategoryDefinition[] {
   return COLOR_CATEGORIES;
 }
 
-export function categoryKeyFor(card: Card): string {
+export function categoryKeyFor(entry: CollectionEntry): string {
+  const { card } = entry;
   if (card.game === 'yugioh') return attributeCategoryFor(card);
   if (card.game === 'pokemon') return pokemonCategoryFor(card);
-  return colorCategoryFor(card.colorIdentity);
+  return mtgCategoryFor(entry as MtgEntry);
 }
 
 export function getCategoryDistribution(entries: CollectionEntry[], game: GameSlug): BarChartDatum[] {

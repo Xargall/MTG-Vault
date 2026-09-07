@@ -1,6 +1,17 @@
+export type CollectorFinish = 'nonfoil' | 'halo';
+
 export interface SetCodeMatch {
   setCode: string;
   collectorNumber: string;
+  isToken: boolean;
+  finish: CollectorFinish;
+}
+
+export interface CollectorNumberMatch {
+  /** Bare printed number, unpadded, never carrying a flag prefix (e.g. "17", "82"). */
+  number: string;
+  isToken: boolean;
+  finish: CollectorFinish;
 }
 
 // Case-sensitive on purpose: matching only already-uppercase tokens avoids
@@ -14,14 +25,51 @@ export interface SetCodeMatch {
 // "WAR" (War of the Spark - a genuine set code that's also an ordinary
 // English word) only works with that real check, not a length restriction.
 const SET_CODE_TOKEN_PATTERN = /\b([A-Z]{2,6})\b/g;
-// 3-5 digits, no leading-zero requirement - matches Scryfall's actual
-// collector_number range (many modern cards print an unpadded 3-digit
-// number, which a stricter "always 4 digits" pattern would never catch).
-// Excludes a number directly after a ©/™ symbol - the card's copyright
-// line ("© 2025 Wizards of the Coast") sits right next to the actual
-// set-code/collector-number line and its year is exactly as plausible-
-// looking a 4-digit match, but is never the real collector number.
-const COLLECTOR_NUMBER_PATTERN = /(?<![©™]\s*)\b(\d{3,5})\b/;
+// Old format (through March of the Machine, 2023): "NR/TOTAL" with an
+// optional trailing flag letter - "017/017 T" (token #17), "020/020 H"
+// (halo #20), "150/350" (plain #150). The flag trails the fraction here,
+// unlike the new format below where it leads the number. Excludes a number
+// directly after a ©/™ symbol for the same reason as the new-format pattern
+// below (copyright-line years look exactly as plausible otherwise).
+const OLD_FORMAT_COLLECTOR_PATTERN = /(?<![©™]\s*)\b(\d{3,5})\/\d{3,5}(?:\s+([A-Z]))?\b/;
+// New format (March of the Machine, 2023 onward): always a zero-padded
+// 4-digit number, no fraction, with an optional leading flag letter -
+// "T 0003" (token #3), "H 0020" (halo #20), "0082" (plain #82). Gemini
+// sometimes prints the flag glued to the digits ("T0003") rather than
+// spaced - `\s*` (zero-or-more) matches both. Excludes a number directly
+// after a ©/™ symbol - the card's copyright line ("© 2025 Wizards of the
+// Coast") sits right next to the actual set-code/collector-number line and
+// its year is exactly as plausible-looking a 4-digit match, but is never
+// the real collector number.
+const NEW_FORMAT_COLLECTOR_PATTERN = /(?<![©™]\s*)\b(?:([A-Z])\s*)?(\d{4})\b/;
+
+/**
+ * Robust collector-number parser covering both formats MTG has printed:
+ * the pre-2023 "NR/TOTAL [FLAG]" fraction and the March of the Machine-
+ * onward "[FLAG] NNNN" fixed 4-digit form. Either format's flag letter is
+ * only meaningful as T (token) or H (halo) - any other letter (a rarity
+ * code like U/C/R/M glued to the digits) is read and discarded exactly as
+ * before, just via one unified pattern instead of a separate normalization
+ * pass. Tried old-format first since its fraction ("/") makes it
+ * unambiguous when present; the new format never contains one.
+ */
+export function parseCollectorNumber(rawText: string): CollectorNumberMatch | null {
+  const text = rawText.toUpperCase();
+
+  const oldMatch = OLD_FORMAT_COLLECTOR_PATTERN.exec(text);
+  if (oldMatch) {
+    const [, number, flag] = oldMatch;
+    return { number: String(parseInt(number, 10)), isToken: flag === 'T', finish: flag === 'H' ? 'halo' : 'nonfoil' };
+  }
+
+  const newMatch = NEW_FORMAT_COLLECTOR_PATTERN.exec(text);
+  if (newMatch) {
+    const [, flag, number] = newMatch;
+    return { number: String(parseInt(number, 10)), isToken: flag === 'T', finish: flag === 'H' ? 'halo' : 'nonfoil' };
+  }
+
+  return null;
+}
 // Fallback only, used when the real Scryfall set-code list (see
 // MtgApiService.getValidSetCodes) hasn't loaded yet or failed to fetch -
 // common uppercase English/German words and rules-text keywords/
@@ -67,16 +115,10 @@ const IGNORED_SET_TOKENS = [
   'EEN', 'ADI', 'SBE', 'PRE', 'EEE', 'NSA', 'NSS', 'SRE', 'LRE', 'TAA',
 ];
 
-/** Standalone collector-number extraction, independent of finding a valid set code alongside it - lets a caller still use the number for scoring even when the set code couldn't be read. */
+/** Standalone bare-number extraction for callers that only need the number, not the format/flag details - see parseCollectorNumber. */
 export function extractCollectorNumber(rawText: string): number | null {
-  // Gemini prints a token's rarity letter directly against the digits with
-  // no space ("T0003") - a letter and a digit are both "word" characters,
-  // so COLLECTOR_NUMBER_PATTERN's \b never matches between them. Insert a
-  // space so Gemini's compact format parses through the exact same path as
-  // Tesseract's spaced-out OCR ("T 0003") instead of needing its own parser.
-  const normalized = rawText.replace(/\b([UCRMTS])(\d{3,5})\b/g, '$1 $2');
-  const numMatch = COLLECTOR_NUMBER_PATTERN.exec(normalized);
-  return numMatch ? parseInt(numMatch[1], 10) : null;
+  const match = parseCollectorNumber(rawText);
+  return match ? parseInt(match.number, 10) : null;
 }
 
 // Tesseract frequently splits a card's tiny bottom info strip (rarity
@@ -129,10 +171,15 @@ export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string>
     // A frame can also OCR the whole strip as one merged last line - fall
     // back to that same line for the number if the second-to-last one
     // doesn't have it.
-    const collectorNum =
-      (secondLastLine && extractCollectorNumber(secondLastLine)) ?? extractCollectorNumber(lastLine);
-    if (collectorNum !== null) {
-      return { setCode: setCodeFromLastLine.toLowerCase(), collectorNumber: String(collectorNum) };
+    const collectorMatch =
+      (secondLastLine && parseCollectorNumber(secondLastLine)) ?? parseCollectorNumber(lastLine);
+    if (collectorMatch) {
+      return {
+        setCode: setCodeFromLastLine.toLowerCase(),
+        collectorNumber: collectorMatch.number,
+        isToken: collectorMatch.isToken,
+        finish: collectorMatch.finish,
+      };
     }
   }
 
@@ -151,17 +198,22 @@ export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string>
   // anything further away.
   const nearbyLines =
     setCodeLineIndex === -1 ? lines : lines.slice(Math.max(0, setCodeLineIndex - 1), setCodeLineIndex + 2);
-  let collectorNum = extractCollectorNumber(nearbyLines.join(' '));
+  let collectorMatch = parseCollectorNumber(nearbyLines.join(' '));
 
   // Pass 2: only if that came up empty - widen to the last few lines of the
   // whole frame, where this info strip always prints (same reasoning as
   // extractPowerToughness's tail-lines restriction), rather than the entire
   // OCR blob.
-  if (collectorNum === null) {
+  if (!collectorMatch) {
     const tailLines = lines.slice(-COLLECTOR_NUMBER_TAIL_LINES).filter(isCompactInfoLine);
-    collectorNum = extractCollectorNumber(tailLines.join(' '));
+    collectorMatch = parseCollectorNumber(tailLines.join(' '));
   }
 
-  if (collectorNum === null) return null;
-  return { setCode: setCodeMatch.toLowerCase(), collectorNumber: String(collectorNum) };
+  if (!collectorMatch) return null;
+  return {
+    setCode: setCodeMatch.toLowerCase(),
+    collectorNumber: collectorMatch.number,
+    isToken: collectorMatch.isToken,
+    finish: collectorMatch.finish,
+  };
 }

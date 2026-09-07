@@ -57,6 +57,11 @@
           @if (entry().card.game === 'mtg') {
             <dt>{{ 'cardDetail.foil' | translate }}</dt>
             <dd>{{ (entry().row.foil ? 'common.yes' : 'common.no') | translate }}</dd>
+
+            @if (entry().row.finish && entry().row.finish !== 'nonfoil') {
+              <dt>{{ 'cardDetail.finish' | translate }}</dt>
+              <dd>{{ ('cardDetail.finish_' + entry().row.finish) | translate }}</dd>
+            }
           }
 
           @if (asYugiohCard(entry().card); as ygoCard) {

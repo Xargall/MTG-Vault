@@ -52,9 +52,9 @@ export class CollectionOverview {
     const query = this.searchQuery().trim().toLowerCase();
     const category = this.selectedCategory();
 
-    return this.entries().filter(({ card }) => {
-      const matchesQuery = !query || card.name.toLowerCase().includes(query);
-      const matchesCategory = !category || categoryKeyFor(card) === category;
+    return this.entries().filter((entry) => {
+      const matchesQuery = !query || entry.card.name.toLowerCase().includes(query);
+      const matchesCategory = !category || categoryKeyFor(entry) === category;
       return matchesQuery && matchesCategory;
     });
   });

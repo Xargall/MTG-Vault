@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Card, MtgCard } from '../models/card.model';
 import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
 import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
-import { extractCollectorNumber, parseSetCode } from '../utils/set-code-parser';
+import { CollectorFinish, parseCollectorNumber, parseSetCode } from '../utils/set-code-parser';
 import { OcrLineLike, cleanOcrText, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification, MtgIdentificationResult, ScoredCandidate } from './card-api.interface';
 import { MtgBulkDataService } from './mtg-bulk-data.service';
@@ -45,6 +45,19 @@ export interface ScryfallRawCard {
 interface ScryfallCandidate {
   card: ScryfallRawCard;
   source: 'exact' | 'name' | 'filter';
+}
+
+// A token or halo-finish card gets its own collection bucket ("✨ Specials")
+// instead of the normal color grouping - see collection-stats.ts. Derived
+// once here (see categoryForMatch below) from the same parsed collector-
+// number flags that already drive the Scryfall lookup, rather than
+// recomputed downstream from the resolved card.
+export type CardCategory = 'normal' | 'token' | 'special';
+
+export interface CroppedIdentification {
+  card: Card;
+  finish: CollectorFinish;
+  cardCategory: CardCategory;
 }
 
 const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
@@ -203,41 +216,48 @@ export class MtgApiService implements CardApiService {
     return raw ? this.toCard(raw) : null;
   }
 
+  private categoryForMatch(match: { isToken: boolean; finish: CollectorFinish }): CardCategory {
+    if (match.isToken) return 'token';
+    if (match.finish === 'halo') return 'special';
+    return 'normal';
+  }
+
   /**
    * Identifies a card from OCR text scoped to just the card's bottom-left
    * set-code/collector-number corner (see Scanner's crop-based capture) -
    * an exact set+number hit only, no name/power-toughness/keyword fallback,
    * since a tight crop of that corner never has those fields in it anyway.
+   * Also reports the finish (halo vs. regular) and card category (token vs.
+   * special vs. normal) parsed off the same collector-number flags, so the
+   * caller can store them on the collection row (see collection.service.ts).
    */
-  async identifyByCroppedText(text: string): Promise<Card | null> {
-    // Token cards print a "T" marker next to the collector number, but on
-    // Scryfall they live in a wholly separate set, not the parent set with
-    // a modified number - "tmsh" (Marvel Super Heroes Tokens), never "msh"
-    // card "T11" (verified against the live API: the latter 404s, the
-    // former is a real card). Used below both to retry a specific set
-    // there and to narrow the no-set-code fallback to token sets only.
-    const isToken = /\bT\s*\d/i.test(text);
-
+  async identifyByCroppedText(text: string): Promise<CroppedIdentification | null> {
     const validSetCodes = await this.getValidSetCodes();
     const match = parseSetCode(text, validSetCodes);
-    if (match) {
-      // The "T" marker is a deliberate signal printed specifically to tell
-      // a token apart from a same-numbered regular card in the same set
-      // (verified: "msh" 11 is itself a real card, "Captain Marvel, Earth's
-      // Protector" - trying the plain set first would silently return that
-      // instead of the token whenever both happen to exist). So when OCR
-      // showed that marker, the token set is tried first, with the plain
-      // set only as a fallback in case "T" was actually a misread rarity
-      // letter.
-      const setCodesToTry =
-        isToken && !match.setCode.startsWith('t') ? [`t${match.setCode}`, match.setCode] : [match.setCode];
 
-      let raw: ScryfallRawCard | null = null;
-      for (const setCode of setCodesToTry) {
-        raw = await this.lookupBySetAndNumber(setCode, match.collectorNumber);
-        if (raw) break;
+    if (match) {
+      const finish = match.finish;
+      const cardCategory = this.categoryForMatch(match);
+
+      // Token cards print a "T" marker next to the collector number, but
+      // where they actually live on Scryfall varies by product: some print
+      // it as a "T"-prefixed number inline in the parent set (e.g.
+      // "clb"/"T17"), tried first per the newer convention; others instead
+      // keep tokens in a wholly separate "t"-prefixed set with the plain
+      // number - "tmsh" (Marvel Super Heroes Tokens), never "msh" card
+      // "T11" (verified against the live API: the latter 404s, the former
+      // is a real card) - tried second as a fallback covering that case.
+      const setCodesToTry: Array<{ setCode: string; number: string }> = match.isToken
+        ? [
+            { setCode: match.setCode, number: `T${match.collectorNumber}` },
+            ...(match.setCode.startsWith('t') ? [] : [{ setCode: `t${match.setCode}`, number: match.collectorNumber }]),
+          ]
+        : [{ setCode: match.setCode, number: match.collectorNumber }];
+
+      for (const { setCode, number } of setCodesToTry) {
+        const raw = await this.lookupBySetAndNumber(setCode, number);
+        if (raw) return { card: this.toCard(raw), finish, cardCategory };
       }
-      if (raw) return this.toCard(raw);
     }
 
     // The crop is tight enough that the set code sometimes falls just
@@ -250,12 +270,14 @@ export class MtgApiService implements CardApiService {
     // token sets only first - the plain fallback is otherwise hopeless for
     // tokens specifically (a bare number recurs across hundreds of sets,
     // but far fewer token sets share it).
-    const bareNumber = extractCollectorNumber(text);
-    if (bareNumber === null) return null;
+    const bareMatch = parseCollectorNumber(text);
+    if (!bareMatch) return null;
 
-    const allMatches = await this.bulkData.findAllByCollectorNumber(String(bareNumber));
-    const candidates = isToken ? allMatches.filter((card) => card.set.startsWith('t')) : allMatches;
-    return candidates.length === 1 ? this.toCard(candidates[0]) : null;
+    const allMatches = await this.bulkData.findAllByCollectorNumber(bareMatch.number);
+    const candidates = bareMatch.isToken ? allMatches.filter((card) => card.set.startsWith('t')) : allMatches;
+    return candidates.length === 1
+      ? { card: this.toCard(candidates[0]), finish: bareMatch.finish, cardCategory: this.categoryForMatch(bareMatch) }
+      : null;
   }
 
   private async fetchCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {
@@ -267,8 +289,9 @@ export class MtgApiService implements CardApiService {
     return response.json();
   }
 
-  /** Both the unpadded number and a 4-digit zero-padded form - Scryfall's own stored collector_number isn't consistently one or the other across sets, so an OCR'd "82" should still hit a card actually stored as "0082" (or vice versa). */
+  /** Both the unpadded number and a 4-digit zero-padded form - Scryfall's own stored collector_number isn't consistently one or the other across sets, so an OCR'd "82" should still hit a card actually stored as "0082" (or vice versa). Purely numeric only - a token's "T17" is never zero-padded, and padStart would otherwise mangle it into "0T17". */
   private collectorNumberVariants(collectorNumber: string): string[] {
+    if (!/^\d+$/.test(collectorNumber)) return [collectorNumber];
     const padded = collectorNumber.padStart(4, '0');
     return collectorNumber === padded ? [collectorNumber] : [collectorNumber, padded];
   }

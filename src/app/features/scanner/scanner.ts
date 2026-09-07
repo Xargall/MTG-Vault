@@ -17,12 +17,13 @@ import { CardIdentification, MtgIdentificationResult, ScoredCandidate } from '..
 import { CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
 import { GeminiVisionService } from '../../core/services/gemini-vision.service';
-import { MtgApiService } from '../../core/services/mtg-api.service';
+import { CardCategory, MtgApiService } from '../../core/services/mtg-api.service';
 import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
 import { OcrLine, OcrService } from '../../core/services/ocr.service';
 import { UserSecretsService } from '../../core/services/user-secrets.service';
 import { YugiohApiService } from '../../core/services/yugioh-api.service';
 import { ScryfallRateLimitError } from '../../core/utils/scryfall-queue';
+import { CollectorFinish } from '../../core/utils/set-code-parser';
 import { extractNameFromLines } from '../../core/utils/string-similarity';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
@@ -163,6 +164,10 @@ function processFoilCropPixels(data: Uint8ClampedArray): void {
 function scoreCollectorNumberText(text: string): number {
   const trimmed = text.trim();
   if (/^[UCRMTS]?\s*\d{3,4}$/.test(trimmed)) return 100;
+  // Pre-2023 fraction format ("017/017", optionally with a trailing T/H
+  // token/halo flag) - just as exact a read as the plain 4-digit form
+  // above, see parseCollectorNumber.
+  if (/^\d{3,5}\/\d{3,5}(\s+[A-Z])?$/.test(trimmed)) return 100;
   if (/\d{3,4}/.test(trimmed)) return 70;
   return 0;
 }
@@ -237,8 +242,11 @@ export class Scanner {
   private isScanning = false;
   private noMatchStreak = 0;
   // Rolling window of the last few frames' resolved cards (null for a frame
-  // with no result at all) - see getConsistentResult().
-  private frameHistory: Array<{ id: string; card: Card } | null> = [];
+  // with no result at all) - see getConsistentResult(). Carries the parsed
+  // finish/category alongside each card, so confirming a match doesn't lose
+  // that signal across the sliding window (see confirmMtgCard).
+  private frameHistory: Array<{ id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null> =
+    [];
   private rateLimitedUntil = 0;
 
   protected readonly status = signal<ScannerStatus>('starting');
@@ -266,6 +274,12 @@ export class Scanner {
   // flight - drives the button's disabled state and spinner.
   protected readonly geminiLoading = signal(false);
   protected readonly detectedCard = signal<Card | null>(null);
+  // Set alongside detectedCard whenever the crop-based MTG path resolved it
+  // (Tesseract auto-loop or the manual Gemini scan) - stays at the defaults
+  // for every other path (picker selection, Yu-Gi-Oh, Pokémon), since only
+  // MTG's collector-number corner carries a token/halo flag to read.
+  protected readonly detectedFinish = signal<CollectorFinish>('nonfoil');
+  protected readonly detectedCardCategory = signal<CardCategory>('normal');
   protected readonly candidateChoices = signal<ScoredCandidate[] | null>(null);
   // Which heading/copy the picker shows - 'medium' (5 options, fairly
   // confident guess) vs 'low' (10 options, weak signal). Derived from how
@@ -508,12 +522,12 @@ export class Scanner {
    * background loop stays Tesseract-only, unchanged otherwise.
    */
   private async handleMtgFrame(videoEl: HTMLVideoElement): Promise<boolean> {
-    const card = await this.tryTesseractPath(videoEl);
+    const result = await this.tryTesseractPath(videoEl);
 
-    const confirmed = this.confirmMtgCard(card);
+    const confirmed = this.confirmMtgCard(result);
     if (!confirmed) return false;
 
-    this.onMatch({ card: confirmed, confidence: 1 });
+    this.onMatch({ card: confirmed.card, confidence: 1 }, confirmed);
     return true;
   }
 
@@ -562,9 +576,9 @@ export class Scanner {
         return;
       }
 
-      const card = await this.tryGeminiPath(videoEl);
-      if (card) {
-        this.onMatch({ card, confidence: 1 });
+      const result = await this.tryGeminiPath(videoEl);
+      if (result) {
+        this.onMatch({ card: result.card, confidence: 1 }, result);
       } else if (this.ocrEngine() !== 'limit') {
         this.showToast(this.translate.instant('scanner.manualScanNotRecognized'), 'warning', FAILURE_TOAST_DURATION_MS);
       }
@@ -573,7 +587,9 @@ export class Scanner {
     }
   }
 
-  private async tryGeminiPath(videoEl: HTMLVideoElement): Promise<Card | null> {
+  private async tryGeminiPath(
+    videoEl: HTMLVideoElement,
+  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null> {
     try {
       const rawFrame = this.captureRawFrame(videoEl);
       if (!rawFrame) return null;
@@ -604,14 +620,18 @@ export class Scanner {
 
       this.ocrEngine.set('gemini');
 
+      // Yu-Gi-Oh and Pokémon have no token/halo concept - wrap their plain
+      // Card result at the defaults so every path returns the same shape.
       if (game === 'yugioh') {
         const code = text.toUpperCase().trim();
         if (!YUGIOH_PRINT_CODE_PATTERN.test(code)) return null;
-        return await this.yugiohApi.identifyByPrintCode(code);
+        const card = await this.yugiohApi.identifyByPrintCode(code);
+        return card ? { card, finish: 'nonfoil', cardCategory: 'normal' } : null;
       }
 
       if (game === 'pokemon') {
-        return (await this.gameService.cardApi().identifyCard(text))?.card ?? null;
+        const card = (await this.gameService.cardApi().identifyCard(text))?.card ?? null;
+        return card ? { card, finish: 'nonfoil', cardCategory: 'normal' } : null;
       }
 
       return await this.mtgApi.identifyByCroppedText(text);
@@ -631,8 +651,10 @@ export class Scanner {
    * toughness/keyword fallback, since a crop this tight never has those
    * fields in it anyway.
    */
-  private async tryTesseractPath(videoEl: HTMLVideoElement): Promise<Card | null> {
-    let card: Card | null = null;
+  private async tryTesseractPath(
+    videoEl: HTMLVideoElement,
+  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null> {
+    let result: { card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null = null;
 
     for (const strategy of CROP_STRATEGIES) {
       const cropCanvas = this.cropToStrategy(videoEl, strategy);
@@ -662,24 +684,29 @@ export class Scanner {
       // at the top of this method would immediately overwrite a "gemini" badge
       // from the very next tick, regardless of whether this attempt succeeds.
       this.ocrEngine.set('tesseract');
-      card = await this.mtgApi.identifyByCroppedText(ocrResult.text);
+      result = await this.mtgApi.identifyByCroppedText(ocrResult.text);
       break;
     }
 
-    return card;
+    return result;
   }
 
-  private pushFrameHistory(entry: { id: string; card: Card } | null) {
+  private pushFrameHistory(entry: { id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null) {
     this.frameHistory.push(entry);
     if (this.frameHistory.length > FRAME_HISTORY_SIZE) this.frameHistory.shift();
   }
 
   /** Sliding-window consistency check: within the last FRAME_HISTORY_SIZE frames, the same card must appear at least CONSISTENT_MATCHES_REQUIRED times - tolerates a single noisy/no-match frame in between two real hits instead of a strict streak. */
-  private confirmMtgCard(card: Card | null): Card | null {
-    this.pushFrameHistory(card ? { id: card.id, card } : null);
-    if (!card) return null;
+  private confirmMtgCard(
+    result: { card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null,
+  ): { card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null {
+    this.pushFrameHistory(result ? { id: result.card.id, ...result } : null);
+    if (!result) return null;
 
-    const entries = this.frameHistory.filter((entry): entry is { id: string; card: Card } => entry !== null);
+    const entries = this.frameHistory.filter(
+      (entry): entry is { id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory } =>
+        entry !== null,
+    );
 
     const counts = new Map<string, number>();
     for (const entry of entries) counts.set(entry.id, (counts.get(entry.id) ?? 0) + 1);
@@ -701,7 +728,7 @@ export class Scanner {
     if (!latest) return null;
 
     this.frameHistory = [];
-    return latest.card;
+    return latest;
   }
 
   /** Full, unfiltered color frame for Gemini - unlike captureFrame() below, no grayscale/contrast pass, since that's a Tesseract-specific preprocessing step a general vision model doesn't need. */
@@ -778,12 +805,14 @@ export class Scanner {
     return this.captureCanvas;
   }
 
-  private onMatch(result: CardIdentification) {
+  private onMatch(result: CardIdentification, meta?: { finish: CollectorFinish; cardCategory: CardCategory }) {
     this.quantity.set(1);
     this.foil.set(false);
     this.addError.set(null);
     this.candidateChoices.set(null);
     this.detectedCard.set(result.card);
+    this.detectedFinish.set(meta?.finish ?? 'nonfoil');
+    this.detectedCardCategory.set(meta?.cardCategory ?? 'normal');
     this.status.set('matched');
     if (navigator.vibrate) navigator.vibrate(200);
   }
@@ -858,6 +887,8 @@ export class Scanner {
         quantity: this.quantity(),
         foil: this.foil(),
         condition: 'NM',
+        finish: this.detectedFinish(),
+        cardCategory: this.detectedCardCategory(),
       });
       this.showToast(
         this.translate.instant('scanner.addedToast', { name: card.name }),
@@ -881,6 +912,8 @@ export class Scanner {
     }
     this.frameHistory = [];
     this.detectedCard.set(null);
+    this.detectedFinish.set('nonfoil');
+    this.detectedCardCategory.set('normal');
     this.candidateChoices.set(null);
     this.status.set('scanning');
     this.scheduleNextCapture();

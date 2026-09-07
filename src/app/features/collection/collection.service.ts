@@ -11,6 +11,14 @@ export interface CollectionCardRow {
   card_id: string;
   quantity: number;
   foil: boolean;
+  // 'nonfoil' | 'foil' | 'halo' | 'etched' - independent of the `foil`
+  // boolean above (kept as-is for the existing foil toggle/pricing), added
+  // specifically so a halo-finish scan isn't misrepresented as a plain foil.
+  finish: string;
+  // 'normal' | 'token' | 'special' - drives the collection's "✨ Specials"
+  // bucket (see card-category-stats.ts); set at add-time from the scanner's
+  // parsed collector-number flags, not recomputed from the card afterward.
+  card_category: string;
   condition: string;
   created_at: string;
 }
@@ -25,6 +33,8 @@ export interface AddCardInput {
   quantity: number;
   foil: boolean;
   condition: string;
+  finish?: string;
+  cardCategory?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -101,19 +111,30 @@ export class CollectionService {
     await Promise.all(inputs.map((input) => this.upsertOne(input)));
   }
 
-  private async upsertOne({ cardId, quantity, foil, condition }: AddCardInput): Promise<void> {
+  private async upsertOne({
+    cardId,
+    quantity,
+    foil,
+    condition,
+    finish = 'nonfoil',
+    cardCategory = 'normal',
+  }: AddCardInput): Promise<void> {
     await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Nicht eingeloggt.');
     const gameId = this.gameService.currentGameId();
     if (!gameId) throw new Error('Kein aktives Spiel.');
 
+    // `finish` is part of the match, not just `foil` - a halo copy of a
+    // card must stack separately from a nonfoil copy of the same card_id,
+    // even though both have foil=false.
     const { data: existing, error: selectError } = await this.supabase.client
       .from('collection_cards')
       .select('id, quantity')
       .eq('game_id', gameId)
       .eq('card_id', cardId)
       .eq('foil', foil)
+      .eq('finish', finish)
       .maybeSingle<{ id: string; quantity: number }>();
 
     if (selectError) throw selectError;
@@ -127,9 +148,16 @@ export class CollectionService {
       return;
     }
 
-    const { error } = await this.supabase.client
-      .from('collection_cards')
-      .insert({ user_id: userId, game_id: gameId, card_id: cardId, quantity, foil, condition });
+    const { error } = await this.supabase.client.from('collection_cards').insert({
+      user_id: userId,
+      game_id: gameId,
+      card_id: cardId,
+      quantity,
+      foil,
+      condition,
+      finish,
+      card_category: cardCategory,
+    });
     if (error) throw error;
   }
 

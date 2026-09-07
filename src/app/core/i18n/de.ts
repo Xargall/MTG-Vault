@@ -31,6 +31,7 @@ export const de = {
     green: 'Grün',
     multicolor: 'Mehrfarbig',
     colorless: 'Farblos',
+    special: '✨ Specials',
   },
   rarity: {
     common: 'Gewöhnlich',
@@ -126,6 +127,10 @@ export const de = {
     set: 'Set',
     rarity: 'Seltenheit',
     foil: 'Foil',
+    finish: 'Ausführung',
+    finish_halo: '✨ Halo',
+    finish_foil: 'Foil',
+    finish_etched: 'Etched',
     price: 'Preis',
     cardmarketLink: 'Auf Cardmarket ansehen',
     deleteLink: 'Aus Sammlung entfernen',
