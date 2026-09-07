@@ -2,16 +2,16 @@ import { Injectable, inject } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 
 import { GameService } from './game.service';
-import { MtgApiService } from './mtg-api.service';
+import { MtgBulkDataService } from './mtg-bulk-data.service';
 import { SupabaseService } from './supabase.service';
 import { ToastService } from './toast.service';
 
 const BATCH_SIZE = 50;
-// Extra pacing on top of MtgApiService's own rate-limited queue - this runs
-// entirely unattended in the background, so there's no reason to push the
-// per-request rate any harder than the scanner itself would.
-const PER_ROW_DELAY_MS = 150;
-const BATCH_PAUSE_MS = 5000;
+// A short breather between batches - not a rate-limit concern (every
+// lookup here is local, see MtgBulkDataService.findById), just a courtesy
+// so a huge backlog on first run doesn't fire hundreds of Supabase writes
+// back-to-back in one tight loop.
+const BATCH_PAUSE_MS = 1000;
 
 interface LegacyRow {
   id: string;
@@ -23,15 +23,17 @@ interface LegacyRow {
  * oracle_id column existed (see 015_oracle_id_and_deck_binding.sql) -
  * fills them in a few at a time so deck-matching/substitution (see
  * deck-stats.ts) stops missing them, without the user having to re-scan or
- * re-add every card by hand. Kicked off once from App's constructor;
- * entirely non-blocking, batch by batch until nothing is left, then quiet
- * until the next full page load.
+ * re-add every card by hand. Resolves each row's oracle_id from the local
+ * bulk-data cache (117k+ printings, already downloaded for the scanner) -
+ * no Scryfall API call at all, so no rate limit to pace around. Kicked off
+ * once from App's constructor; entirely non-blocking, batch by batch until
+ * nothing is left, then quiet until the next full page load.
  */
 @Injectable({ providedIn: 'root' })
 export class OracleIdBackfillService {
   private readonly supabase = inject(SupabaseService);
   private readonly gameService = inject(GameService);
-  private readonly mtgApi = inject(MtgApiService);
+  private readonly mtgBulkData = inject(MtgBulkDataService);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
 
@@ -42,12 +44,17 @@ export class OracleIdBackfillService {
     if (this.started) return;
     this.started = true;
 
-    await Promise.all([this.supabase.ready, this.gameService.ready]);
+    await Promise.all([this.supabase.ready, this.gameService.ready, this.mtgBulkData.ensureLoaded()]);
     // Nothing to backfill for a signed-out visitor (RLS would just return
     // nothing anyway) - and oracle_id is a Scryfall/MTG-only concept (see
     // card.model.ts), so this is scoped to the MTG game id specifically,
     // never Yu-Gi-Oh/Pokémon rows (which would never resolve one).
     if (!this.supabase.session()) return;
+    // Without a warm local cache every lookup below would just return null -
+    // rather than burn through the whole backlog doing nothing, wait for a
+    // session where the cache actually loaded (see MtgBulkDataService;
+    // App's constructor already kicks its own load off independently).
+    if (!this.mtgBulkData.ready()) return;
 
     const mtgGameId = this.gameService.games().find((game) => game.slug === 'mtg')?.id;
     if (!mtgGameId) return;
@@ -69,27 +76,28 @@ export class OracleIdBackfillService {
       return;
     }
 
-    for (const row of data) {
-      try {
-        // scryfall_id (Scryfall's own print id) is what collection_cards
-        // stores as card_id for MTG - getCard resolves it to a full Card,
-        // oracleId included, already retried on a mobile 504 internally.
-        const card = await this.mtgApi.getCard(row.card_id);
-        if (card?.oracleId) {
+    await Promise.all(
+      data.map(async (row) => {
+        try {
+          // card_id is Scryfall's own print id (scryfall_id) for MTG rows -
+          // findById is a plain local IndexedDB lookup by that same key,
+          // no network call.
+          const card = await this.mtgBulkData.findById(row.card_id);
+          if (!card?.oracle_id) return;
+
           const { error: updateError } = await this.supabase.client
             .from('collection_cards')
-            .update({ oracle_id: card.oracleId })
+            .update({ oracle_id: card.oracle_id })
             .eq('id', row.id);
           if (!updateError) this.backfilledAny = true;
+        } catch (e) {
+          // A single row failing shouldn't stop the rest of the batch -
+          // just log and move on; it stays null and gets retried on the
+          // next app start.
+          console.error('Oracle-ID-Backfill fehlgeschlagen für Zeile', row.id, e);
         }
-      } catch (e) {
-        // A single row failing (deleted/renamed card, transient network
-        // issue) shouldn't stop the rest of the batch - just log and move
-        // on; it stays null and gets retried on the next app start.
-        console.error('Oracle-ID-Backfill fehlgeschlagen für Zeile', row.id, e);
-      }
-      await new Promise((r) => setTimeout(r, PER_ROW_DELAY_MS));
-    }
+      }),
+    );
 
     if (data.length === BATCH_SIZE) {
       setTimeout(() => void this.runBatch(mtgGameId), BATCH_PAUSE_MS);

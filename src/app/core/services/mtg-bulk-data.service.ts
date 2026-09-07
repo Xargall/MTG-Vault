@@ -279,6 +279,14 @@ export class MtgBulkDataService {
     this.nameIndexPromise = null; // rebuild lazily against the fresh data next time it's needed
   }
 
+  /** Exact local lookup by Scryfall id (the store's own primary key) - e.g. resolving a collection row's card_id straight to its oracle_id with no network call at all (see OracleIdBackfillService and DeckService.grantMissingCards). */
+  async findById(id: string): Promise<ScryfallRawCard | null> {
+    if (!this.ready()) return null;
+    const db = await this.getDb();
+    const result = (await idbGet(db, STORE_CARDS, id)) as StoredCard | undefined;
+    return result ?? null;
+  }
+
   /** Exact local lookup by set code (any case) + collector number - the scanner's primary, most reliable identification path. */
   async findBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {
     if (!this.ready()) return null;

@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Card } from '../../core/models/card.model';
 import { PreconDetail } from '../../core/models/precon.model';
 import { GameService } from '../../core/services/game.service';
+import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
 import { SupabaseService } from '../../core/services/supabase.service';
 import { AddCardInput, CollectionService } from '../collection/collection.service';
 
@@ -45,6 +46,7 @@ export class DeckService {
   private readonly supabase = inject(SupabaseService);
   private readonly gameService = inject(GameService);
   private readonly collectionService = inject(CollectionService);
+  private readonly mtgBulkData = inject(MtgBulkDataService);
 
   async getMyDecks(): Promise<DeckEntry[]> {
     await this.gameService.ready;
@@ -209,32 +211,37 @@ export class DeckService {
   /**
    * Grants any not-yet-owned copies of a newly added deck's cards into the
    * collection - shared by addPreconDeck/importDeck/addEdhrecDeck. Resolves
-   * each card's oracle_id (already needed for the collection insert below,
-   * see collection.service.ts) so a basic land or reprint already owned
-   * under a *different* printing correctly counts as owned here too,
-   * instead of granting a redundant duplicate.
+   * each card's oracle_id from the local bulk-data cache (no Scryfall call
+   * at all - the /cards/collection endpoint this used to call for exactly
+   * this has no CORS support for a plain browser POST) so a basic land or
+   * reprint already owned under a *different* printing correctly counts as
+   * owned here too, instead of granting a redundant duplicate.
    */
   private async grantMissingCards(cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
-    const [resolvedCards, ownedByCardId, ownedByOracle] = await Promise.all([
-      this.gameService.cardApi().getCardsByIds(cards.map((card) => card.cardId)),
+    const isMtg = this.gameService.currentSlug() === 'mtg';
+    const [ownedByCardId, ownedByOracle] = await Promise.all([
       this.collectionService.getQuantitiesByCardId(),
       this.collectionService.getQuantitiesByOracleId(),
     ]);
-    const oracleIdByCardId = new Map(resolvedCards.map((card) => [card.id, card.oracleId]));
 
-    const collectionInputs: AddCardInput[] = cards
-      .map((card) => {
-        const oracleId = oracleIdByCardId.get(card.cardId) ?? null;
-        const owned = (oracleId ? (ownedByOracle.get(oracleId) ?? 0) : 0) + (ownedByCardId.get(card.cardId) ?? 0);
-        return {
-          cardId: card.cardId,
-          quantity: card.quantity - owned,
-          foil: false,
-          condition: 'NM',
-          oracleId,
-        };
-      })
-      .filter((input) => input.quantity > 0);
+    const collectionInputs = (
+      await Promise.all(
+        cards.map(async (card) => {
+          // oracle_id is a Scryfall/MTG-only concept (see card.model.ts) -
+          // no lookup at all for other games, same as everywhere else.
+          const oracleId = isMtg ? ((await this.mtgBulkData.findById(card.cardId))?.oracle_id ?? null) : null;
+          const owned = (oracleId ? (ownedByOracle.get(oracleId) ?? 0) : 0) + (ownedByCardId.get(card.cardId) ?? 0);
+          const input: AddCardInput = {
+            cardId: card.cardId,
+            quantity: card.quantity - owned,
+            foil: false,
+            condition: 'NM',
+            oracleId,
+          };
+          return input;
+        }),
+      )
+    ).filter((input) => input.quantity > 0);
 
     if (collectionInputs.length > 0) {
       await this.collectionService.addCards(collectionInputs);
