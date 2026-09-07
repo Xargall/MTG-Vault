@@ -27,8 +27,12 @@
   ],
   "dataGroups": [
     {
-      "name": "api-calls",
-      "urls": ["https://api.scryfall.com/**", "https://json.edhrec.com/**"],
+      "name": "external-apis",
+      "urls": [
+        "https://api.scryfall.com/**",
+        "https://json.edhrec.com/**",
+        "https://*.supabase.co/functions/**"
+      ],
       "cacheConfig": {
         "strategy": "freshness",
         "maxAge": "0s",

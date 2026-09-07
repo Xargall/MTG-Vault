@@ -71,7 +71,25 @@ export class OracleIdBackfillService {
       .limit(BATCH_SIZE)
       .returns<LegacyRow[]>();
 
-    if (error || !data || data.length === 0) {
+    if (error) {
+      // 42703 = PostgreSQL's "undefined_column" - almost certainly means
+      // 015_oracle_id_and_deck_binding.sql hasn't been run against this
+      // Supabase project yet (oracle_id/is_assigned don't exist there
+      // yet). Logged once per app load rather than thrown, so a
+      // not-yet-migrated project doesn't break anything else - this
+      // service just quietly has nothing to do until the migration runs.
+      if (error.code === '42703') {
+        console.warn(
+          'Oracle-ID-Backfill: Spalte fehlt noch in collection_cards - wurde supabase/sql/015_oracle_id_and_deck_binding.sql schon ausgeführt?',
+          error,
+        );
+      } else {
+        console.error('Oracle-ID-Backfill: Batch-Abfrage fehlgeschlagen', error);
+      }
+      this.finish();
+      return;
+    }
+    if (!data || data.length === 0) {
       this.finish();
       return;
     }

@@ -1,6 +1,13 @@
 import { Injectable, inject } from '@angular/core';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { SupabaseService } from './supabase.service';
+
+// EDHREC's 403 (see edhrec-proxy) is presumably a temporary block on the
+// proxy's own outbound IP, not a per-user thing - same cool-off pattern as
+// GeminiVisionService.rateLimited/ScryfallRateLimitError, just a much
+// longer window since this is an IP-level block, not a per-second quota.
+const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
 
 export interface EdhrecCard {
   name: string;
@@ -56,8 +63,14 @@ export class EdhrecService {
 
   private readonly averageDeckCache = new Map<string, Promise<EdhrecCard[]>>();
   private readonly cardCommandersCache = new Map<string, Promise<EdhrecCommanderHit[]>>();
+  // Set once a 403 comes back from the proxy - checked *before* touching
+  // either cache above, so a cooled-off skip never gets memoized as if it
+  // were a real (empty) EDHREC result for that slug.
+  private rateLimitedUntil = 0;
 
   getAverageDeck(commanderName: string): Promise<EdhrecCard[]> {
+    if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
+
     const slug = slugifyMtgName(commanderName);
     let cached = this.averageDeckCache.get(slug);
     if (!cached) {
@@ -78,6 +91,8 @@ export class EdhrecService {
    * already substantially covers, not just commanders already owned.
    */
   getCommandersForCard(cardName: string): Promise<EdhrecCommanderHit[]> {
+    if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
+
     const slug = slugifyMtgName(cardName);
     let cached = this.cardCommandersCache.get(slug);
     if (!cached) {
@@ -99,7 +114,18 @@ export class EdhrecService {
       'edhrec-proxy',
       { body: { path } },
     );
-    if (error) throw error;
+    if (error) {
+      // A 403 from the proxy means EDHREC itself blocked its outbound
+      // request (see edhrec-proxy/index.ts, which forwards EDHREC's own
+      // status through) - almost certainly a temporary IP-level block, not
+      // this specific page. Pausing every EDHREC call for a while beats
+      // hammering it with more requests that would just 403 again too.
+      if (error instanceof FunctionsHttpError && error.context?.status === 403) {
+        this.rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+        return [];
+      }
+      throw error;
+    }
     if (data?.error) throw new Error(`EDHREC-Anfrage fehlgeschlagen: ${data.error}`);
 
     return extract(data?.container?.json_dict?.cardlists ?? []);
