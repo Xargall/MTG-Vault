@@ -10,6 +10,16 @@
 
 const EDHREC_BASE = 'https://json.edhrec.com';
 const EDHREC_TIMEOUT_MS = 15000;
+// EDHREC now also 403s a plain server-to-server request with no browser-like
+// headers (confirmed live: the proxy itself was blocked, not just direct
+// client requests) - a real browser's User-Agent/Accept/Referer/Origin,
+// matching what a visit to edhrec.com itself would send.
+const EDHREC_FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  Accept: 'application/json',
+  Referer: 'https://edhrec.com/',
+  Origin: 'https://edhrec.com',
+};
 // Only ever these two page types are proxied - see EdhrecService
 // (average-decks/{slug}.json, cards/{slug}.json) - rejecting anything else
 // keeps this from becoming an open fetch-any-url-on-our-behalf proxy.
@@ -43,7 +53,10 @@ Deno.serve(async (req: Request) => {
     const timeoutId = setTimeout(() => controller.abort(), EDHREC_TIMEOUT_MS);
     let edhrecResponse: Response;
     try {
-      edhrecResponse = await fetch(`${EDHREC_BASE}/${path}`, { signal: controller.signal });
+      edhrecResponse = await fetch(`${EDHREC_BASE}/${path}`, {
+        signal: controller.signal,
+        headers: EDHREC_FETCH_HEADERS,
+      });
     } catch (fetchError) {
       const timedOut = fetchError instanceof Error && fetchError.name === 'AbortError';
       return jsonResponse(
