@@ -6,7 +6,6 @@ export const en: typeof de = {
     collection: 'Collection',
     decks: 'Decks',
     wishlist: 'Wishlist',
-    settings: 'Settings',
     logout: 'Logout',
   },
   games: {

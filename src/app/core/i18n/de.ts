@@ -4,7 +4,6 @@ export const de = {
     collection: 'Sammlung',
     decks: 'Decks',
     wishlist: 'Wishlist',
-    settings: 'Einstellungen',
     logout: 'Logout',
   },
   games: {

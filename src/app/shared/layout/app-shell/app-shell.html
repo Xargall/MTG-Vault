@@ -60,9 +60,6 @@
         <a routerLink="/decks" routerLinkActive="is-active">{{ 'nav.decks' | translate }}</a>
       }
       <a routerLink="/wishlist" routerLinkActive="is-active">{{ 'nav.wishlist' | translate }}</a>
-      @if (!authService.isGuest()) {
-        <a routerLink="/settings" routerLinkActive="is-active">{{ 'nav.settings' | translate }}</a>
-      }
     </nav>
   </header>
 
