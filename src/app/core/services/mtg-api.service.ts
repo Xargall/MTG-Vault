@@ -114,6 +114,12 @@ const SEARCH_ENDPOINT = 'https://api.scryfall.com/cards/search';
 const SETS_ENDPOINT = 'https://api.scryfall.com/sets';
 const BATCH_SIZE = 75;
 const SCRYFALL_USER_AGENT = 'TCGVault/1.0 (mathias-mayer.de)';
+// Mobile networks hit Scryfall 504s (gateway timeout) far more often than
+// desktop - retried with exponential backoff (1s, 2s, 4s) rather than
+// surfacing the failure immediately. A thrown network error (offline blip,
+// DNS hiccup) gets the same treatment, on the same retry budget.
+const FETCH_RETRY_ATTEMPTS = 3;
+const FETCH_RETRY_BASE_DELAY_MS = 1000;
 
 // Real set codes vary in length and can coincide with ordinary words (e.g.
 // "war" for War of the Spark) - matching the scanner's set-code guesses
@@ -169,12 +175,27 @@ export class MtgApiService implements CardApiService {
 
   private scryfallFetch(url: string, init?: RequestInit): Promise<Response> {
     return this.queue.add(async () => {
-      const response = await fetch(url, {
-        ...init,
-        headers: { ...init?.headers, 'User-Agent': SCRYFALL_USER_AGENT },
-      });
-      if (response.status === 403) throw new ScryfallRateLimitError();
-      return response;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const response = await fetch(url, {
+            ...init,
+            headers: { ...init?.headers, 'User-Agent': SCRYFALL_USER_AGENT },
+          });
+          if (response.status === 403) throw new ScryfallRateLimitError();
+          // A 504 is transient (mobile networks hit these often) - retry
+          // instead of handing the caller a hard failure, unless retries
+          // are exhausted, in which case the (still-504) response is
+          // returned as-is for the caller's existing !response.ok handling.
+          if (response.status === 504 && attempt < FETCH_RETRY_ATTEMPTS - 1) {
+            await new Promise((r) => setTimeout(r, FETCH_RETRY_BASE_DELAY_MS * 2 ** attempt));
+            continue;
+          }
+          return response;
+        } catch (error) {
+          if (error instanceof ScryfallRateLimitError || attempt >= FETCH_RETRY_ATTEMPTS - 1) throw error;
+          await new Promise((r) => setTimeout(r, FETCH_RETRY_BASE_DELAY_MS * 2 ** attempt));
+        }
+      }
     });
   }
 
@@ -568,6 +589,7 @@ export class MtgApiService implements CardApiService {
     return {
       game: 'mtg',
       id: raw.id,
+      oracleId: raw.oracle_id,
       name: raw.printed_name ?? raw.name,
       imageUrl: raw.image_uris?.normal ?? raw.card_faces?.[0]?.image_uris?.normal ?? null,
       setName: raw.set_name,

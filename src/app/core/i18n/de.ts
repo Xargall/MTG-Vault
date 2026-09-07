@@ -104,6 +104,7 @@ export const de = {
     manaCurve: 'Mana-Kurve',
     emptyCollection: 'Noch keine Karten in deiner Sammlung. Füge deine erste Karte hinzu!',
     noResults: 'Keine Karten gefunden.',
+    oracleBackfillDone: 'Sammlung wurde aktualisiert',
   },
   addCard: {
     title: 'Karte hinzufügen',
@@ -175,6 +176,9 @@ export const de = {
     skippedOther: '{{count}} Karten konnten nicht zugeordnet werden.',
     submit: 'Zu meinen Decks hinzufügen',
     addFailed: 'Deck konnte nicht hinzugefügt werden.',
+    matchModeLabel: 'Verplante Karten zählen',
+    matchModeStrict: 'Strikt',
+    matchModeFlexible: 'Flexibel',
   },
   deckDetail: {
     missingCards: '{{count}} Karten fehlen noch in der Sammlung.',
@@ -187,6 +191,15 @@ export const de = {
     cancel: 'Abbrechen',
     deleteFailed: 'Deck konnte nicht entfernt werden.',
     wishlistFailed: 'Wunschliste konnte nicht aktualisiert werden.',
+    plannedElsewhereHint: '(davon {{percent}}% in anderen Decks verplant)',
+    bindingDetailsTitle: 'Details',
+    substituteNote: 'Ersetzt {{name}} ({{print}})',
+    assignedElsewhereNote: 'Bereits in „{{deckName}}" verplant',
+    availableNote: 'Verfügbar: {{available}} von {{needed}}',
+    releaseButton: '🔓 Freigeben',
+    confirmReleaseText: '{{cardName}} aus „{{deckName}}" freigeben? Das Deck wird dadurch unvollständig.',
+    confirmReleaseButton: 'Freigeben',
+    releaseFailed: 'Karte konnte nicht freigegeben werden.',
   },
   commanderRecs: {
     title: 'Commander-Empfehlungen',

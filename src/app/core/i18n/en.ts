@@ -106,6 +106,7 @@ export const en: typeof de = {
     manaCurve: 'Mana Curve',
     emptyCollection: 'No cards in your collection yet. Add your first card!',
     noResults: 'No cards found.',
+    oracleBackfillDone: 'Collection updated',
   },
   addCard: {
     title: 'Add Card',
@@ -177,6 +178,9 @@ export const en: typeof de = {
     skippedOther: '{{count}} cards could not be matched.',
     submit: 'Add to my decks',
     addFailed: 'Deck could not be added.',
+    matchModeLabel: 'Count planned cards',
+    matchModeStrict: 'Strict',
+    matchModeFlexible: 'Flexible',
   },
   deckDetail: {
     missingCards: '{{count}} cards still missing from your collection.',
@@ -189,6 +193,15 @@ export const en: typeof de = {
     cancel: 'Cancel',
     deleteFailed: 'Deck could not be removed.',
     wishlistFailed: 'Wishlist could not be updated.',
+    plannedElsewhereHint: '(of which {{percent}}% is planned in other decks)',
+    bindingDetailsTitle: 'Details',
+    substituteNote: 'Replaces {{name}} ({{print}})',
+    assignedElsewhereNote: 'Already assigned to "{{deckName}}"',
+    availableNote: 'Available: {{available}} of {{needed}}',
+    releaseButton: '🔓 Release',
+    confirmReleaseText: 'Release {{cardName}} from "{{deckName}}"? That deck will become incomplete.',
+    confirmReleaseButton: 'Release',
+    releaseFailed: 'Card could not be released.',
   },
   commanderRecs: {
     title: 'Commander Recommendations',

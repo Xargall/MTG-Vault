@@ -1,7 +1,7 @@
 <button type="button" class="banner" (click)="bannerClick.emit()" [attr.aria-label]="'decks.bannerAria' | translate">
   <div class="track">
     @for (image of loopImages(); track $index) {
-      <img class="banner-image" [src]="image" alt="" />
+      <img class="banner-image" [src]="image" alt="" loading="lazy" />
     }
   </div>
   <div class="overlay">

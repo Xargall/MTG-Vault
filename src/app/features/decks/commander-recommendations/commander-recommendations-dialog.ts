@@ -2,14 +2,21 @@ import { Component, computed, inject, output, signal } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../../core/models/card.model';
-import { EdhrecService } from '../../../core/services/edhrec.service';
+import { EdhrecCard, EdhrecService } from '../../../core/services/edhrec.service';
 import { MtgApiService } from '../../../core/services/mtg-api.service';
+import { OracleIdCacheService } from '../../../core/services/oracle-id-cache.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
-import { getCardOwnedStatus, getMissingQuantity } from '../deck-stats';
+import { buildOwnedOracleMap, getCardOwnedStatus, getMissingQuantity } from '../deck-stats';
 import { DeckService } from '../deck.service';
-import { buildOwnedByNameMap, getEdhrecMatch, isLand, isLegendaryCreature } from './commander-recommendations-stats';
+import {
+  buildOwnedByNameMap,
+  EdhrecMatchCard,
+  getEdhrecMatch,
+  isLand,
+  isLegendaryCreature,
+} from './commander-recommendations-stats';
 
 export interface CommanderDeckCard {
   card: Card;
@@ -57,6 +64,7 @@ export class CommanderRecommendationsDialog {
   private readonly collectionService = inject(CollectionService);
   private readonly mtgApi = inject(MtgApiService);
   private readonly edhrec = inject(EdhrecService);
+  private readonly oracleIdCache = inject(OracleIdCacheService);
   private readonly deckService = inject(DeckService);
   private readonly wishlistService = inject(WishlistService);
   private readonly translate = inject(TranslateService);
@@ -123,6 +131,7 @@ export class CommanderRecommendationsDialog {
       );
       this.collectionEntries.set(collection);
       const ownedByName = buildOwnedByNameMap(collection);
+      const ownedByOracle = buildOwnedOracleMap(collection);
 
       const ownedCommanders = dedupeByCardName(
         collection.filter(({ card }) => card.game === 'mtg' && isLegendaryCreature(card.typeLine)),
@@ -190,7 +199,8 @@ export class CommanderRecommendationsDialog {
         const batchResults = await Promise.all(
           batch.map(async (candidate) => {
             const deckCards = await this.edhrec.getAverageDeck(candidate.name).catch(() => []);
-            const { matchedCount, totalCount } = getEdhrecMatch(deckCards, ownedByName);
+            const enriched = await this.enrichWithOracleIds(deckCards, ownedByName);
+            const { matchedCount, totalCount } = getEdhrecMatch(enriched, ownedByName, ownedByOracle);
             const matchPercent = totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0;
             return { ...candidate, matchPercent, matchedCount, totalCount };
           }),
@@ -208,6 +218,26 @@ export class CommanderRecommendationsDialog {
     }
   }
 
+  /**
+   * Resolves each deck card's oracle_id via OracleIdCacheService, but only
+   * when the plain name match doesn't already cover the needed quantity -
+   * oracle matching only ever helps a card owned under a name EDHREC
+   * doesn't use (a different printing, or a localized/German print name),
+   * so a card that's already fully matched by name has nothing to gain
+   * from the extra lookup. Keeps the verification pass from resolving
+   * hundreds of names per commander when most of them don't need it.
+   */
+  private async enrichWithOracleIds(
+    deckCards: EdhrecCard[],
+    ownedByName: Map<string, number>,
+  ): Promise<EdhrecMatchCard[]> {
+    const needsResolve = deckCards.filter(
+      (card) => (ownedByName.get(card.name.toLowerCase()) ?? 0) < card.quantity,
+    );
+    const oracleIds = await this.oracleIdCache.resolveMany(needsResolve.map((card) => card.name));
+    return deckCards.map((card) => ({ ...card, oracleId: oracleIds.get(card.name) ?? null }));
+  }
+
   async selectRecommendation(rec: CommanderRecommendation) {
     this.selectedRecommendation.set(rec);
     this.detailError.set(null);
@@ -221,16 +251,22 @@ export class CommanderRecommendationsDialog {
     this.loadingDetail.set(true);
     try {
       const deckCards = await this.edhrec.getAverageDeck(rec.name);
+      // Already resolving full Card objects here (for images/names in the
+      // detail view) means oracleId comes along for free - no separate
+      // EDHREC-name oracle lookup needed, unlike the bulk verification pass
+      // in load() (which never resolves full cards, for performance).
       const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name));
       const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
       const ownedByName = buildOwnedByNameMap(this.collectionEntries());
+      const ownedByOracle = buildOwnedOracleMap(this.collectionEntries());
 
       const owned: CommanderDeckCard[] = [];
       const missing: CommanderDeckCard[] = [];
       for (const { name, quantity } of deckCards) {
         const card = cardsByName.get(name.toLowerCase());
         if (!card) continue;
-        const ownedQty = ownedByName.get(name.toLowerCase()) ?? 0;
+        const oracleQty = card.oracleId ? (ownedByOracle.get(card.oracleId) ?? 0) : 0;
+        const ownedQty = oracleQty + (ownedByName.get(name.toLowerCase()) ?? 0);
         const entry: CommanderDeckCard = { card, quantity, ownedQty };
         (getCardOwnedStatus(quantity, ownedQty) === 'owned' ? owned : missing).push(entry);
       }

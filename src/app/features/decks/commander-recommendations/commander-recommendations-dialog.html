@@ -12,7 +12,7 @@
         </button>
 
         @if (rec.imageUrl; as imageUrl) {
-          <img class="commander-hero" [src]="imageUrl" [alt]="rec.name" />
+          <img class="commander-hero" [src]="imageUrl" [alt]="rec.name" loading="lazy" />
         }
         <h3>{{ rec.name }}</h3>
 
@@ -102,7 +102,7 @@
             <li>
               <button type="button" class="recommendation-row" (click)="selectRecommendation(rec)">
                 @if (rec.imageUrl; as imageUrl) {
-                  <img class="commander-image" [src]="imageUrl" [alt]="rec.name" />
+                  <img class="commander-image" [src]="imageUrl" [alt]="rec.name" loading="lazy" />
                 } @else {
                   <div class="commander-placeholder"></div>
                 }

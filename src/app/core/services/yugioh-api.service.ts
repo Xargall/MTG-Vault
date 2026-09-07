@@ -159,6 +159,7 @@ export class YugiohApiService implements CardApiService {
     return {
       game: 'yugioh',
       id: String(raw.id),
+      oracleId: null,
       name: raw.name,
       imageUrl: raw.card_images?.[0]?.image_url ?? null,
       setName: raw.card_sets?.[0]?.set_name ?? null,

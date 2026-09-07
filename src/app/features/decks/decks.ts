@@ -13,7 +13,15 @@ import { ArchetypeBrowserDialog } from './archetype-browser-dialog/archetype-bro
 import { CommanderRecommendationsDialog } from './commander-recommendations/commander-recommendations-dialog';
 import { DeckDetailDialog } from './deck-detail-dialog/deck-detail-dialog';
 import { DeckImportDialog } from './deck-import-dialog/deck-import-dialog';
-import { buildOwnedMap, getDeckCardCount, getDeckMatch, getDeckShowcase, getPreconMatch } from './deck-stats';
+import {
+  buildAssignedElsewhereMaps,
+  buildOwnedMap,
+  buildOwnedOracleMap,
+  getAvailabilityMatch,
+  getDeckCardCount,
+  getDeckShowcase,
+  getPreconMatch,
+} from './deck-stats';
 import { DeckEntry, DeckService } from './deck.service';
 
 const BANNER_SAMPLE_SIZE = 16;
@@ -101,7 +109,11 @@ export class Decks {
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
-  private readonly decks = signal<DeckEntry[]>([]);
+  // Protected, not private - the deck-detail dialog needs every deck (not
+  // just the one being viewed) to compute how many of its cards are
+  // already committed to the user's *other* decks (see deck-stats.ts's
+  // buildAssignedElsewhereMaps).
+  protected readonly decks = signal<DeckEntry[]>([]);
   protected readonly collectionEntries = signal<CollectionEntry[]>([]);
   protected readonly bannerImages = signal<string[]>([]);
   protected readonly showBrowseDialog = signal(false);
@@ -119,14 +131,26 @@ export class Decks {
 
   protected readonly hasDecks = computed(() => this.decks().length > 0);
 
-  protected readonly deckSummaries = computed(() =>
-    this.decks().map((entry) => ({
-      entry,
-      showcase: getDeckShowcase(entry),
-      cardCount: getDeckCardCount(entry),
-      matchPercent: getDeckMatch(entry, this.collectionEntries()),
-    })),
-  );
+  protected readonly deckSummaries = computed(() => {
+    const owned = buildOwnedMap(this.collectionEntries());
+    const ownedByOracle = buildOwnedOracleMap(this.collectionEntries());
+    const allDecks = this.decks();
+
+    return allDecks.map((entry) => {
+      const { byCardId, byOracleId } = buildAssignedElsewhereMaps(allDecks, entry.deck.id);
+      const required = entry.cards.map(({ row, card }) => ({
+        cardId: row.card_id,
+        oracleId: card.oracleId,
+        quantity: row.quantity,
+      }));
+      return {
+        entry,
+        showcase: getDeckShowcase(entry),
+        cardCount: getDeckCardCount(entry),
+        matchPercent: getAvailabilityMatch(required, owned, ownedByOracle, byCardId, byOracleId, 'flexible').percent,
+      };
+    });
+  });
 
   protected readonly recommendations = computed<Recommendation[]>(() => {
     this.activeIndex()?.indexedCount(); // re-run as the background index grows

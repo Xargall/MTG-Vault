@@ -116,6 +116,7 @@ export class AddCardDialog {
         quantity: this.quantity(),
         foil: this.foil(),
         condition: this.condition(),
+        oracleId: card.oracleId,
       });
       this.added.emit();
       this.close.emit();

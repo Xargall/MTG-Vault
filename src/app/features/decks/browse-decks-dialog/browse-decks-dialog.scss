@@ -149,6 +149,33 @@
   }
 }
 
+.match-mode-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.match-mode-option {
+  padding: 3px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+
+  &.is-selected {
+    background: var(--color-accent);
+    color: var(--color-bg);
+    font-weight: 600;
+  }
+
+  &:not(.is-selected):hover {
+    background: var(--color-surface-alt);
+  }
+}
+
 .results-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));

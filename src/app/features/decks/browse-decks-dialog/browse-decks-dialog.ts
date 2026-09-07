@@ -10,8 +10,16 @@ import { YugiohPreconIndexService } from '../../../core/services/yugioh-precon-i
 import { CardOwnedStatus, CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { CollectionEntry } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
-import { buildOwnedMap, getCardOwnedStatus, getMissingQuantity, getPreconMatch } from '../deck-stats';
-import { DeckService } from '../deck.service';
+import {
+  buildAssignedElsewhereMaps,
+  buildOwnedMap,
+  buildOwnedOracleMap,
+  getAvailabilityMatch,
+  getCardOwnedStatus,
+  getMissingQuantity,
+  MatchMode,
+} from '../deck-stats';
+import { DeckEntry, DeckService } from '../deck.service';
 
 export interface PreconDetailCard {
   card: Card;
@@ -37,6 +45,13 @@ export class BrowseDecksDialog {
   private readonly translate = inject(TranslateService);
 
   readonly collectionEntries = input.required<CollectionEntry[]>();
+  // Every one of the user's existing decks - needed to tell how many of the
+  // previewed precon's cards are already committed elsewhere (see
+  // deck-stats.ts's buildAssignedElsewhereMaps). There's no "current deck"
+  // to exclude here since this precon hasn't been added yet. Named
+  // `myDecks`, not `allDecks` - that name is already taken by the list of
+  // every *browsable* precon (see below).
+  readonly myDecks = input.required<DeckEntry[]>();
 
   protected readonly deckCardIndexActive = computed(() =>
     this.gameService.currentSlug() === 'yugioh' ? this.yugiohPreconIndex : this.deckCardIndex,
@@ -66,11 +81,28 @@ export class BrowseDecksDialog {
   protected readonly detailCards = signal<PreconDetailCard[] | null>(null);
   protected readonly loadingDetailCards = signal(false);
 
-  protected readonly matchPercent = computed(() => {
-    const detail = this.detail();
-    if (!detail) return 0;
-    return getPreconMatch(detail.cards, buildOwnedMap(this.collectionEntries()));
+  // 'flexible' (a partially-available card still earns half credit) is the
+  // default; 'strict' only credits a fully-available card. Deliberately not
+  // reset when switching between previewed decks - it's a standing search
+  // preference, not per-deck state.
+  protected readonly matchMode = signal<MatchMode>('flexible');
+
+  protected readonly availabilityMatch = computed(() => {
+    const cards = this.detailCards();
+    if (!cards || cards.length === 0) return { percent: 0, plannedElsewherePercent: 0 };
+
+    const required = cards.map((entry) => ({
+      cardId: entry.card.id,
+      oracleId: entry.card.oracleId,
+      quantity: entry.quantity,
+    }));
+    const owned = buildOwnedMap(this.collectionEntries());
+    const ownedByOracle = buildOwnedOracleMap(this.collectionEntries());
+    const { byCardId, byOracleId } = buildAssignedElsewhereMaps(this.myDecks(), null);
+    return getAvailabilityMatch(required, owned, ownedByOracle, byCardId, byOracleId, this.matchMode());
   });
+
+  protected readonly matchPercent = computed(() => this.availabilityMatch().percent);
 
   /** Total copies in the deck (sum of quantities) - never the number of distinct cards, which is what `detail().cards.length` would give. */
   protected readonly totalCardCount = computed(

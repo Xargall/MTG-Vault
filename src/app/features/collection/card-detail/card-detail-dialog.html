@@ -8,7 +8,7 @@
     <div class="detail-layout">
       <div class="image-column">
         @if (entry().card.imageUrl; as url) {
-          <img class="card-image" [src]="url" [alt]="entry().card.name" />
+          <img class="card-image" [src]="url" [alt]="entry().card.name" loading="lazy" />
         } @else {
           <div class="card-placeholder">{{ entry().card.name }}</div>
         }

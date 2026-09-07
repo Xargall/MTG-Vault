@@ -16,6 +16,12 @@ interface CardBase {
   setName: string | null;
   rarity: string | null;
   prices: CardPrice;
+  // Scryfall's oracle_id - the same across every printing of a card (unlike
+  // `id`, which is per-printing) - null for Yu-Gi-Oh/Pokémon, which have no
+  // such concept. Lets deck-matching and collection ownership recognize a
+  // different print (or a basic land from a different set) of the same card
+  // as a valid substitute, instead of requiring an exact print match.
+  oracleId: string | null;
 }
 
 export interface MtgCard extends CardBase {

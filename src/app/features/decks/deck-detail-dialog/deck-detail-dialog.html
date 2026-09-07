@@ -17,6 +17,12 @@
             @if (totalValue() > 0) {
               <span class="meta-badge">{{ totalValue() | number: '1.2-2' }} €</span>
             }
+            <span class="meta-badge" [class.is-complete]="availabilityMatch().percent === 100">
+              {{ 'decks.matchInCollection' | translate: { percent: availabilityMatch().percent } }}
+              @if (availabilityMatch().plannedElsewherePercent > 0) {
+                {{ 'deckDetail.plannedElsewhereHint' | translate: { percent: availabilityMatch().plannedElsewherePercent } }}
+              }
+            </span>
           </div>
         </div>
       </div>
@@ -49,6 +55,84 @@
           <app-card-tile [card]="item.entry.card" [quantity]="item.entry.row.quantity" [status]="item.status" />
         }
       </div>
+
+      @if (cardBindingDetails().length > 0) {
+        <h3>{{ 'deckDetail.bindingDetailsTitle' | translate }}</h3>
+        <ul class="binding-details-list">
+          @for (detail of cardBindingDetails(); track detail.entry.row.id) {
+            <li class="binding-detail-row binding-detail-row--{{ detail.status }}">
+              <span class="binding-detail-icon" aria-hidden="true">
+                @if (detail.status === 'available') {
+                  ✅
+                } @else if (detail.status === 'partial') {
+                  🟡
+                } @else {
+                  ❌
+                }
+              </span>
+              <div class="binding-detail-body">
+                <span class="binding-detail-name">{{ detail.entry.card.name }} ×{{ detail.entry.row.quantity }}</span>
+
+                @if (detail.substitute; as substitute) {
+                  <span class="binding-detail-note">
+                    {{
+                      'deckDetail.substituteNote'
+                        | translate
+                          : {
+                              name: substitute.card.name,
+                              print: printLabel(substitute.card),
+                            }
+                    }}
+                  </span>
+                }
+
+                @for (assigned of detail.assignedElsewhere; track assigned.deckId) {
+                  @if (confirmingRelease()?.key === releaseKey(detail.entry.row.id, assigned)) {
+                    <div class="release-confirm">
+                      <span class="binding-detail-note">
+                        {{
+                          'deckDetail.confirmReleaseText'
+                            | translate: { cardName: detail.entry.card.name, deckName: assigned.deckName }
+                        }}
+                      </span>
+                      @if (releaseError()) {
+                        <span class="state-message error">{{ releaseError() }}</span>
+                      }
+                      <div class="release-confirm-actions">
+                        <button type="button" class="cancel-link" [disabled]="releasing()" (click)="cancelRelease()">
+                          {{ 'deckDetail.cancel' | translate }}
+                        </button>
+                        <button
+                          type="button"
+                          class="release-button"
+                          [disabled]="releasing()"
+                          (click)="confirmRelease()"
+                        >
+                          {{ 'deckDetail.confirmReleaseButton' | translate }}
+                        </button>
+                      </div>
+                    </div>
+                  } @else {
+                    <span class="binding-detail-note binding-detail-note--with-action">
+                      {{ 'deckDetail.assignedElsewhereNote' | translate: { deckName: assigned.deckName } }}
+                      <button type="button" class="release-link" (click)="requestRelease(detail, assigned)">
+                        {{ 'deckDetail.releaseButton' | translate }}
+                      </button>
+                    </span>
+                  }
+                }
+
+                <span class="binding-detail-note">
+                  {{
+                    'deckDetail.availableNote'
+                      | translate: { available: detail.available, needed: detail.entry.row.quantity }
+                  }}
+                </span>
+              </div>
+            </li>
+          }
+        </ul>
+      }
 
       <div class="danger-zone">
         @if (deleteError()) {

@@ -59,7 +59,33 @@
           <p class="card-count">{{ 'browseDecks.cardsCount' | translate: { count: totalCardCount() } }}</p>
           <span class="match-badge" [class.is-complete]="matchPercent() === 100">
             {{ 'decks.matchInCollection' | translate: { percent: matchPercent() } }}
+            @if (availabilityMatch().plannedElsewherePercent > 0) {
+              {{ 'deckDetail.plannedElsewhereHint' | translate: { percent: availabilityMatch().plannedElsewherePercent } }}
+            }
           </span>
+
+          <div class="match-mode-toggle" role="radiogroup" [attr.aria-label]="'browseDecks.matchModeLabel' | translate">
+            <button
+              type="button"
+              class="match-mode-option"
+              [class.is-selected]="matchMode() === 'strict'"
+              role="radio"
+              [attr.aria-checked]="matchMode() === 'strict'"
+              (click)="matchMode.set('strict')"
+            >
+              {{ 'browseDecks.matchModeStrict' | translate }}
+            </button>
+            <button
+              type="button"
+              class="match-mode-option"
+              [class.is-selected]="matchMode() === 'flexible'"
+              role="radio"
+              [attr.aria-checked]="matchMode() === 'flexible'"
+              (click)="matchMode.set('flexible')"
+            >
+              {{ 'browseDecks.matchModeFlexible' | translate }}
+            </button>
+          </div>
           @if (d.skippedCount > 0) {
             <p class="state-message">
               {{

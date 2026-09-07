@@ -33,7 +33,7 @@
         @for (rec of recommendations(); track rec.deck.fileName) {
           <div class="recommendation-card">
             @if (rec.deck.bannerImageUrl ?? heroImageUrl(rec.heroCardId); as imageUrl) {
-              <img class="showcase-image" [src]="imageUrl" [alt]="rec.deck.name" />
+              <img class="showcase-image" [src]="imageUrl" [alt]="rec.deck.name" loading="lazy" />
             } @else {
               <div class="showcase-placeholder">{{ rec.deck.name }}</div>
             }
@@ -86,7 +86,7 @@
         <button type="button" class="deck-card" (click)="selectedDeck.set(summary.entry)">
           @if (summary.showcase; as showcase) {
             @if (showcase.card.imageUrl; as imageUrl) {
-              <img class="showcase-image" [src]="imageUrl" [alt]="showcase.card.name" />
+              <img class="showcase-image" [src]="imageUrl" [alt]="showcase.card.name" loading="lazy" />
             } @else {
               <div class="showcase-placeholder">{{ showcase.card.name }}</div>
             }
@@ -110,6 +110,7 @@
 @if (showBrowseDialog()) {
   <app-browse-decks-dialog
     [collectionEntries]="collectionEntries()"
+    [myDecks]="decks()"
     (close)="showBrowseDialog.set(false)"
     (added)="onDeckAdded()"
   />
@@ -119,8 +120,10 @@
   <app-deck-detail-dialog
     [entry]="deck"
     [collectionEntries]="collectionEntries()"
+    [allDecks]="decks()"
     (close)="selectedDeck.set(null)"
     (deleted)="onDeckDeleted()"
+    (released)="onDeckAdded()"
   />
 }
 

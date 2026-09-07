@@ -137,6 +137,7 @@ export class PokemonApiService implements CardApiService {
     return {
       game: 'pokemon',
       id: raw.id,
+      oracleId: null,
       name: raw.name,
       imageUrl: raw.image ? `${raw.image}/high.webp` : null,
       setName: raw.set?.name ?? null,

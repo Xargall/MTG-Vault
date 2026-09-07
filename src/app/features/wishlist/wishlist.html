@@ -26,7 +26,7 @@
       @for (entry of entries(); track entry.row.id) {
         <li class="entry-row">
           @if (entry.card.imageUrl; as imageUrl) {
-            <img class="entry-image" [src]="imageUrl" [alt]="entry.card.name" />
+            <img class="entry-image" [src]="imageUrl" [alt]="entry.card.name" loading="lazy" />
           } @else {
             <div class="entry-placeholder">{{ entry.card.name }}</div>
           }

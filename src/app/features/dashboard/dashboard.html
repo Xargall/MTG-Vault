@@ -28,7 +28,7 @@
           <span class="corner corner--br"></span>
           <h2>{{ 'dashboard.popularCards' | translate }}</h2>
           @if (card.imageUrl; as imageUrl) {
-            <img class="popular-image" [src]="imageUrl" [alt]="card.name" />
+            <img class="popular-image" [src]="imageUrl" [alt]="card.name" loading="lazy" />
           } @else {
             <div class="popular-placeholder">{{ card.name }}</div>
           }
@@ -55,7 +55,7 @@
             <span class="category-bar" [style.background]="category.color"></span>
             @if (category.showcase; as entry) {
               @if (entry.card.imageUrl; as imageUrl) {
-                <img class="showcase-image" [src]="imageUrl" [alt]="entry.card.name" />
+                <img class="showcase-image" [src]="imageUrl" [alt]="entry.card.name" loading="lazy" />
               } @else {
                 <div class="showcase-placeholder">{{ entry.card.name }}</div>
               }

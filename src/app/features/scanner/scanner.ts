@@ -839,6 +839,7 @@ export class Scanner {
         quantity: 1,
         foil: false,
         condition: 'NM',
+        oracleId: candidate.card.oracleId,
       });
       this.showToast(
         this.translate.instant('scanner.addedToast', { name: candidate.card.name }),
@@ -889,6 +890,7 @@ export class Scanner {
         condition: 'NM',
         finish: this.detectedFinish(),
         cardCategory: this.detectedCardCategory(),
+        oracleId: card.oracleId,
       });
       this.showToast(
         this.translate.instant('scanner.addedToast', { name: card.name }),

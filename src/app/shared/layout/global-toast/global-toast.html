@@ -1,0 +1,5 @@
+@if (toastService.current(); as toast) {
+  <div class="global-toast" [class.global-toast--warning]="toast.variant === 'warning'">
+    {{ toast.message }}
+  </div>
+}

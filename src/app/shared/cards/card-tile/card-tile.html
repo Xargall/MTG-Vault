@@ -16,7 +16,7 @@
   }
 
   @if (card().imageUrl; as url) {
-    <img class="card-image" [src]="url" [alt]="card().name" />
+    <img class="card-image" [src]="url" [alt]="card().name" loading="lazy" />
   } @else {
     <div class="card-placeholder">{{ card().name }}</div>
   }

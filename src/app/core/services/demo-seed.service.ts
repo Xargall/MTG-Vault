@@ -148,7 +148,7 @@ export class DemoSeedService {
 
   private async seedCollection(
     cards: Array<{ name: string; quantity: number }>,
-    getCardsByNames: (names: string[]) => Promise<{ id: string; name: string }[]>,
+    getCardsByNames: (names: string[]) => Promise<{ id: string; name: string; oracleId?: string | null }[]>,
   ): Promise<Set<string>> {
     try {
       const resolved = await getCardsByNames(cards.map((c) => c.name));
@@ -159,6 +159,7 @@ export class DemoSeedService {
         quantity: quantityByName.get(card.name.toLowerCase()) ?? 1,
         foil: false,
         condition: 'NM',
+        oracleId: card.oracleId ?? null,
       }));
 
       if (inputs.length > 0) await this.collectionService.addCards(inputs);

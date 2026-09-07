@@ -21,6 +21,11 @@ export interface CollectionCardRow {
   card_category: string;
   condition: string;
   created_at: string;
+  // Scryfall's oracle_id, mirrored from the card at add-time - null for rows
+  // added before this column existed, and always null for Yu-Gi-Oh/Pokémon
+  // (see card.model.ts). Used to recognize a different printing of the same
+  // card as a deck substitute (see deck-stats.ts).
+  oracle_id: string | null;
 }
 
 export interface CollectionEntry {
@@ -35,6 +40,7 @@ export interface AddCardInput {
   condition: string;
   finish?: string;
   cardCategory?: string;
+  oracleId?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -87,6 +93,28 @@ export class CollectionService {
     return totals;
   }
 
+  /** Same as getQuantitiesByCardId, keyed by oracle_id instead - rows added before that column existed (oracle_id null) are simply excluded, not bucketed under a fake key. Callers combine this with the card_id-keyed map so a legacy row still matches by its exact print. */
+  async getQuantitiesByOracleId(): Promise<Map<string, number>> {
+    await this.gameService.ready;
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) return new Map();
+
+    const { data, error } = await this.supabase.client
+      .from('collection_cards')
+      .select('oracle_id, quantity')
+      .eq('game_id', gameId)
+      .not('oracle_id', 'is', null)
+      .returns<Array<{ oracle_id: string; quantity: number }>>();
+
+    if (error) throw error;
+
+    const totals = new Map<string, number>();
+    for (const row of data ?? []) {
+      totals.set(row.oracle_id, (totals.get(row.oracle_id) ?? 0) + row.quantity);
+    }
+    return totals;
+  }
+
   /** Card totals across every game at once (not scoped to the currently active game) - used by the game-selection screen to show "X Karten in Sammlung" per tile. */
   async getQuantityTotalsByGame(): Promise<Map<string, number>> {
     const { data, error } = await this.supabase.client
@@ -118,6 +146,7 @@ export class CollectionService {
     condition,
     finish = 'nonfoil',
     cardCategory = 'normal',
+    oracleId = null,
   }: AddCardInput): Promise<void> {
     await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;
@@ -130,19 +159,22 @@ export class CollectionService {
     // even though both have foil=false.
     const { data: existing, error: selectError } = await this.supabase.client
       .from('collection_cards')
-      .select('id, quantity')
+      .select('id, quantity, oracle_id')
       .eq('game_id', gameId)
       .eq('card_id', cardId)
       .eq('foil', foil)
       .eq('finish', finish)
-      .maybeSingle<{ id: string; quantity: number }>();
+      .maybeSingle<{ id: string; quantity: number; oracle_id: string | null }>();
 
     if (selectError) throw selectError;
 
     if (existing) {
       const { error } = await this.supabase.client
         .from('collection_cards')
-        .update({ quantity: existing.quantity + quantity })
+        // Backfills oracle_id on a legacy row (added before this column
+        // existed) the next time more copies of it are added, rather than
+        // leaving it null forever - self-healing, no migration script needed.
+        .update({ quantity: existing.quantity + quantity, oracle_id: existing.oracle_id ?? oracleId })
         .eq('id', existing.id);
       if (error) throw error;
       return;
@@ -157,6 +189,7 @@ export class CollectionService {
       condition,
       finish,
       card_category: cardCategory,
+      oracle_id: oracleId,
     });
     if (error) throw error;
   }

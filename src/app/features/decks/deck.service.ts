@@ -23,6 +23,11 @@ export interface DeckCardRow {
   deck_id: string;
   card_id: string;
   quantity: number;
+  // Whether this card counts as "committed" to this deck for the
+  // availability calculation in deck-stats.ts - defaults true (being listed
+  // in a deck's card list is itself the commitment); there's no UI to
+  // toggle it off in this pass.
+  is_assigned: boolean;
 }
 
 export interface DeckCardEntry {
@@ -126,19 +131,7 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    const owned = await this.collectionService.getQuantitiesByCardId();
-    const collectionInputs: AddCardInput[] = detail.cards
-      .map((card) => ({
-        cardId: card.cardId,
-        quantity: card.quantity - (owned.get(card.cardId) ?? 0),
-        foil: false,
-        condition: 'NM',
-      }))
-      .filter((input) => input.quantity > 0);
-
-    if (collectionInputs.length > 0) {
-      await this.collectionService.addCards(collectionInputs);
-    }
+    await this.grantMissingCards(detail.cards);
   }
 
   /** Deck built from a pasted card list (see DeckImportDialog) rather than a bundled precon. */
@@ -174,19 +167,7 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    const owned = await this.collectionService.getQuantitiesByCardId();
-    const collectionInputs: AddCardInput[] = cards
-      .map((card) => ({
-        cardId: card.cardId,
-        quantity: card.quantity - (owned.get(card.cardId) ?? 0),
-        foil: false,
-        condition: 'NM',
-      }))
-      .filter((input) => input.quantity > 0);
-
-    if (collectionInputs.length > 0) {
-      await this.collectionService.addCards(collectionInputs);
-    }
+    await this.grantMissingCards(cards);
   }
 
   /** Deck built from an EDHREC average-decklist (see CommanderRecommendationsDialog) - same shape/side effects as importDeck (grants any missing cards into the collection), just tagged with a fixed 'Commander' format instead of a free-text one. */
@@ -222,14 +203,37 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    const owned = await this.collectionService.getQuantitiesByCardId();
+    await this.grantMissingCards(cards);
+  }
+
+  /**
+   * Grants any not-yet-owned copies of a newly added deck's cards into the
+   * collection - shared by addPreconDeck/importDeck/addEdhrecDeck. Resolves
+   * each card's oracle_id (already needed for the collection insert below,
+   * see collection.service.ts) so a basic land or reprint already owned
+   * under a *different* printing correctly counts as owned here too,
+   * instead of granting a redundant duplicate.
+   */
+  private async grantMissingCards(cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
+    const [resolvedCards, ownedByCardId, ownedByOracle] = await Promise.all([
+      this.gameService.cardApi().getCardsByIds(cards.map((card) => card.cardId)),
+      this.collectionService.getQuantitiesByCardId(),
+      this.collectionService.getQuantitiesByOracleId(),
+    ]);
+    const oracleIdByCardId = new Map(resolvedCards.map((card) => [card.id, card.oracleId]));
+
     const collectionInputs: AddCardInput[] = cards
-      .map((card) => ({
-        cardId: card.cardId,
-        quantity: card.quantity - (owned.get(card.cardId) ?? 0),
-        foil: false,
-        condition: 'NM',
-      }))
+      .map((card) => {
+        const oracleId = oracleIdByCardId.get(card.cardId) ?? null;
+        const owned = (oracleId ? (ownedByOracle.get(oracleId) ?? 0) : 0) + (ownedByCardId.get(card.cardId) ?? 0);
+        return {
+          cardId: card.cardId,
+          quantity: card.quantity - owned,
+          foil: false,
+          condition: 'NM',
+          oracleId,
+        };
+      })
       .filter((input) => input.quantity > 0);
 
     if (collectionInputs.length > 0) {
@@ -239,6 +243,16 @@ export class DeckService {
 
   async deleteDeck(deckId: string): Promise<void> {
     const { error } = await this.supabase.client.from('decks').delete().eq('id', deckId);
+    if (error) throw error;
+  }
+
+  /** Manually frees a card from another deck's commitment (see deck-stats.ts's "assigned elsewhere" - the deck-detail dialog's "Freigeben" button) - the freed deck itself keeps the card in its list (still shows on its card grid), just no longer counts against its own completeness/availability elsewhere. `cardIds` covers every printing of the card that deck happens to list (see getAssignedElsewhereDecks), not just one. */
+  async releaseAssignment(deckId: string, cardIds: string[]): Promise<void> {
+    const { error } = await this.supabase.client
+      .from('deck_cards')
+      .update({ is_assigned: false })
+      .eq('deck_id', deckId)
+      .in('card_id', cardIds);
     if (error) throw error;
   }
 }

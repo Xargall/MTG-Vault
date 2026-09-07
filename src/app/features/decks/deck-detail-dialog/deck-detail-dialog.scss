@@ -136,6 +136,116 @@
   font-weight: 600;
 }
 
+.binding-details-list {
+  list-style: none;
+  margin: 0 0 var(--spacing-lg);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.binding-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius);
+  background: var(--color-surface-alt);
+  border-left: 3px solid transparent;
+
+  &--available {
+    border-left-color: #4caf7d;
+  }
+
+  &--partial {
+    border-left-color: #d9a83c;
+  }
+
+  &--unavailable {
+    border-left-color: var(--color-text-muted);
+  }
+}
+
+.binding-detail-icon {
+  flex-shrink: 0;
+}
+
+.binding-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.binding-detail-name {
+  font-size: 0.9rem;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.binding-detail-note {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+
+  &::before {
+    content: '↳ ';
+  }
+
+  &--with-action {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+}
+
+.release-link {
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 1px 8px;
+
+  &:hover {
+    color: var(--color-text);
+    border-color: var(--color-accent);
+  }
+}
+
+.release-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 0;
+}
+
+.release-confirm-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.release-button {
+  padding: 3px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-danger);
+  background: transparent;
+  color: var(--color-danger);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--color-danger);
+    color: var(--color-bg);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
 .danger-zone {
   margin-top: var(--spacing-lg);
   padding-top: var(--spacing-md);
