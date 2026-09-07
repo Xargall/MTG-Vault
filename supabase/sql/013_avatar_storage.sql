@@ -10,7 +10,10 @@ insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
 on conflict (id) do nothing;
 
-alter table storage.objects enable row level security;
+-- storage.objects is owned by supabase_storage_admin (not the SQL editor's
+-- role) and already has RLS enabled by default on every Supabase project -
+-- attempting to ALTER it here just fails with "must be owner of table
+-- objects". Only creating policies on it is needed (and permitted).
 
 drop policy if exists "Avatar images are publicly accessible" on storage.objects;
 create policy "Avatar images are publicly accessible"
