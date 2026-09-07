@@ -35,6 +35,18 @@
           }
         }
 
+        @if (asPokemonCard(entry().card); as pkmCard) {
+          @if (pkmCard.types.length > 0) {
+            <div class="mana-cost">
+              @for (type of pkmCard.types; track type) {
+                <span class="mana-symbol attribute-symbol" [style.background]="pokemonTypeColor()">
+                  {{ type }}
+                </span>
+              }
+            </div>
+          }
+        }
+
         <dl class="info-list">
           <dt>{{ 'cardDetail.set' | translate }}</dt>
           <dd>{{ entry().card.setName ?? ('common.unknown' | translate) }}</dd>
@@ -59,6 +71,16 @@
             @if (banlistLabel(); as label) {
               <dt>{{ 'yugioh.banlistStatus' | translate }}</dt>
               <dd class="banlist-badge">{{ label | translate }}</dd>
+            }
+          }
+
+          @if (asPokemonCard(entry().card); as pkmCard) {
+            <dt>{{ 'pokemon.supertype' | translate }}</dt>
+            <dd>{{ pkmCard.supertype }}</dd>
+
+            @if (pkmCard.hp !== null) {
+              <dt>HP</dt>
+              <dd>{{ pkmCard.hp }}</dd>
             }
           }
 

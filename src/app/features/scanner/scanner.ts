@@ -482,9 +482,9 @@ export class Scanner {
       return this.handleMtgFrame(videoEl);
     }
 
-    // Yu-Gi-Oh: unchanged, whole-frame OCR feeding the name-only lookup
-    // (it has none of MTG's structured Scryfall set-code/collector-number
-    // fields to crop toward).
+    // Yu-Gi-Oh and Pokémon: whole-frame OCR feeding the name-only lookup -
+    // neither has MTG's structured Scryfall set-code/collector-number
+    // fields to crop toward.
     const canvas = this.captureFrame(videoEl);
     if (!canvas) return false;
 
@@ -549,8 +549,12 @@ export class Scanner {
       const rawFrame = this.captureRawFrame(videoEl);
       if (!rawFrame) return null;
 
-      const game = this.gameService.currentSlug() === 'yugioh' ? 'yugioh' : 'mtg';
-      const cropped = cropCollectorArea(rawFrame);
+      const game = this.gameService.currentSlug();
+      // MTG's collector number and Yu-Gi-Oh's print code both print in the
+      // bottom corner, so both crop toward it (see cropCollectorArea).
+      // Pokémon has neither - no compact code to read at all, just its
+      // printed name up top - so it gets the full, uncropped frame instead.
+      const cropped = game === 'pokemon' ? rawFrame : cropCollectorArea(rawFrame);
       const text = await this.geminiVision.recognizeCollectorText(cropped, game);
 
       if (this.geminiVision.rateLimited()) {
@@ -575,6 +579,10 @@ export class Scanner {
         const code = text.toUpperCase().trim();
         if (!YUGIOH_PRINT_CODE_PATTERN.test(code)) return null;
         return await this.yugiohApi.identifyByPrintCode(code);
+      }
+
+      if (game === 'pokemon') {
+        return (await this.gameService.cardApi().identifyCard(text))?.card ?? null;
       }
 
       return await this.mtgApi.identifyByCroppedText(text);

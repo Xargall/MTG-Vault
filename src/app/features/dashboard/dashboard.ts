@@ -44,14 +44,18 @@ export class Dashboard {
   protected readonly priceDistribution = computed(() => getPriceDistribution(this.entries()));
   protected readonly totalValue = computed(() => getTotalValue(this.entries()));
 
-  protected readonly categoryHeading = computed(() =>
-    this.gameService.currentSlug() === 'yugioh'
-      ? 'dashboard.attributeDistribution'
-      : 'dashboard.colorDistribution',
-  );
-  protected readonly categoryListHeading = computed(() =>
-    this.gameService.currentSlug() === 'yugioh' ? 'dashboard.attributeCategories' : 'dashboard.colorCategories',
-  );
+  protected readonly categoryHeading = computed(() => {
+    const slug = this.gameService.currentSlug();
+    if (slug === 'yugioh') return 'dashboard.attributeDistribution';
+    if (slug === 'pokemon') return 'dashboard.typeDistribution';
+    return 'dashboard.colorDistribution';
+  });
+  protected readonly categoryListHeading = computed(() => {
+    const slug = this.gameService.currentSlug();
+    if (slug === 'yugioh') return 'dashboard.attributeCategories';
+    if (slug === 'pokemon') return 'dashboard.typeCategories';
+    return 'dashboard.colorCategories';
+  });
 
   protected readonly popularCards = signal<Card[]>([]);
   private readonly popularIndex = signal(0);

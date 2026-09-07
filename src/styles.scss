@@ -53,6 +53,18 @@
   --chart-5: #7a8f42; // weathered moss
   --chart-6: #8b76ab; // faded amethyst
   --chart-7: #a8524a; // dried-blood red
+  // Extends the 7-slot palette above for Pokémon's 11 energy types + 2
+  // card-supertype buckets (13 total) - see pokemon-collection-stats.ts.
+  // Types with a good semantic match reuse chart-1..7 (Water->steel-blue,
+  // Fire->blood-red, Grass->moss, Lightning->gold, Psychic->amethyst,
+  // Fighting->rust, Colorless->bronze-green); these 5 cover what's left
+  // (Darkness/Metal/Fairy/Dragon/the "Energy" card bucket - "Trainer"
+  // reuses --color-bronze below, already a close parchment-brown match).
+  --chart-8: #4a3f4d; // charcoal-plum (Darkness)
+  --chart-9: #7d8891; // cool slate (Metal)
+  --chart-10: #b87a94; // dusty rose (Fairy)
+  --chart-11: #4f5a8f; // deep indigo (Dragon)
+  --chart-12: #4f8f7a; // muted teal (Energy cards)
   // Single-series accent (mana curve, price histogram) and the scrollbar
   // thumb - both were the same hardcoded #8a6a2c before, now one token.
   --color-bronze: #8a6a2c;

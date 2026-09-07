@@ -2,6 +2,7 @@ import { Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { GameService } from '../../../core/services/game.service';
 import { MtgApiService } from '../../../core/services/mtg-api.service';
 import { DeckService } from '../deck.service';
 
@@ -37,6 +38,7 @@ function parseLine(line: string): ParsedLine | null {
 })
 export class DeckImportDialog {
   private readonly mtgApi = inject(MtgApiService);
+  private readonly gameService = inject(GameService);
   private readonly deckService = inject(DeckService);
   private readonly translate = inject(TranslateService);
 
@@ -81,10 +83,17 @@ export class DeckImportDialog {
       }
 
       try {
+        const isMtg = this.gameService.currentSlug() === 'mtg';
+        // MTG keeps its precise set+number resolution (an exact print, not a
+        // fuzzy guess) when the pasted line includes it; every other game -
+        // and MTG lines without a set code - falls back to the same
+        // fuzzy-name identifyCard() every service already implements for OCR.
         const card =
-          parsed.setCode && parsed.collectorNumber
+          isMtg && parsed.setCode && parsed.collectorNumber
             ? await this.mtgApi.getCardBySetAndNumber(parsed.setCode, parsed.collectorNumber)
-            : await this.mtgApi.getCardByFuzzyName(parsed.name);
+            : isMtg
+              ? await this.mtgApi.getCardByFuzzyName(parsed.name)
+              : (await this.gameService.cardApi().identifyCard(parsed.name))?.card ?? null;
 
         if (!card) {
           failed.push(line);

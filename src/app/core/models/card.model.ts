@@ -1,6 +1,6 @@
 export type GameSlug = 'mtg' | 'yugioh' | 'pokemon';
 
-export const SUPPORTED_GAME_SLUGS: GameSlug[] = ['mtg', 'yugioh'];
+export const SUPPORTED_GAME_SLUGS: GameSlug[] = ['mtg', 'yugioh', 'pokemon'];
 
 export interface CardPrice {
   eur: number | null;
@@ -40,4 +40,18 @@ export interface YugiohCard extends CardBase {
   banlistStatus: YugiohBanlistStatus | null;
 }
 
-export type Card = MtgCard | YugiohCard;
+// Matches TCGdex's own German-locale `category` values verbatim (confirmed
+// live: "Pokémon", "Trainer", "Energie" - German, not English "Energy") so
+// mapping raw API data needs no extra normalization step.
+export type PokemonSupertype = 'Pokémon' | 'Trainer' | 'Energie';
+
+export interface PokemonCard extends CardBase {
+  game: 'pokemon';
+  supertype: PokemonSupertype;
+  /** Energy types (e.g. ["Fire"]) - empty for Trainer/Energy cards. */
+  types: string[];
+  hp: number | null;
+  evolvesFrom: string | null;
+}
+
+export type Card = MtgCard | YugiohCard | PokemonCard;

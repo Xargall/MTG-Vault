@@ -45,11 +45,19 @@
         </span>
       </button>
 
-      <div class="game-tile is-disabled">
-        <span class="coming-soon-badge">{{ 'games.comingSoon' | translate }}</span>
+      <button
+        type="button"
+        class="game-tile"
+        [class.is-active]="gameService.currentSlug() === 'pokemon'"
+        [disabled]="choosing() !== null"
+        (click)="choose('pokemon')"
+      >
         <span class="game-badge">PKM</span>
         <span class="game-name">{{ 'games.pokemon' | translate }}</span>
-      </div>
+        <span class="game-count">
+          {{ 'selectGame.cardsInCollection' | translate: { count: loading() ? '…' : cardCountFor('pokemon') } }}
+        </span>
+      </button>
 
       <div class="game-tile is-disabled">
         <span class="game-badge" aria-hidden="true">&#9670;</span>

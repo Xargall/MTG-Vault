@@ -5,6 +5,8 @@
     {{ 'footer.cardDataFrom' | translate }}
     @if (gameService.currentSlug() === 'yugioh') {
       <a href="https://ygoprodeck.com" target="_blank" rel="noopener">YGOPRODeck</a>
+    } @else if (gameService.currentSlug() === 'pokemon') {
+      <a href="https://tcgdex.dev" target="_blank" rel="noopener">TCGdex</a>
     } @else {
       <a href="https://scryfall.com" target="_blank" rel="noopener">Scryfall</a>
     }

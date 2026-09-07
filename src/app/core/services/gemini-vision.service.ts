@@ -34,7 +34,7 @@ export class GeminiVisionService {
   // from any other reason recognizeCollectorText returned null.
   readonly rateLimited = signal(false);
 
-  async recognizeCollectorText(canvas: HTMLCanvasElement, game: 'mtg' | 'yugioh'): Promise<string | null> {
+  async recognizeCollectorText(canvas: HTMLCanvasElement, game: 'mtg' | 'yugioh' | 'pokemon'): Promise<string | null> {
     this.rateLimited.set(false);
     await this.waitForRateLimit();
 

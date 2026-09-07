@@ -89,9 +89,15 @@ export class Decks {
   private readonly yugiohPreconIndex = inject(YugiohPreconIndexService);
   private readonly translate = inject(TranslateService);
 
-  private readonly activeIndex = computed(() =>
-    this.gameService.currentSlug() === 'yugioh' ? this.yugiohPreconIndex : this.deckCardIndex,
-  );
+  // null for games with no precon provider (Pokémon) - there's nothing to
+  // index, and allPreconDecks() below stays empty for them too so the
+  // recommendations computed's loop over it never actually dereferences this.
+  private readonly activeIndex = computed(() => {
+    const slug = this.gameService.currentSlug();
+    if (slug === 'yugioh') return this.yugiohPreconIndex;
+    if (slug === 'mtg') return this.deckCardIndex;
+    return null;
+  });
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
@@ -123,7 +129,7 @@ export class Decks {
   );
 
   protected readonly recommendations = computed<Recommendation[]>(() => {
-    this.activeIndex().indexedCount(); // re-run as the background index grows
+    this.activeIndex()?.indexedCount(); // re-run as the background index grows
 
     const owned = buildOwnedMap(this.collectionEntries());
     const trackedFileNames = new Set(
@@ -137,7 +143,7 @@ export class Decks {
     for (const deck of this.allPreconDecks()) {
       if (trackedFileNames.has(deck.fileName) || trackedNames.has(deck.name)) continue;
 
-      const indexed = this.activeIndex().getEntry(deck.fileName);
+      const indexed = this.activeIndex()?.getEntry(deck.fileName);
       if (!indexed || indexed.cards.length === 0) continue;
 
       const matchPercent = getPreconMatch(indexed.cards, owned);
@@ -162,7 +168,7 @@ export class Decks {
       untracked(() => {
         this.loadDecks();
         this.loadPreconList();
-        this.activeIndex().ensureBuilding();
+        this.activeIndex()?.ensureBuilding();
       });
     });
 
@@ -256,7 +262,7 @@ export class Decks {
     this.addingFileName.set(rec.deck.fileName);
     this.recommendationError.set(null);
     try {
-      const indexed = this.activeIndex().getEntry(rec.deck.fileName);
+      const indexed = this.activeIndex()?.getEntry(rec.deck.fileName);
       if (!indexed) throw new Error(this.translate.instant('browseDecks.detailFailed'));
 
       await this.deckService.addPreconDeck(rec.deck.name, rec.deck.type, rec.deck.releaseDate, rec.deck.fileName, {

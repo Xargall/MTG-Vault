@@ -5,6 +5,7 @@ import { PreconDeckProvider } from '../models/precon.model';
 import { CardApiService } from './card-api.interface';
 import { MtgApiService } from './mtg-api.service';
 import { MtgPreconService } from './mtg-precon.service';
+import { PokemonApiService } from './pokemon-api.service';
 import { SupabaseService } from './supabase.service';
 import { YugiohApiService } from './yugioh-api.service';
 import { YugiohPreconService } from './yugioh-precon.service';
@@ -22,6 +23,7 @@ export class GameService {
   private readonly supabase = inject(SupabaseService);
   private readonly mtgApi = inject(MtgApiService);
   private readonly yugiohApi = inject(YugiohApiService);
+  private readonly pokemonApi = inject(PokemonApiService);
   private readonly mtgPrecon = inject(MtgPreconService);
   private readonly yugiohPrecon = inject(YugiohPreconService);
 
@@ -33,9 +35,12 @@ export class GameService {
   );
   readonly currentGameId = computed(() => this.currentGame()?.id ?? null);
 
-  readonly cardApi = computed<CardApiService>(() =>
-    this.currentSlug() === 'yugioh' ? this.yugiohApi : this.mtgApi,
-  );
+  readonly cardApi = computed<CardApiService>(() => {
+    const slug = this.currentSlug();
+    if (slug === 'yugioh') return this.yugiohApi;
+    if (slug === 'pokemon') return this.pokemonApi;
+    return this.mtgApi;
+  });
 
   readonly precon = computed<PreconDeckProvider | null>(() => {
     const slug = this.currentSlug();
@@ -43,7 +48,12 @@ export class GameService {
     if (slug === 'yugioh') return this.yugiohPrecon;
     return null;
   });
-  readonly decksSupported = computed(() => this.precon() !== null);
+  // Every game supports *some* deck functionality now (own decks + manual
+  // import, see DeckImportDialog) - this just gates the Decks nav tab/route,
+  // not precon/community browsing specifically. Use hasPreconBrowsing for that.
+  readonly decksSupported = computed(() => true);
+  /** Whether the active game has a precon/community deck provider to browse - Pokémon doesn't (no viable data source yet), so its Decks page only offers manual import. */
+  readonly hasPreconBrowsing = computed(() => this.precon() !== null);
 
   private resolveReady!: () => void;
   readonly ready: Promise<void> = new Promise((resolve) => {

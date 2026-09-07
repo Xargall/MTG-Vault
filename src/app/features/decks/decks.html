@@ -1,21 +1,23 @@
 <div class="decks">
   <h1>{{ 'decks.title' | translate }}</h1>
 
-  <app-deck-banner [images]="bannerImages()" (bannerClick)="showBrowseDialog.set(true)" />
+  @if (gameService.hasPreconBrowsing()) {
+    <app-deck-banner [images]="bannerImages()" (bannerClick)="showBrowseDialog.set(true)" />
+  }
 
   <div class="deck-action-row">
     @if (gameService.currentSlug() === 'mtg') {
       <button type="button" class="commander-recs-button" (click)="showCommanderRecs.set(true)">
         {{ 'decks.commanderRecsButton' | translate }}
       </button>
-      <button type="button" class="commander-recs-button" (click)="showDeckImport.set(true)">
-        {{ 'deckImport.openButton' | translate }}
-      </button>
     } @else if (gameService.currentSlug() === 'yugioh') {
       <button type="button" class="commander-recs-button" (click)="showArchetypeBrowser.set(true)">
         {{ 'archetypeBrowser.openButton' | translate }}
       </button>
     }
+    <button type="button" class="commander-recs-button" (click)="showDeckImport.set(true)">
+      {{ 'deckImport.openButton' | translate }}
+    </button>
   </div>
 
   @if (recommendations().length > 0) {
@@ -75,7 +77,9 @@
   } @else if (errorMessage()) {
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else if (!hasDecks()) {
-    <p class="state-message">{{ 'decks.empty' | translate }}</p>
+    <p class="state-message">
+      {{ (gameService.hasPreconBrowsing() ? 'decks.empty' : 'decks.emptyNoPrecon') | translate }}
+    </p>
   } @else {
     <div class="deck-grid">
       @for (summary of deckSummaries(); track summary.entry.deck.id) {

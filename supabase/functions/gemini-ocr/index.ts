@@ -56,6 +56,19 @@ Antworte NUR mit dem Code, z.B.: "SDAZ-DE001"
 Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
 Keine weiteren Erklärungen, kein zusätzlicher Text.`;
 
+// Unlike MTG/Yu-Gi-Oh, Pokémon has no compact printed code to read (its
+// card number, e.g. "025/198", isn't enough on its own to identify a card
+// without also reading a set symbol icon) - so this reads the card's
+// printed name instead, resolved client-side via the same fuzzy-name
+// identifyCard() path used by the Tesseract-based automatic loop.
+const POKEMON_PROMPT = `Du siehst ein Foto einer Pokémon-Sammelkarte.
+Lies NUR den Namen des Pokémon (oder Trainer-/Energiekarten-Namen), so wie er oben auf der Karte aufgedruckt ist.
+
+Antworte NUR mit dem Namen, z.B.: "Glurak" oder "Professor Eichs Forschung"
+
+Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
+Keine weiteren Erklärungen, kein zusätzlicher Text.`;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -127,7 +140,7 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const prompt = game === 'yugioh' ? YUGIOH_PROMPT : MTG_PROMPT;
+    const prompt = game === 'yugioh' ? YUGIOH_PROMPT : game === 'pokemon' ? POKEMON_PROMPT : MTG_PROMPT;
 
     const apiKey = (await resolveUserGeminiKey(req)) ?? Deno.env.get('GEMINI_API_KEY');
     if (!apiKey) {

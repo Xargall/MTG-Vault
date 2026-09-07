@@ -4,6 +4,7 @@ import { PreconDeckProvider, PreconIndexData, PreconListEntry } from '../models/
 import { GameService } from './game.service';
 import { MtgApiService } from './mtg-api.service';
 import { MtgPreconService } from './mtg-precon.service';
+import { PokemonApiService } from './pokemon-api.service';
 import { YugiohApiService } from './yugioh-api.service';
 import { YugiohPreconService } from './yugioh-precon.service';
 import { AddCardInput, CollectionService } from '../../features/collection/collection.service';
@@ -44,6 +45,21 @@ const YUGIOH_WISHLIST = [
   'Time Wizard',
 ];
 
+// German names (TCGdex's primary locale - see PokemonApiService) for
+// well-known Pokémon, so the demo collection resolves cleanly on the first try.
+const POKEMON_COLLECTION: Array<{ name: string; quantity: number }> = [
+  { name: 'Glurak', quantity: 1 },
+  { name: 'Pikachu', quantity: 2 },
+  { name: 'Bisaflor', quantity: 1 },
+  { name: 'Turtok', quantity: 1 },
+  { name: 'Relaxo', quantity: 2 },
+  { name: 'Gengar', quantity: 1 },
+  { name: 'Mauzi', quantity: 2 },
+  { name: 'Onix', quantity: 1 },
+];
+
+const POKEMON_WISHLIST = ['Mewtu', 'Lugia', 'Dragoran', 'Kadabra', 'Zapdos'];
+
 // Picked by exact name rather than dynamically (unlike the MTG Commander
 // Decks below) because YGOPRODeck's precon catalog includes edge cases like
 // multi-deck bundle products sharing one set_code (see YugiohPreconService) -
@@ -69,6 +85,7 @@ export class DemoSeedService {
   private readonly wishlistService = inject(WishlistService);
   private readonly mtgApi = inject(MtgApiService);
   private readonly yugiohApi = inject(YugiohApiService);
+  private readonly pokemonApi = inject(PokemonApiService);
   private readonly mtgPrecon = inject(MtgPreconService);
   private readonly yugiohPrecon = inject(YugiohPreconService);
 
@@ -88,6 +105,12 @@ export class DemoSeedService {
       await this.seedWishlist(YUGIOH_WISHLIST, (names) => this.yugiohApi.getCardsByNames(names));
       const yugiohDecks = await this.pickYugiohDecks();
       await this.seedDecks(this.yugiohPrecon, yugiohDecks, yugiohBaseIds);
+
+      // No precon provider for Pokémon yet (see GameService.precon) - just
+      // collection + wishlist, no seedDecks step.
+      this.gameService.setGame('pokemon');
+      await this.seedCollection(POKEMON_COLLECTION, (names) => this.pokemonApi.getCardsByNames(names));
+      await this.seedWishlist(POKEMON_WISHLIST, (names) => this.pokemonApi.getCardsByNames(names));
     } finally {
       this.gameService.setGame(originalSlug);
     }

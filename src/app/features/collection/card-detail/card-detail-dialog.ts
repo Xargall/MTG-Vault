@@ -2,10 +2,11 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { Card, MtgCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
+import { Card, MtgCard, PokemonCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
 import { ATTRIBUTE_CATEGORIES } from '../yugioh-collection-stats';
 import { COLOR_CATEGORIES, getEntryPrice } from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
+import { pokemonCategoryFor, POKEMON_CATEGORIES } from '../pokemon-collection-stats';
 
 const SYMBOL_COLORS = new Map<string, string>(
   COLOR_CATEGORIES.map(({ key, color }) => [key, color]),
@@ -13,6 +14,10 @@ const SYMBOL_COLORS = new Map<string, string>(
 
 const ATTRIBUTE_COLORS = new Map<string, string>(
   ATTRIBUTE_CATEGORIES.map(({ key, color }) => [key, color]),
+);
+
+const POKEMON_TYPE_COLORS = new Map<string, string>(
+  POKEMON_CATEGORIES.map(({ key, color }) => [key, color]),
 );
 
 // Values are i18n keys, resolved via the `translate` pipe in the template -
@@ -82,6 +87,10 @@ export class CardDetailDialog {
     return card.game === 'yugioh' ? card : null;
   }
 
+  protected asPokemonCard(card: Card): PokemonCard | null {
+    return card.game === 'pokemon' ? card : null;
+  }
+
   protected readonly cardmarketUrl = computed(
     () => this.asMtgCard(this.entry().card)?.cardmarketUrl ?? null,
   );
@@ -104,5 +113,11 @@ export class CardDetailDialog {
   protected readonly banlistLabel = computed(() => {
     const card = this.asYugiohCard(this.entry().card);
     return card?.banlistStatus ? BANLIST_LABELS[card.banlistStatus] : null;
+  });
+
+  protected readonly pokemonTypeColor = computed(() => {
+    const card = this.asPokemonCard(this.entry().card);
+    if (!card) return null;
+    return POKEMON_TYPE_COLORS.get(pokemonCategoryFor(card)) ?? 'var(--color-border)';
   });
 }
