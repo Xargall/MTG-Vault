@@ -4,6 +4,12 @@ export interface SetCodeMatch {
   setCode: string;
   collectorNumber: string;
   isToken: boolean;
+  // The "H" flag (e.g. "H 0020", "020/020 H") was originally assumed to
+  // mark a Halo-foil finish, but real Scryfall data disproves that: it
+  // marks a Reminder/"Helper" card (e.g. a hideaway/disguise explainer),
+  // which lives in the set's token sheet like an ordinary token - not a
+  // finish variant of the plain print at all. See resolveSetCodeMatch.
+  isHelper: boolean;
   finish: CollectorFinish;
 }
 
@@ -11,6 +17,7 @@ export interface CollectorNumberMatch {
   /** Bare printed number, unpadded, never carrying a flag prefix (e.g. "17", "82"). */
   number: string;
   isToken: boolean;
+  isHelper: boolean;
   finish: CollectorFinish;
 }
 
@@ -27,31 +34,36 @@ export interface CollectorNumberMatch {
 const SET_CODE_TOKEN_PATTERN = /\b([A-Z]{2,6})\b/g;
 // Old format (through March of the Machine, 2023): "NR/TOTAL" with an
 // optional trailing flag letter - "017/017 T" (token #17), "020/020 H"
-// (halo #20), "150/350" (plain #150). The flag trails the fraction here,
-// unlike the new format below where it leads the number. Excludes a number
-// directly after a ©/™ symbol for the same reason as the new-format pattern
-// below (copyright-line years look exactly as plausible otherwise).
+// (Reminder/"Helper" card #20), "150/350" (plain #150). The flag trails the
+// fraction here, unlike the new format below where it leads the number.
+// Excludes a number directly after a ©/™ symbol for the same reason as the
+// new-format pattern below (copyright-line years look exactly as plausible
+// otherwise).
 const OLD_FORMAT_COLLECTOR_PATTERN = /(?<![©™]\s*)\b(\d{3,5})\/\d{3,5}(?:\s+([A-Z]))?\b/;
 // New format (March of the Machine, 2023 onward): always a zero-padded
 // 4-digit number, no fraction, with an optional leading flag letter -
-// "T 0003" (token #3), "H 0020" (halo #20), "0082" (plain #82). Gemini
-// sometimes prints the flag glued to the digits ("T0003") rather than
-// spaced - `\s*` (zero-or-more) matches both. Excludes a number directly
-// after a ©/™ symbol - the card's copyright line ("© 2025 Wizards of the
-// Coast") sits right next to the actual set-code/collector-number line and
-// its year is exactly as plausible-looking a 4-digit match, but is never
-// the real collector number.
+// "T 0003" (token #3), "H 0020" (Reminder/"Helper" card #20), "0082" (plain
+// #82). Gemini sometimes prints the flag glued to the digits ("T0003")
+// rather than spaced - `\s*` (zero-or-more) matches both. Excludes a number
+// directly after a ©/™ symbol - the card's copyright line ("© 2025 Wizards
+// of the Coast") sits right next to the actual set-code/collector-number
+// line and its year is exactly as plausible-looking a 4-digit match, but is
+// never the real collector number.
 const NEW_FORMAT_COLLECTOR_PATTERN = /(?<![©™]\s*)\b(?:([A-Z])\s*)?(\d{4})\b/;
 
 /**
  * Robust collector-number parser covering both formats MTG has printed:
  * the pre-2023 "NR/TOTAL [FLAG]" fraction and the March of the Machine-
  * onward "[FLAG] NNNN" fixed 4-digit form. Either format's flag letter is
- * only meaningful as T (token) or H (halo) - any other letter (a rarity
- * code like U/C/R/M glued to the digits) is read and discarded exactly as
- * before, just via one unified pattern instead of a separate normalization
- * pass. Tried old-format first since its fraction ("/") makes it
- * unambiguous when present; the new format never contains one.
+ * only meaningful as T (token) or H (Reminder/"Helper" card, e.g. a
+ * hideaway/disguise explainer - confirmed against Scryfall to NOT be a
+ * Halo-foil marker despite the name resemblance, see SetCodeMatch) - any
+ * other letter (a rarity code like U/C/R/M glued to the digits) is read
+ * and discarded exactly as before, just via one unified pattern instead of
+ * a separate normalization pass. Tried old-format first since its fraction
+ * ("/") makes it unambiguous when present; the new format never contains
+ * one. `finish` is always 'nonfoil' here - neither flag is an actual
+ * Scryfall finish.
  */
 export function parseCollectorNumber(rawText: string): CollectorNumberMatch | null {
   const text = rawText.toUpperCase();
@@ -59,13 +71,23 @@ export function parseCollectorNumber(rawText: string): CollectorNumberMatch | nu
   const oldMatch = OLD_FORMAT_COLLECTOR_PATTERN.exec(text);
   if (oldMatch) {
     const [, number, flag] = oldMatch;
-    return { number: String(parseInt(number, 10)), isToken: flag === 'T', finish: flag === 'H' ? 'halo' : 'nonfoil' };
+    return {
+      number: String(parseInt(number, 10)),
+      isToken: flag === 'T',
+      isHelper: flag === 'H',
+      finish: 'nonfoil',
+    };
   }
 
   const newMatch = NEW_FORMAT_COLLECTOR_PATTERN.exec(text);
   if (newMatch) {
     const [, flag, number] = newMatch;
-    return { number: String(parseInt(number, 10)), isToken: flag === 'T', finish: flag === 'H' ? 'halo' : 'nonfoil' };
+    return {
+      number: String(parseInt(number, 10)),
+      isToken: flag === 'T',
+      isHelper: flag === 'H',
+      finish: 'nonfoil',
+    };
   }
 
   return null;
@@ -141,7 +163,8 @@ export function parseGeminiMtgResult(text: string): SetCodeMatch | null {
     setCode: setCode.toLowerCase(),
     collectorNumber: String(parseInt(digits, 10)),
     isToken: flag === 'T',
-    finish: flag === 'H' ? 'halo' : 'nonfoil',
+    isHelper: flag === 'H',
+    finish: 'nonfoil',
   };
 }
 
@@ -208,6 +231,7 @@ export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string>
         setCode: setCodeFromLastLine.toLowerCase(),
         collectorNumber: collectorMatch.number,
         isToken: collectorMatch.isToken,
+        isHelper: collectorMatch.isHelper,
         finish: collectorMatch.finish,
       };
     }
@@ -244,6 +268,7 @@ export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string>
     setCode: setCodeMatch.toLowerCase(),
     collectorNumber: collectorMatch.number,
     isToken: collectorMatch.isToken,
+    isHelper: collectorMatch.isHelper,
     finish: collectorMatch.finish,
   };
 }

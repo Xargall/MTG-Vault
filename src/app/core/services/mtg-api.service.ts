@@ -43,10 +43,6 @@ export interface ScryfallRawCard {
   collector_number: string;
   rarity: string;
   released_at: string;
-  // Promo/finish treatments beyond Scryfall's plain "finishes" enum
-  // (nonfoil/foil/etched/glossy) - "halofoil" is the one relevant here, see
-  // resolveHaloCard.
-  promo_types?: string[];
   image_uris?: { normal: string; small: string; art_crop: string };
   card_faces?: ScryfallCardFace[];
   prices: { usd: string | null; usd_foil: string | null; eur: string | null; eur_foil: string | null };
@@ -263,9 +259,9 @@ export class MtgApiService implements CardApiService {
     return raw ? this.toCard(raw) : null;
   }
 
-  private categoryForMatch(match: { isToken: boolean; finish: CollectorFinish }): CardCategory {
+  private categoryForMatch(match: { isToken: boolean; isHelper: boolean }): CardCategory {
     if (match.isToken) return 'token';
-    if (match.finish === 'halo') return 'special';
+    if (match.isHelper) return 'special';
     return 'normal';
   }
 
@@ -280,9 +276,15 @@ export class MtgApiService implements CardApiService {
    * wholly separate "t"-prefixed set with the plain number - "tmsh" (Marvel
    * Super Heroes Tokens), never "msh" card "T11" (verified against the live
    * API: the latter 404s, the former is a real card) - tried second as a
-   * fallback covering that case. Halo cards need no number prefix at all -
-   * they're just a finish variant of the plain print, not a separate
-   * collector number.
+   * fallback covering that case.
+   *
+   * The "H" flag looks like a finish marker but isn't one - confirmed
+   * against Scryfall that it marks a Reminder/"Helper" card (e.g. a
+   * hideaway/disguise explainer), which - like a token - lives in the
+   * set's token sheet ("tmkm"/"21" for "H 0021 MKM"), just under its plain
+   * number rather than a "T"-prefixed one. Tried first for that reason;
+   * falling back to an H-prefixed or plain number in the parent set covers
+   * products that instead keep these inline.
    */
   private async resolveSetCodeMatch(match: SetCodeMatch): Promise<CroppedIdentification | null> {
     const finish = match.finish;
@@ -293,41 +295,19 @@ export class MtgApiService implements CardApiService {
           { setCode: match.setCode, number: `T${match.collectorNumber}` },
           ...(match.setCode.startsWith('t') ? [] : [{ setCode: `t${match.setCode}`, number: match.collectorNumber }]),
         ]
-      : [{ setCode: match.setCode, number: match.collectorNumber }];
+      : match.isHelper
+        ? [
+            ...(match.setCode.startsWith('t') ? [] : [{ setCode: `t${match.setCode}`, number: match.collectorNumber }]),
+            { setCode: match.setCode, number: `H${match.collectorNumber}` },
+            { setCode: match.setCode, number: match.collectorNumber },
+          ]
+        : [{ setCode: match.setCode, number: match.collectorNumber }];
 
     for (const { setCode, number } of setCodesToTry) {
-      let raw = await this.lookupBySetAndNumber(setCode, number);
-      if (raw && finish === 'halo') raw = await this.resolveHaloCard(setCode, number, raw);
+      const raw = await this.lookupBySetAndNumber(setCode, number);
       if (raw) return { card: this.toCard(raw), finish, cardCategory };
     }
     return null;
-  }
-
-  /**
-   * "Halo" is a promo *treatment* (Scryfall's own "is:halofoil" search
-   * predicate, see scryfall.com/docs/syntax) - not one of Scryfall's actual
-   * `finishes` (nonfoil/foil/etched/glossy), and its print can share a
-   * literal set+number with a wholly unrelated card in the same set (a rare
-   * numbering overlap between a set's main sheet and its bonus/showcase
-   * sheet) - the plain `/cards/:code/:number` endpoint can only ever return
-   * one of them, silently giving back the wrong card (e.g. "mkm"/"21"
-   * resolving to a common instead of the Halo-foil card actually scanned).
-   * Confirms the naive hit via `promo_types` when the API/local cache
-   * happens to carry it; otherwise re-resolves with an authoritative
-   * `is:halofoil` search scoped to the same set+number, which Scryfall can
-   * disambiguate even though the direct endpoint can't. Falls back to the
-   * original hit if that search finds nothing, rather than dropping a
-   * still-plausible match entirely.
-   */
-  private async resolveHaloCard(
-    setCode: string,
-    collectorNumber: string,
-    naiveMatch: ScryfallRawCard,
-  ): Promise<ScryfallRawCard> {
-    if (naiveMatch.promo_types?.includes('halofoil')) return naiveMatch;
-
-    const haloMatches = await this.runSearch(`set:${setCode} number:${collectorNumber} is:halofoil`, 'unique=prints');
-    return haloMatches[0] ?? naiveMatch;
   }
 
   /**
@@ -335,8 +315,8 @@ export class MtgApiService implements CardApiService {
    * set-code/collector-number corner (see Scanner's crop-based capture) -
    * an exact set+number hit only, no name/power-toughness/keyword fallback,
    * since a tight crop of that corner never has those fields in it anyway.
-   * Also reports the finish (halo vs. regular) and card category (token vs.
-   * special vs. normal) parsed off the same collector-number flags, so the
+   * Also reports the finish and card category (token vs. special/Helper
+   * card vs. normal) parsed off the same collector-number flags, so the
    * caller can store them on the collection row (see collection.service.ts).
    */
   async identifyByCroppedText(text: string): Promise<CroppedIdentification | null> {
@@ -354,15 +334,17 @@ export class MtgApiService implements CardApiService {
     // fall back to every locally-known printing at that number, but only
     // when there's exactly one. With no other field left to score against,
     // a tie can't be resolved safely, so it's treated as no match rather
-    // than guessing. When a token marker was read, narrow that search to
-    // token sets only first - the plain fallback is otherwise hopeless for
-    // tokens specifically (a bare number recurs across hundreds of sets,
+    // than guessing. When a token or Helper-card marker was read, narrow
+    // that search to token sets only first - both live there (see
+    // resolveSetCodeMatch) - the plain fallback is otherwise hopeless for
+    // either specifically (a bare number recurs across hundreds of sets,
     // but far fewer token sets share it).
     const bareMatch = parseCollectorNumber(text);
     if (!bareMatch) return null;
 
     const allMatches = await this.bulkData.findAllByCollectorNumber(bareMatch.number);
-    const candidates = bareMatch.isToken ? allMatches.filter((card) => card.set.startsWith('t')) : allMatches;
+    const candidates =
+      bareMatch.isToken || bareMatch.isHelper ? allMatches.filter((card) => card.set.startsWith('t')) : allMatches;
     return candidates.length === 1
       ? { card: this.toCard(candidates[0]), finish: bareMatch.finish, cardCategory: this.categoryForMatch(bareMatch) }
       : null;
@@ -372,7 +354,7 @@ export class MtgApiService implements CardApiService {
    * Identifies a card from Gemini's already-normalized MTG answer (see
    * gemini-ocr's MTG_PROMPT - always "SET NUM" / "SET TNUM" / "SET HNUM",
    * unpadded, single line, covering every format actually printed on a
-   * card: new 4-digit, old "X/Y" fraction, and both token/halo flag
+   * card: new 4-digit, old "X/Y" fraction, and both token/Helper-card flag
    * positions). Unlike identifyByCroppedText, Gemini's answer needs no
    * fuzzy OCR recovery - just a strict format check (parseGeminiMtgResult)
    * - before reusing the exact same set+number lookup.
