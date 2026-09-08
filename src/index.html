@@ -18,5 +18,12 @@
   <body>
     <app-root></app-root>
     <noscript>Please enable JavaScript to continue using this application.</noscript>
+
+    <!-- TEMPORARY DEBUG TOOL - remove once the iOS scryfall-proxy 504
+         investigation is done. Eruda gives a mobile console/network
+         inspector (tap the floating icon) since remote-debugging an
+         iPhone normally needs a Mac. -->
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
   </body>
 </html>
