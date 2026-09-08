@@ -2,7 +2,7 @@ import { Component, computed, inject, output, signal } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../../core/models/card.model';
-import { EdhrecService } from '../../../core/services/edhrec.service';
+import { EDHREC_COLOR_IDENTITIES, EdhrecService } from '../../../core/services/edhrec.service';
 import { MtgApiService } from '../../../core/services/mtg-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
@@ -13,7 +13,6 @@ import {
   buildOwnedByNameMap,
   buildPlainOwnedByNameMap,
   getEdhrecMatch,
-  isLand,
   isLegendaryCreature,
 } from './commander-recommendations-stats';
 
@@ -25,9 +24,9 @@ export interface CommanderDeckCard {
 
 const BATCH_SIZE = 5;
 // Bounds how many not-yet-owned candidate commanders get a full average-deck
-// verification after the reverse card scan - only the most-voted ones are
-// worth the extra request, long-tail single-vote candidates rarely reach a
-// useful match %.
+// verification after color-identity discovery - only the most-popular ones
+// (by EDHREC's own num_decks) are worth the extra request, long-tail
+// candidates rarely reach a useful match %.
 const CANDIDATE_LIMIT = 20;
 
 type ScanPhase = 'cards' | 'commanders';
@@ -142,25 +141,33 @@ export class CommanderRecommendationsDialog {
       );
       const ownedCommanderNames = new Set(ownedCommanders.map((entry) => entry.card.name.toLowerCase()));
 
-      // Reverse scan: for every non-land card owned, ask EDHREC which
-      // commanders most often run it, and tally candidates not already owned.
-      const signalCards = dedupeByCardName(
-        collection.filter(({ card }) => card.game === 'mtg' && !isLand(card.typeLine)),
+      // Candidate discovery: rather than asking EDHREC which commanders run
+      // each owned card (one request per card, unbounded - tripped EDHREC's
+      // own bot-protection on any collection past a couple dozen cards),
+      // pull EDHREC's own per-color-identity commander rankings instead -
+      // fixed at 32 possible identities total, independent of collection
+      // size, and narrowed further to just the identities this collection's
+      // own colors could actually cast (colorless always qualifies).
+      const ownedColors = new Set(
+        collection.flatMap(({ card }) => (card.game === 'mtg' ? card.colorIdentity : [])),
+      );
+      const relevantIdentities = EDHREC_COLOR_IDENTITIES.filter((identity) =>
+        identity.colors.every((color) => ownedColors.has(color)),
       );
 
       this.scanPhase.set('cards');
       this.checked.set(0);
-      this.total.set(signalCards.length);
+      this.total.set(relevantIdentities.length);
 
       const tally = new Map<string, number>();
-      for (let i = 0; i < signalCards.length; i += BATCH_SIZE) {
-        const batch = signalCards.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < relevantIdentities.length; i += BATCH_SIZE) {
+        const batch = relevantIdentities.slice(i, i + BATCH_SIZE);
         await Promise.all(
-          batch.map(async ({ card }) => {
-            const hits = await this.edhrec.getCommandersForCard(card.name).catch(() => []);
+          batch.map(async (identity) => {
+            const hits = await this.edhrec.getCommandersByColorIdentity(identity.slug).catch(() => []);
             for (const hit of hits) {
               if (ownedCommanderNames.has(hit.name.toLowerCase())) continue;
-              tally.set(hit.name, (tally.get(hit.name) ?? 0) + 1);
+              tally.set(hit.name, Math.max(tally.get(hit.name) ?? 0, hit.numDecks ?? 0));
             }
           }),
         );

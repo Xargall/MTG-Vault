@@ -5,10 +5,6 @@ export function isLegendaryCreature(typeLine: string): boolean {
   return typeLine.includes('Legendary') && typeLine.includes('Creature');
 }
 
-export function isLand(typeLine: string): boolean {
-  return typeLine.includes('Land');
-}
-
 /** Every collection row counted by name, regardless of oracle_id - used for the bulk commander-ranking scan (load() in commander-recommendations-dialog.ts), which deliberately does *not* resolve each EDHREC card's oracle_id (resolving hundreds of names across dozens of candidates at once used to hammer Scryfall and trigger 429s) - plain name matching only there. See buildOwnedByNameMap below for the oracle-aware variant used once a single commander is actually opened. */
 export function buildPlainOwnedByNameMap(entries: CollectionEntry[]): Map<string, number> {
   const owned = new Map<string, number>();

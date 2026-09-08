@@ -16,7 +16,50 @@ export interface EdhrecCard {
 
 export interface EdhrecCommanderHit {
   name: string;
+  /** Only present on pages/commanders/{identity}.json's cardviews - EDHREC's own popularity ranking signal, see getCommandersByColorIdentity. */
+  numDecks?: number;
 }
+
+/** One of the 32 possible MTG color identities, exactly as EDHREC names/groups them (mono colors, guilds, shards/wedges, four-color, five-color) - see getCommandersByColorIdentity. Pulled directly from a live pages/commanders/five-color.json response's own related_info listing, not guessed. */
+export interface EdhrecColorIdentity {
+  slug: string;
+  colors: string[];
+}
+
+export const EDHREC_COLOR_IDENTITIES: readonly EdhrecColorIdentity[] = [
+  { slug: 'mono-white', colors: ['W'] },
+  { slug: 'mono-blue', colors: ['U'] },
+  { slug: 'mono-black', colors: ['B'] },
+  { slug: 'mono-red', colors: ['R'] },
+  { slug: 'mono-green', colors: ['G'] },
+  { slug: 'colorless', colors: [] },
+  { slug: 'azorius', colors: ['W', 'U'] },
+  { slug: 'dimir', colors: ['U', 'B'] },
+  { slug: 'rakdos', colors: ['B', 'R'] },
+  { slug: 'gruul', colors: ['R', 'G'] },
+  { slug: 'selesnya', colors: ['G', 'W'] },
+  { slug: 'orzhov', colors: ['W', 'B'] },
+  { slug: 'izzet', colors: ['U', 'R'] },
+  { slug: 'golgari', colors: ['B', 'G'] },
+  { slug: 'boros', colors: ['R', 'W'] },
+  { slug: 'simic', colors: ['G', 'U'] },
+  { slug: 'esper', colors: ['W', 'U', 'B'] },
+  { slug: 'grixis', colors: ['U', 'B', 'R'] },
+  { slug: 'jund', colors: ['B', 'R', 'G'] },
+  { slug: 'naya', colors: ['R', 'G', 'W'] },
+  { slug: 'bant', colors: ['G', 'W', 'U'] },
+  { slug: 'abzan', colors: ['W', 'B', 'G'] },
+  { slug: 'jeskai', colors: ['U', 'R', 'W'] },
+  { slug: 'sultai', colors: ['B', 'G', 'U'] },
+  { slug: 'mardu', colors: ['R', 'W', 'B'] },
+  { slug: 'temur', colors: ['G', 'U', 'R'] },
+  { slug: 'yore-tiller', colors: ['W', 'U', 'B', 'R'] },
+  { slug: 'glint-eye', colors: ['U', 'B', 'R', 'G'] },
+  { slug: 'dune-brood', colors: ['B', 'R', 'G', 'W'] },
+  { slug: 'ink-treader', colors: ['R', 'G', 'W', 'U'] },
+  { slug: 'witch-maw', colors: ['G', 'W', 'U', 'B'] },
+  { slug: 'five-color', colors: ['W', 'U', 'B', 'R', 'G'] },
+];
 
 export interface EdhrecSaltCard {
   name: string;
@@ -29,6 +72,8 @@ interface EdhrecCardviewRaw {
   label?: string;
   /** Only present on pages/top/salt.json's cardviews - see getSaltiestCards. */
   salt?: number;
+  /** Only present on pages/commanders/{identity}.json's cardviews - see getCommandersByColorIdentity. */
+  num_decks?: number;
 }
 
 interface EdhrecCardlistRaw {
@@ -74,6 +119,42 @@ function writeSaltCache(data: EdhrecSaltCard[]): void {
   }
 }
 
+// Same reasoning as the salt cache above - EDHREC's per-color-identity
+// popularity rankings don't meaningfully shift within a day, and fetching
+// all 32 of them is exactly the bulk cost getCommandersByColorIdentity
+// exists to keep bounded and infrequent (see CommanderRecommendationsDialog,
+// which replaced an unbounded per-owned-card reverse scan with this). One
+// shared cache entry keyed by identity slug, not 32 separate localStorage keys.
+const COMMANDER_LISTS_CACHE_KEY = 'mtg-vault-commander-lists';
+const COMMANDER_LISTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+interface CommanderListsCacheEntry {
+  data: Record<string, EdhrecCommanderHit[]>;
+  timestamp: number;
+}
+
+function readCommanderListsCache(): Record<string, EdhrecCommanderHit[]> {
+  try {
+    const raw = localStorage.getItem(COMMANDER_LISTS_CACHE_KEY);
+    if (!raw) return {};
+    const { data, timestamp } = JSON.parse(raw) as CommanderListsCacheEntry;
+    if (Date.now() - timestamp >= COMMANDER_LISTS_CACHE_TTL_MS) return {};
+    return data;
+  } catch {
+    return {};
+  }
+}
+
+function writeCommanderListsCache(data: Record<string, EdhrecCommanderHit[]>): void {
+  try {
+    const entry: CommanderListsCacheEntry = { data, timestamp: Date.now() };
+    localStorage.setItem(COMMANDER_LISTS_CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // Storage full/unavailable (private browsing) - not fatal, just means
+    // the next session fetches fresh instead of from cache.
+  }
+}
+
 const DIACRITICS_PATTERN = /[̀-ͯ]/g;
 
 /**
@@ -103,7 +184,6 @@ export class EdhrecService {
   private readonly supabase = inject(SupabaseService);
 
   private readonly averageDeckCache = new Map<string, Promise<EdhrecCard[]>>();
-  private readonly cardCommandersCache = new Map<string, Promise<EdhrecCommanderHit[]>>();
   // Set once a 403 comes back from the proxy - checked *before* touching
   // either cache above, so a cooled-off skip never gets memoized as if it
   // were a real (empty) EDHREC result for that slug.
@@ -129,23 +209,45 @@ export class EdhrecService {
     return cached;
   }
 
+  private readonly colorIdentityCache = new Map<string, Promise<EdhrecCommanderHit[]>>();
+  // Read once per app load, lazily, then kept in sync as identities resolve -
+  // avoids re-parsing localStorage on every one of the (up to 32) calls this
+  // fires in a burst from CommanderRecommendationsDialog.
+  private commanderListsDiskCache: Record<string, EdhrecCommanderHit[]> | null = null;
+
   /**
-   * Which commanders most often run a given card - EDHREC's per-card page
-   * carries a "Top Commanders" list for exactly this. Used to find commanders
-   * the collection doesn't (yet) own but whose average deck the collection
-   * already substantially covers, not just commanders already owned.
+   * Every EDHREC-ranked commander for one color identity (`slug` - see
+   * EDHREC_COLOR_IDENTITIES), sorted by EDHREC itself in num_decks order.
+   * Replaces the old "ask EDHREC which commanders run each of my owned
+   * cards" reverse scan (one request per owned card, unbounded, tripped
+   * EDHREC's own bot-protection on any collection past a couple dozen
+   * cards) with a fixed set of at most 32 requests total, independent of
+   * collection size, and cached both in-memory and in localStorage for 24h
+   * (see COMMANDER_LISTS_CACHE_KEY) since these rankings barely move day to
+   * day. See CommanderRecommendationsDialog.load() for how the 32 get
+   * narrowed down to just the identities the collection can actually support.
    */
-  getCommandersForCard(cardName: string): Promise<EdhrecCommanderHit[]> {
+  getCommandersByColorIdentity(identity: string): Promise<EdhrecCommanderHit[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
-    const slug = slugifyMtgName(cardName);
-    let cached = this.cardCommandersCache.get(slug);
+    this.commanderListsDiskCache ??= readCommanderListsCache();
+    const fromDisk = this.commanderListsDiskCache[identity];
+    if (fromDisk) return Promise.resolve(fromDisk);
+
+    let cached = this.colorIdentityCache.get(identity);
     if (!cached) {
-      cached = this.fetchPage<EdhrecCommanderHit>(`pages/cards/${slug}.json`, (cardlists) => {
-        const topCommanders = cardlists.find((list) => list.tag === 'topcommanders');
-        return (topCommanders?.cardviews ?? []).map((view) => ({ name: view.name }));
+      cached = this.fetchPage<EdhrecCommanderHit>(`pages/commanders/${identity}.json`, (cardlists) =>
+        cardlists.flatMap((list) =>
+          list.cardviews.map((view) => ({ name: view.name, numDecks: view.num_decks })),
+        ),
+      ).then((hits) => {
+        if (hits.length > 0 && this.commanderListsDiskCache) {
+          this.commanderListsDiskCache[identity] = hits;
+          writeCommanderListsCache(this.commanderListsDiskCache);
+        }
+        return hits;
       });
-      this.cardCommandersCache.set(slug, cached);
+      this.colorIdentityCache.set(identity, cached);
     }
     return cached;
   }
@@ -154,8 +256,8 @@ export class EdhrecService {
 
   /**
    * EDHREC's yearly "Saltiest Cards" community survey (dashboard's
-   * Saltiest Cards section) - unlike getAverageDeck/getCommandersForCard,
-   * also persisted in localStorage for 24h (see SALT_CACHE_KEY), since this
+   * Saltiest Cards section) - unlike getAverageDeck, also persisted in
+   * localStorage for 24h (see SALT_CACHE_KEY), since this
    * list only changes once a year and there's no reason to hit the proxy
    * again every time the app reloads. Still respects the shared 403
    * cool-off above: a page load during a cooldown gets an empty list, same
