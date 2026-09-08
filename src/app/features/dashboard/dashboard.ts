@@ -19,7 +19,6 @@ const SALTIEST_CARD_COUNT = 10;
 // >= 3.5 red ("very salty"), >= 2.5 orange, otherwise yellow.
 const SALT_HIGH_THRESHOLD = 3.5;
 const SALT_MEDIUM_THRESHOLD = 2.5;
-const SALT_SCALE_MAX = 4;
 
 export interface SaltyCard {
   card: Card;
@@ -83,11 +82,16 @@ export class Dashboard {
     () => this.popularCards()[this.popularIndex()] ?? null,
   );
 
-  // Empty until loaded - also stays empty (never an error state) whenever
-  // EDHREC is unavailable (403 cooldown, network issue, ...), so the
-  // section simply doesn't render rather than showing an error (see
-  // loadSaltiestCards and the template's `saltiestCards().length > 0` guard).
+  // Same rotating-single-card presentation as popularCards/currentPopularCard
+  // above (see the template - it's the exact same box/size, just styled with
+  // a salt badge) - empty until loaded, and also stays empty (never an error
+  // state) whenever EDHREC is unavailable (403 cooldown, network issue, ...),
+  // so the section simply doesn't render at all (see loadSaltiestCards).
   protected readonly saltiestCards = signal<SaltyCard[]>([]);
+  private readonly saltiestIndex = signal(0);
+  protected readonly currentSaltiestCard = computed(
+    () => this.saltiestCards()[this.saltiestIndex()] ?? null,
+  );
   protected readonly saltLevel = saltLevel;
 
   constructor() {
@@ -144,11 +148,17 @@ export class Dashboard {
       if (saltByName.size === 0) return;
 
       const cards = await this.mtgApi.getCardsByNames([...saltByName.keys()]);
-      this.saltiestCards.set(
-        cards
-          .map((card) => ({ card, salt: saltByName.get(card.name) ?? 0 }))
-          .sort((a, b) => b.salt - a.salt),
-      );
+      const saltiest = cards
+        .map((card) => ({ card, salt: saltByName.get(card.name) ?? 0 }))
+        .sort((a, b) => b.salt - a.salt);
+      this.saltiestCards.set(saltiest);
+
+      if (saltiest.length > 1) {
+        const intervalId = setInterval(() => {
+          this.saltiestIndex.update((i) => (i + 1) % saltiest.length);
+        }, POPULAR_CARD_ROTATION_MS);
+        this.destroyRef.onDestroy(() => clearInterval(intervalId));
+      }
     } catch {
       // Purely decorative - the rest of the dashboard works fine without it.
     }
