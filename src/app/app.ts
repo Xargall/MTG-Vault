@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 
+import { CardCategoryBackfillService } from './core/services/card-category-backfill.service';
 import { MtgBulkDataService } from './core/services/mtg-bulk-data.service';
 import { OracleIdBackfillService } from './core/services/oracle-id-backfill.service';
 import { LANG_STORAGE_KEY } from './core/utils/language.util';
@@ -33,5 +34,10 @@ export class App {
     // OracleIdBackfillService for why this needs to wait for login/the MTG
     // game id rather than firing immediately like the two above.
     void inject(OracleIdBackfillService).start();
+
+    // Same idea again: corrects card_category on any collection row added
+    // while token detection was broken (card_category = 'normal' instead
+    // of 'token') - see CardCategoryBackfillService.
+    void inject(CardCategoryBackfillService).start();
   }
 }
