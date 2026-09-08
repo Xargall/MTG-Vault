@@ -218,4 +218,41 @@ export class CollectionService {
       .eq('card_id', cardId);
     if (error) throw error;
   }
+
+  /** Reverses a prior addCards grant (see DeckService.deleteDeck) - takes `quantity` copies of each card back out of the collection, never below what's actually there. A card_id can be stacked across several rows (foil/finish variants); the nonfoil stack is drained first since that's what deck grants always add to. */
+  async reduceQuantities(cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
+    await this.gameService.ready;
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) return;
+
+    for (const { cardId, quantity } of cards) {
+      let remaining = quantity;
+      if (remaining <= 0) continue;
+
+      const { data: rows, error } = await this.supabase.client
+        .from('collection_cards')
+        .select('id, quantity, foil')
+        .eq('game_id', gameId)
+        .eq('card_id', cardId)
+        .returns<Array<{ id: string; quantity: number; foil: boolean }>>();
+      if (error) throw error;
+      if (!rows || rows.length === 0) continue;
+
+      const ordered = [...rows].sort((a, b) => Number(a.foil) - Number(b.foil));
+      for (const row of ordered) {
+        if (remaining <= 0) break;
+        const take = Math.min(remaining, row.quantity);
+        remaining -= take;
+        if (take === row.quantity) {
+          await this.deleteEntry(row.id);
+        } else {
+          const { error: updateError } = await this.supabase.client
+            .from('collection_cards')
+            .update({ quantity: row.quantity - take })
+            .eq('id', row.id);
+          if (updateError) throw updateError;
+        }
+      }
+    }
+  }
 }

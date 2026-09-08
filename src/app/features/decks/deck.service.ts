@@ -6,6 +6,7 @@ import { GameService } from '../../core/services/game.service';
 import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
 import { SupabaseService } from '../../core/services/supabase.service';
 import { AddCardInput, CollectionService } from '../collection/collection.service';
+import { buildAssignedElsewhereMaps, getOwnedQuantity } from './deck-stats';
 
 export interface DeckRow {
   id: string;
@@ -133,7 +134,7 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    await this.grantMissingCards(detail.cards);
+    await this.grantMissingCards(deck.id, detail.cards);
   }
 
   /** Deck built from a pasted card list (see DeckImportDialog) rather than a bundled precon. */
@@ -169,7 +170,7 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    await this.grantMissingCards(cards);
+    await this.grantMissingCards(deck.id, cards);
   }
 
   /** Deck built from an EDHREC average-decklist (see CommanderRecommendationsDialog) - same shape/side effects as importDeck (grants any missing cards into the collection), just tagged with a fixed 'Commander' format instead of a free-text one. */
@@ -205,24 +206,37 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    await this.grantMissingCards(cards);
+    await this.grantMissingCards(deck.id, cards);
   }
 
   /**
-   * Grants any not-yet-owned copies of a newly added deck's cards into the
-   * collection - shared by addPreconDeck/importDeck/addEdhrecDeck. Resolves
-   * each card's oracle_id from the local bulk-data cache (no Scryfall call
-   * at all - the /cards/collection endpoint this used to call for exactly
-   * this has no CORS support for a plain browser POST) so a basic land or
-   * reprint already owned under a *different* printing correctly counts as
-   * owned here too, instead of granting a redundant duplicate.
+   * Grants any not-yet-*available* copies of a newly added deck's cards into
+   * the collection - shared by addPreconDeck/importDeck/addEdhrecDeck.
+   * "Available" excludes copies already committed to another of the user's
+   * decks (see deck-stats.ts's assigned-elsewhere maps) - otherwise a card
+   * shared across several decks (e.g. Howling Golem across every Game Night
+   * 2022 precon) only ever gets granted once, leaving every later deck
+   * short a copy it needs of its own even though the first deck "already
+   * owns" it. Resolves each card's oracle_id from the local bulk-data cache
+   * (no Scryfall call at all - the /cards/collection endpoint this used to
+   * call for exactly this has no CORS support for a plain browser POST) so
+   * a basic land or reprint already owned under a *different* printing
+   * correctly counts as owned here too, instead of granting a redundant
+   * duplicate.
    */
-  private async grantMissingCards(cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
+  private async grantMissingCards(deckId: string, cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
     const isMtg = this.gameService.currentSlug() === 'mtg';
-    const [ownedByCardId, ownedByOracle] = await Promise.all([
+    const [ownedByCardId, ownedByOracle, allDecks] = await Promise.all([
       this.collectionService.getQuantitiesByCardId(),
       this.collectionService.getQuantitiesByOracleId(),
+      this.getMyDecks(),
     ]);
+    // Excludes this deck's own just-inserted rows - only *other* decks'
+    // claims should shrink what's available to grant here.
+    const { byCardId: assignedByCardId, byOracleId: assignedByOracle } = buildAssignedElsewhereMaps(
+      allDecks,
+      deckId,
+    );
 
     const collectionInputs = (
       await Promise.all(
@@ -230,21 +244,14 @@ export class DeckService {
           // oracle_id is a Scryfall/MTG-only concept (see card.model.ts) -
           // no lookup at all for other games, same as everywhere else.
           const bulkMatch = isMtg ? await this.mtgBulkData.findById(card.cardId) : null;
-          console.log(
-            '[oracle_id debug] bulk-data lookup for cardId:',
-            card.cardId,
-            'bulkData.ready:',
-            this.mtgBulkData.ready(),
-            'found:',
-            !!bulkMatch,
-            'oracle_id:',
-            bulkMatch?.oracle_id,
-          );
           const oracleId = bulkMatch?.oracle_id ?? null;
-          const owned = (oracleId ? (ownedByOracle.get(oracleId) ?? 0) : 0) + (ownedByCardId.get(card.cardId) ?? 0);
+          const cardRef = { cardId: card.cardId, oracleId };
+          const owned = getOwnedQuantity(cardRef, ownedByCardId, ownedByOracle);
+          const assignedElsewhere = getOwnedQuantity(cardRef, assignedByCardId, assignedByOracle);
+          const available = Math.max(0, owned - assignedElsewhere);
           const input: AddCardInput = {
             cardId: card.cardId,
-            quantity: card.quantity - owned,
+            quantity: card.quantity - available,
             foil: false,
             condition: 'NM',
             oracleId,
@@ -259,9 +266,28 @@ export class DeckService {
     }
   }
 
+  /**
+   * Deleting a deck releases the collection copies that were granted for it
+   * on import, so a shared card (see grantMissingCards) becomes available
+   * for another deck again and a later re-import of the same deck doesn't
+   * find it "already owned" and skip granting its own copy back.
+   */
   async deleteDeck(deckId: string): Promise<void> {
+    const { data: deckCards, error: cardsError } = await this.supabase.client
+      .from('deck_cards')
+      .select('card_id, quantity')
+      .eq('deck_id', deckId)
+      .returns<Array<{ card_id: string; quantity: number }>>();
+    if (cardsError) throw cardsError;
+
     const { error } = await this.supabase.client.from('decks').delete().eq('id', deckId);
     if (error) throw error;
+
+    if (deckCards && deckCards.length > 0) {
+      await this.collectionService.reduceQuantities(
+        deckCards.map((row) => ({ cardId: row.card_id, quantity: row.quantity })),
+      );
+    }
   }
 
   /** Manually frees a card from another deck's commitment (see deck-stats.ts's "assigned elsewhere" - the deck-detail dialog's "Freigeben" button) - the freed deck itself keeps the card in its list (still shows on its card grid), just no longer counts against its own completeness/availability elsewhere. `cardIds` covers every printing of the card that deck happens to list (see getAssignedElsewhereDecks), not just one. */
