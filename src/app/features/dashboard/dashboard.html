@@ -47,6 +47,28 @@
       </section>
     </div>
 
+    @if (gameService.currentSlug() === 'mtg' && saltiestCards().length > 0) {
+      <section class="saltiest-cards">
+        <h2>{{ 'dashboard.saltiestCards' | translate }}</h2>
+        <p class="saltiest-subtitle">{{ 'dashboard.saltiestCardsSubtitle' | translate }}</p>
+        <div class="saltiest-grid">
+          @for (entry of saltiestCards(); track entry.card.id) {
+            <div class="saltiest-tile">
+              <span class="salt-badge salt-badge--{{ saltLevel(entry.salt) }}">
+                🧂 {{ entry.salt | number: '1.1-1' }} / 4.0
+              </span>
+              @if (entry.card.imageUrl; as imageUrl) {
+                <img class="saltiest-image" [src]="imageUrl" [alt]="entry.card.name" loading="lazy" />
+              } @else {
+                <div class="saltiest-placeholder">{{ entry.card.name }}</div>
+              }
+              <p class="saltiest-name">{{ entry.card.name }}</p>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
     <section class="color-categories">
       <h2>{{ categoryListHeading() | translate }}</h2>
       <div class="category-grid">

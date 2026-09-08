@@ -46,6 +46,99 @@ h1 {
   }
 }
 
+.saltiest-cards {
+  margin-top: var(--spacing-lg);
+  text-align: center;
+
+  h2 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+    color: var(--color-text);
+  }
+}
+
+.saltiest-subtitle {
+  margin: 0 0 var(--spacing-md);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.saltiest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--spacing-md);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.saltiest-tile {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 0 14px rgba(201, 162, 74, 0.16);
+}
+
+.salt-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+
+  &--high {
+    background: var(--color-danger, #dc2626);
+  }
+
+  &--medium {
+    background: #d97706;
+  }
+
+  &--low {
+    background: #ca8a04;
+  }
+}
+
+.saltiest-image {
+  width: 100%;
+  border-radius: 8px;
+  aspect-ratio: 5 / 7;
+  object-fit: cover;
+}
+
+.saltiest-placeholder {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: 8px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-md);
+}
+
+.saltiest-name {
+  margin: var(--spacing-sm) 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 .color-categories {
   margin-top: var(--spacing-lg);
 

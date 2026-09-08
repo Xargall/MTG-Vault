@@ -84,6 +84,8 @@ export const de = {
     attributeDistribution: 'Attributverteilung',
     priceDistribution: 'Preisverteilung',
     popularCards: 'Beliebte Karten',
+    saltiestCards: '😤 Saltiest Cards',
+    saltiestCardsSubtitle: 'Karten die deine Mitspieler am meisten nerven',
     colorCategories: 'Farbkategorien',
     attributeCategories: 'Attributkategorien',
     typeDistribution: 'Typverteilung',

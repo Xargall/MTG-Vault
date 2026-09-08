@@ -86,6 +86,8 @@ export const en: typeof de = {
     attributeDistribution: 'Attribute Distribution',
     priceDistribution: 'Price Distribution',
     popularCards: 'Popular Cards',
+    saltiestCards: '😤 Saltiest Cards',
+    saltiestCardsSubtitle: 'Cards that annoy your playgroup the most',
     colorCategories: 'Color Categories',
     attributeCategories: 'Attribute Categories',
     typeDistribution: 'Type Distribution',

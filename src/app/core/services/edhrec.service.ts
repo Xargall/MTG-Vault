@@ -18,9 +18,17 @@ export interface EdhrecCommanderHit {
   name: string;
 }
 
+export interface EdhrecSaltCard {
+  name: string;
+  /** 0-4 scale, EDHREC's yearly community "Salt Score" survey. */
+  salt: number;
+}
+
 interface EdhrecCardviewRaw {
   name: string;
   label?: string;
+  /** Only present on pages/top/salt.json's cardviews - see getSaltiestCards. */
+  salt?: number;
 }
 
 interface EdhrecCardlistRaw {
@@ -31,6 +39,39 @@ interface EdhrecCardlistRaw {
 
 interface EdhrecPageResponse {
   container?: { json_dict?: { cardlists?: EdhrecCardlistRaw[] } };
+}
+
+// The salt survey runs once a year, so there's no point re-fetching it every
+// session - cached in localStorage (not just the in-memory caches below,
+// which don't survive a reload) for a full day.
+const SALT_CACHE_KEY = 'mtg-vault-saltiest-cards';
+const SALT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+interface SaltCacheEntry {
+  data: EdhrecSaltCard[];
+  timestamp: number;
+}
+
+function readSaltCache(): EdhrecSaltCard[] | null {
+  try {
+    const raw = localStorage.getItem(SALT_CACHE_KEY);
+    if (!raw) return null;
+    const { data, timestamp } = JSON.parse(raw) as SaltCacheEntry;
+    if (Date.now() - timestamp >= SALT_CACHE_TTL_MS) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function writeSaltCache(data: EdhrecSaltCard[]): void {
+  try {
+    const entry: SaltCacheEntry = { data, timestamp: Date.now() };
+    localStorage.setItem(SALT_CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // Storage full/unavailable (private browsing) - not fatal, just means
+    // the next session fetches fresh instead of from cache.
+  }
 }
 
 const DIACRITICS_PATTERN = /[̀-ͯ]/g;
@@ -103,6 +144,38 @@ export class EdhrecService {
       this.cardCommandersCache.set(slug, cached);
     }
     return cached;
+  }
+
+  private saltiestCardsCache: Promise<EdhrecSaltCard[]> | null = null;
+
+  /**
+   * EDHREC's yearly "Saltiest Cards" community survey (dashboard's
+   * Saltiest Cards section) - unlike getAverageDeck/getCommandersForCard,
+   * also persisted in localStorage for 24h (see SALT_CACHE_KEY), since this
+   * list only changes once a year and there's no reason to hit the proxy
+   * again every time the app reloads. Still respects the shared 403
+   * cool-off above: a page load during a cooldown gets an empty list, same
+   * as every other EDHREC call right now, so the dashboard section just
+   * hides itself instead of showing an error (see Dashboard.loadSaltiestCards).
+   */
+  getSaltiestCards(limit: number): Promise<EdhrecSaltCard[]> {
+    if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
+
+    if (!this.saltiestCardsCache) {
+      this.saltiestCardsCache = this.loadSaltiestCards();
+    }
+    return this.saltiestCardsCache.then((cards) => cards.slice(0, limit));
+  }
+
+  private async loadSaltiestCards(): Promise<EdhrecSaltCard[]> {
+    const cached = readSaltCache();
+    if (cached) return cached;
+
+    const cards = await this.fetchPage<EdhrecSaltCard>('pages/top/salt.json', (cardlists) =>
+      (cardlists[0]?.cardviews ?? []).map((view) => ({ name: view.name, salt: view.salt ?? 0 })),
+    );
+    if (cards.length > 0) writeSaltCache(cards);
+    return cards;
   }
 
   /** Routed through the edhrec-proxy Supabase Edge Function, not a direct browser fetch - EDHREC now returns 403 for direct cross-origin requests (bot/hotlink protection), so this fetches server-side on the app's behalf, same as gemini-ocr does for Gemini Vision. `path` is EDHREC's own relative page path (e.g. "pages/average-decks/atraxa-praetors-voice.json"). */

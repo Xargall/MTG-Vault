@@ -20,10 +20,12 @@ const EDHREC_FETCH_HEADERS = {
   Referer: 'https://edhrec.com/',
   Origin: 'https://edhrec.com',
 };
-// Only ever these two page types are proxied - see EdhrecService
-// (average-decks/{slug}.json, cards/{slug}.json) - rejecting anything else
-// keeps this from becoming an open fetch-any-url-on-our-behalf proxy.
-const ALLOWED_PATH_PATTERN = /^pages\/(average-decks|cards)\/[a-z0-9-]+\.json$/;
+// Only ever these page types are proxied - see EdhrecService
+// (average-decks/{slug}.json, cards/{slug}.json, and the one fixed
+// top/salt.json page for the dashboard's Saltiest Cards section) -
+// rejecting anything else keeps this from becoming an open
+// fetch-any-url-on-our-behalf proxy.
+const ALLOWED_PATH_PATTERN = /^pages\/(average-decks|cards)\/[a-z0-9-]+\.json$|^pages\/top\/salt\.json$/;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

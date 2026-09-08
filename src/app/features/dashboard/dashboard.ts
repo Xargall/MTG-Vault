@@ -6,6 +6,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { BarChart } from '../../shared/charts/bar-chart/bar-chart';
 import { DonutChart } from '../../shared/charts/donut-chart/donut-chart';
 import { Card } from '../../core/models/card.model';
+import { EdhrecService } from '../../core/services/edhrec.service';
 import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
 import { getCategoryDistribution, getCategorySummaries } from '../collection/card-category-stats';
@@ -14,6 +15,24 @@ import { CollectionEntry, CollectionService } from '../collection/collection.ser
 
 const POPULAR_CARD_COUNT = 12;
 const POPULAR_CARD_ROTATION_MS = 15000;
+const SALTIEST_CARD_COUNT = 10;
+// >= 3.5 red ("very salty"), >= 2.5 orange, otherwise yellow.
+const SALT_HIGH_THRESHOLD = 3.5;
+const SALT_MEDIUM_THRESHOLD = 2.5;
+const SALT_SCALE_MAX = 4;
+
+export interface SaltyCard {
+  card: Card;
+  salt: number;
+}
+
+export type SaltLevel = 'high' | 'medium' | 'low';
+
+export function saltLevel(salt: number): SaltLevel {
+  if (salt >= SALT_HIGH_THRESHOLD) return 'high';
+  if (salt >= SALT_MEDIUM_THRESHOLD) return 'medium';
+  return 'low';
+}
 
 @Component({
   selector: 'app-dashboard',
@@ -24,6 +43,7 @@ const POPULAR_CARD_ROTATION_MS = 15000;
 export class Dashboard {
   private readonly collectionService = inject(CollectionService);
   private readonly mtgApi = inject(MtgApiService);
+  private readonly edhrec = inject(EdhrecService);
   protected readonly gameService = inject(GameService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly translate = inject(TranslateService);
@@ -63,12 +83,20 @@ export class Dashboard {
     () => this.popularCards()[this.popularIndex()] ?? null,
   );
 
+  // Empty until loaded - also stays empty (never an error state) whenever
+  // EDHREC is unavailable (403 cooldown, network issue, ...), so the
+  // section simply doesn't render rather than showing an error (see
+  // loadSaltiestCards and the template's `saltiestCards().length > 0` guard).
+  protected readonly saltiestCards = signal<SaltyCard[]>([]);
+  protected readonly saltLevel = saltLevel;
+
   constructor() {
     effect(() => {
       this.gameService.currentSlug();
       untracked(() => this.load());
     });
     this.loadPopularCards();
+    this.loadSaltiestCards();
   }
 
   private async load() {
@@ -95,6 +123,32 @@ export class Dashboard {
         }, POPULAR_CARD_ROTATION_MS);
         this.destroyRef.onDestroy(() => clearInterval(intervalId));
       }
+    } catch {
+      // Purely decorative - the rest of the dashboard works fine without it.
+    }
+  }
+
+  /**
+   * EDHREC only gives name+score, not full card data - resolved into real
+   * Card objects (for the image) via a single batched Scryfall lookup, then
+   * matched back to their salt score by name. A name Scryfall doesn't
+   * recognize (or EDHREC being cooled-off/unavailable, see EdhrecService)
+   * just quietly shrinks the list rather than erroring - same
+   * decorative-only failure handling as loadPopularCards.
+   */
+  private async loadSaltiestCards() {
+    try {
+      const saltByName = new Map(
+        (await this.edhrec.getSaltiestCards(SALTIEST_CARD_COUNT)).map((c) => [c.name, c.salt]),
+      );
+      if (saltByName.size === 0) return;
+
+      const cards = await this.mtgApi.getCardsByNames([...saltByName.keys()]);
+      this.saltiestCards.set(
+        cards
+          .map((card) => ({ card, salt: saltByName.get(card.name) ?? 0 }))
+          .sort((a, b) => b.salt - a.salt),
+      );
     } catch {
       // Purely decorative - the rest of the dashboard works fine without it.
     }
