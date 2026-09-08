@@ -1,6 +1,6 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners, isDevMode } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { provideTranslateService } from '@ngx-translate/core';
+import { provideTranslateLoader, provideTranslateService } from '@ngx-translate/core';
 
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
@@ -15,7 +15,9 @@ export const appConfig: ApplicationConfig = {
       registrationStrategy: 'registerWhenStable:30000',
     }),
     provideTranslateService({
-      loader: InlineTranslateLoader,
+      // A bare class here still works (ngx-translate auto-wraps it), but
+      // triggers a one-line console.warn nudging toward this explicit form.
+      loader: provideTranslateLoader(InlineTranslateLoader),
       lang: 'de',
       fallbackLang: 'de',
     }),
