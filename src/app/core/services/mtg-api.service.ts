@@ -4,7 +4,13 @@ import { environment } from '../../../environments/environment';
 import { Card, MtgCard } from '../models/card.model';
 import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
 import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
-import { CollectorFinish, parseCollectorNumber, parseSetCode } from '../utils/set-code-parser';
+import {
+  CollectorFinish,
+  SetCodeMatch,
+  parseCollectorNumber,
+  parseGeminiMtgResult,
+  parseSetCode,
+} from '../utils/set-code-parser';
 import { OcrLineLike, cleanOcrText, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification, MtgIdentificationResult, ScoredCandidate } from './card-api.interface';
 import { MtgBulkDataService } from './mtg-bulk-data.service';
@@ -260,6 +266,39 @@ export class MtgApiService implements CardApiService {
   }
 
   /**
+   * Resolves an already-parsed set+number match (see parseSetCode /
+   * parseGeminiMtgResult) to an actual card, shared by identifyByCroppedText
+   * and identifyByGeminiResult so both parsing paths feed the exact same
+   * lookup. Token cards print a "T" marker next to the collector number, but
+   * where they actually live on Scryfall varies by product: some print it
+   * as a "T"-prefixed number inline in the parent set (e.g. "clb"/"T17"),
+   * tried first per the newer convention; others instead keep tokens in a
+   * wholly separate "t"-prefixed set with the plain number - "tmsh" (Marvel
+   * Super Heroes Tokens), never "msh" card "T11" (verified against the live
+   * API: the latter 404s, the former is a real card) - tried second as a
+   * fallback covering that case. Halo cards need no number prefix at all -
+   * they're just a finish variant of the plain print, not a separate
+   * collector number.
+   */
+  private async resolveSetCodeMatch(match: SetCodeMatch): Promise<CroppedIdentification | null> {
+    const finish = match.finish;
+    const cardCategory = this.categoryForMatch(match);
+
+    const setCodesToTry: Array<{ setCode: string; number: string }> = match.isToken
+      ? [
+          { setCode: match.setCode, number: `T${match.collectorNumber}` },
+          ...(match.setCode.startsWith('t') ? [] : [{ setCode: `t${match.setCode}`, number: match.collectorNumber }]),
+        ]
+      : [{ setCode: match.setCode, number: match.collectorNumber }];
+
+    for (const { setCode, number } of setCodesToTry) {
+      const raw = await this.lookupBySetAndNumber(setCode, number);
+      if (raw) return { card: this.toCard(raw), finish, cardCategory };
+    }
+    return null;
+  }
+
+  /**
    * Identifies a card from OCR text scoped to just the card's bottom-left
    * set-code/collector-number corner (see Scanner's crop-based capture) -
    * an exact set+number hit only, no name/power-toughness/keyword fallback,
@@ -273,28 +312,8 @@ export class MtgApiService implements CardApiService {
     const match = parseSetCode(text, validSetCodes);
 
     if (match) {
-      const finish = match.finish;
-      const cardCategory = this.categoryForMatch(match);
-
-      // Token cards print a "T" marker next to the collector number, but
-      // where they actually live on Scryfall varies by product: some print
-      // it as a "T"-prefixed number inline in the parent set (e.g.
-      // "clb"/"T17"), tried first per the newer convention; others instead
-      // keep tokens in a wholly separate "t"-prefixed set with the plain
-      // number - "tmsh" (Marvel Super Heroes Tokens), never "msh" card
-      // "T11" (verified against the live API: the latter 404s, the former
-      // is a real card) - tried second as a fallback covering that case.
-      const setCodesToTry: Array<{ setCode: string; number: string }> = match.isToken
-        ? [
-            { setCode: match.setCode, number: `T${match.collectorNumber}` },
-            ...(match.setCode.startsWith('t') ? [] : [{ setCode: `t${match.setCode}`, number: match.collectorNumber }]),
-          ]
-        : [{ setCode: match.setCode, number: match.collectorNumber }];
-
-      for (const { setCode, number } of setCodesToTry) {
-        const raw = await this.lookupBySetAndNumber(setCode, number);
-        if (raw) return { card: this.toCard(raw), finish, cardCategory };
-      }
+      const resolved = await this.resolveSetCodeMatch(match);
+      if (resolved) return resolved;
     }
 
     // The crop is tight enough that the set code sometimes falls just
@@ -315,6 +334,20 @@ export class MtgApiService implements CardApiService {
     return candidates.length === 1
       ? { card: this.toCard(candidates[0]), finish: bareMatch.finish, cardCategory: this.categoryForMatch(bareMatch) }
       : null;
+  }
+
+  /**
+   * Identifies a card from Gemini's already-normalized MTG answer (see
+   * gemini-ocr's MTG_PROMPT - always "SET NUM" / "SET TNUM" / "SET HNUM",
+   * unpadded, single line, covering every format actually printed on a
+   * card: new 4-digit, old "X/Y" fraction, and both token/halo flag
+   * positions). Unlike identifyByCroppedText, Gemini's answer needs no
+   * fuzzy OCR recovery - just a strict format check (parseGeminiMtgResult)
+   * - before reusing the exact same set+number lookup.
+   */
+  async identifyByGeminiResult(text: string): Promise<CroppedIdentification | null> {
+    const match = parseGeminiMtgResult(text);
+    return match ? this.resolveSetCodeMatch(match) : null;
   }
 
   private async fetchCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {

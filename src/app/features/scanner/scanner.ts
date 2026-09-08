@@ -534,7 +534,7 @@ export class Scanner {
   /**
    * Manual, single-shot Gemini scan triggered by the "Jetzt scannen"
    * button - reuses tryGeminiPath as-is (same crop, same rate limiting,
-   * same identifyByCroppedText pipeline). A deliberate one-frame user
+   * same identifyByGeminiResult pipeline). A deliberate one-frame user
    * action is trusted immediately on success rather than routed through
    * confirmMtgCard's 2-of-3 sliding window, which exists to smooth out
    * noise across the *automatic* stream of frames - not applicable here.
@@ -634,7 +634,7 @@ export class Scanner {
         return card ? { card, finish: 'nonfoil', cardCategory: 'normal' } : null;
       }
 
-      return await this.mtgApi.identifyByCroppedText(text);
+      return await this.mtgApi.identifyByGeminiResult(text);
     } catch (error) {
       console.error('Gemini Vision fehlgeschlagen, Tesseract-Fallback:', error);
       return null;

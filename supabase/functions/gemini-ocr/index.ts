@@ -34,14 +34,26 @@ const GEMINI_TIMEOUT_MS = 25000;
 // the one card format actually relevant, rather than asking Gemini to also
 // figure out which TCG it's looking at. Keeps the already-tuned MTG prompt
 // untouched.
-const MTG_PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Magic: The Gathering Karte mit der Set-Code/Sammlenummer-Zeile.
+const MTG_PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Magic: The Gathering Karte mit der Set-Code/Sammelnummer-Zeile.
+
 Lies NUR den Set-Code (3 Großbuchstaben) und die Collector Number unten links dieser Karte.
 
-Wichtig: Token-Karten haben ein "T" vor der Nummer (z.B. "T 0003" oder "T003"). Gib das T mit aus, wenn es vorhanden ist.
+Formate die vorkommen können:
+- Normal neu:   "0082"        → Ausgabe: "MSH 82"
+- Normal alt:   "082/350"     → Ausgabe: "MSH 82"
+- Token neu:    "T 0003"      → Ausgabe: "MSH T3"
+- Token alt:    "016/017 T"   → Ausgabe: "MSH T16"
+- Token alt:    "017/017T"    → Ausgabe: "MSH T17"
+- Halo neu:     "H 0020"      → Ausgabe: "MSH H20"
+- Halo alt:     "020/020 H"   → Ausgabe: "MSH H20"
+
+Wichtig bei X/Y Format: IMMER nur X nehmen, nie Y!
+Das Flag (T oder H) steht vor oder nach der Nummer.
 
 Antworte NUR in diesem Format:
 - Normale Karte: "MSH 82"
-- Token-Karte: "MSH T3"
+- Token-Karte:   "MSH T3"
+- Halo-Karte:    "MSH H20"
 
 Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
 Keine weiteren Erklärungen, kein zusätzlicher Text.`;

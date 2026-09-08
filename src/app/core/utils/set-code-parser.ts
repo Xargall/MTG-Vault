@@ -115,6 +115,36 @@ const IGNORED_SET_TOKENS = [
   'EEN', 'ADI', 'SBE', 'PRE', 'EEE', 'NSA', 'NSS', 'SRE', 'LRE', 'TAA',
 ];
 
+// Gemini's own MTG prompt (see gemini-ocr's MTG_PROMPT) asks it to normalize
+// every printed format itself - "0082", "082/350", "T 0003", "016/017 T",
+// "017/017T", "H 0020", "020/020 H" all become exactly one of "MSH 82" /
+// "MSH T3" / "MSH H20" (unpadded, no fraction, flag always leading, single
+// line). That means parsing its answer needs no fuzzy OCR recovery, just a
+// strict check against that one shape - reusing parseSetCode/
+// parseCollectorNumber here would actually be wrong, since their new-format
+// pattern requires a zero-padded 4-digit number (matching what's printed on
+// the card), which Gemini's unpadded "82"/"T3"/"H20" answer never is.
+const GEMINI_MTG_RESULT_PATTERN = /^([A-Z]{2,4})\s+([TH]?)(\d{1,4})$/;
+
+/**
+ * Parses Gemini's normalized MTG answer into the same shape parseSetCode
+ * produces, so both feed the same set+number lookup (see
+ * MtgApiService.identifyByGeminiResult). Returns null for anything that
+ * doesn't match that exact shape, including Gemini's own "UNKNOWN" answer.
+ */
+export function parseGeminiMtgResult(text: string): SetCodeMatch | null {
+  const match = GEMINI_MTG_RESULT_PATTERN.exec(text.trim().toUpperCase());
+  if (!match) return null;
+
+  const [, setCode, flag, digits] = match;
+  return {
+    setCode: setCode.toLowerCase(),
+    collectorNumber: String(parseInt(digits, 10)),
+    isToken: flag === 'T',
+    finish: flag === 'H' ? 'halo' : 'nonfoil',
+  };
+}
+
 /** Standalone bare-number extraction for callers that only need the number, not the format/flag details - see parseCollectorNumber. */
 export function extractCollectorNumber(rawText: string): number | null {
   const match = parseCollectorNumber(rawText);
