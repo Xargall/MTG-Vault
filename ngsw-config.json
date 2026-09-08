@@ -29,7 +29,6 @@
     {
       "name": "external-apis",
       "urls": [
-        "https://api.scryfall.com/**",
         "https://json.edhrec.com/**",
         "https://*.supabase.co/functions/**"
       ],

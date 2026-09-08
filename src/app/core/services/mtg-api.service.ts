@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
+import { environment } from '../../../environments/environment';
 import { Card, MtgCard } from '../models/card.model';
 import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
 import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
@@ -108,10 +109,17 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const CARD_ENDPOINT = 'https://api.scryfall.com/cards';
-const COLLECTION_ENDPOINT = 'https://api.scryfall.com/cards/collection';
-const SEARCH_ENDPOINT = 'https://api.scryfall.com/cards/search';
-const SETS_ENDPOINT = 'https://api.scryfall.com/sets';
+// Routed through the scryfall-proxy Supabase Edge Function, not directly at
+// api.scryfall.com - the browser gets a CORS error calling Scryfall
+// cross-origin (most visibly the POST-based /cards/collection lookup, but
+// true of every endpoint here). The proxy mirrors Scryfall's URL structure
+// 1:1, so only these base URLs change - every path/query/method built from
+// them below is unchanged.
+const SCRYFALL_PROXY_BASE = `${environment.supabaseUrl}/functions/v1/scryfall-proxy`;
+const CARD_ENDPOINT = `${SCRYFALL_PROXY_BASE}/cards`;
+const COLLECTION_ENDPOINT = `${SCRYFALL_PROXY_BASE}/cards/collection`;
+const SEARCH_ENDPOINT = `${SCRYFALL_PROXY_BASE}/cards/search`;
+const SETS_ENDPOINT = `${SCRYFALL_PROXY_BASE}/sets`;
 const BATCH_SIZE = 75;
 const SCRYFALL_USER_AGENT = 'TCGVault/1.0 (mathias-mayer.de)';
 // Mobile networks hit Scryfall 504s (gateway timeout) far more often than
@@ -179,7 +187,15 @@ export class MtgApiService implements CardApiService {
         try {
           const response = await fetch(url, {
             ...init,
-            headers: { ...init?.headers, 'User-Agent': SCRYFALL_USER_AGENT },
+            // Every Supabase Edge Function requires a valid Authorization
+            // bearer (verify_jwt, left at its default) - the anon key alone
+            // satisfies that regardless of the user's own login state.
+            headers: {
+              ...init?.headers,
+              'User-Agent': SCRYFALL_USER_AGENT,
+              apikey: environment.supabaseAnonKey,
+              Authorization: `Bearer ${environment.supabaseAnonKey}`,
+            },
           });
           if (response.status === 403) throw new ScryfallRateLimitError();
           // A 504 is transient (mobile networks hit these often) - retry
