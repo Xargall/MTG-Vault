@@ -56,6 +56,9 @@ Deno.serve(async (req: Request) => {
       signal: controller.signal,
     });
 
+    console.log('Scryfall response status:', response.status);
+    console.log('Scryfall response headers:', Object.fromEntries(response.headers));
+
     const body = await response.text();
     return new Response(body, {
       status: response.status,
