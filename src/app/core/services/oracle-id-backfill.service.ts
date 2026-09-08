@@ -59,17 +59,33 @@ export class OracleIdBackfillService {
     const mtgGameId = this.gameService.games().find((game) => game.slug === 'mtg')?.id;
     if (!mtgGameId) return;
 
-    void this.runBatch(mtgGameId);
+    void this.runBatch(mtgGameId, null);
   }
 
-  private async runBatch(mtgGameId: string): Promise<void> {
-    const { data, error } = await this.supabase.client
+  /**
+   * Pages by `id` (keyset pagination) rather than repeatedly re-querying
+   * `oracle_id IS NULL` from the top - a resolved row leaves that filtered
+   * set, but a row whose card_id isn't in the local bulk cache (e.g. a
+   * retired/removed print) never does. Without a cursor, once 50+ such
+   * permanently-unresolvable rows exist, every batch re-fetches the exact
+   * same stuck rows, resolves none of them, stays at a full BATCH_SIZE
+   * forever, and this loops every BATCH_PAUSE_MS indefinitely (the real
+   * cause of a since-reported runaway request loop). Ordering + a `cursor`
+   * argument guarantees a full forward pass over every row that was
+   * unresolved at scan time, stuck ones included, and lets it actually
+   * finish.
+   */
+  private async runBatch(mtgGameId: string, cursor: string | null): Promise<void> {
+    let query = this.supabase.client
       .from('collection_cards')
       .select('id, card_id')
       .eq('game_id', mtgGameId)
       .is('oracle_id', null)
-      .limit(BATCH_SIZE)
-      .returns<LegacyRow[]>();
+      .order('id', { ascending: true })
+      .limit(BATCH_SIZE);
+    if (cursor) query = query.gt('id', cursor);
+
+    const { data, error } = await query.returns<LegacyRow[]>();
 
     if (error) {
       // 42703 = PostgreSQL's "undefined_column" - almost certainly means
@@ -117,8 +133,9 @@ export class OracleIdBackfillService {
       }),
     );
 
+    const nextCursor = data[data.length - 1].id;
     if (data.length === BATCH_SIZE) {
-      setTimeout(() => void this.runBatch(mtgGameId), BATCH_PAUSE_MS);
+      setTimeout(() => void this.runBatch(mtgGameId, nextCursor), BATCH_PAUSE_MS);
     } else {
       this.finish();
     }
