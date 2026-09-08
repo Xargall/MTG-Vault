@@ -72,9 +72,13 @@ const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]{2,6}-[A-Z]{2}\d{2,4}$/;
 /** Gemini's own crop for its collector-number guess - deliberately looser than CROP_STRATEGIES (a vision model reads a wider region fine) and left as unfiltered color, since Gemini isn't Tesseract's binarize-first pipeline. */
 function cropCollectorArea(source: HTMLCanvasElement): HTMLCanvasElement {
   const crop = document.createElement('canvas');
-  const h = Math.floor(source.height * 0.2);
+  // 20%→25% / 60%→65%: the "Jetzt scannen" button (see .scan-button in
+  // scanner.html/.scss) sat low enough to overlap this corner on real
+  // devices, clipping the collector number out of the captured frame
+  // before it ever reached Gemini - widened to give it room.
+  const h = Math.floor(source.height * 0.25);
   const y = source.height - h;
-  crop.width = Math.floor(source.width * 0.6);
+  crop.width = Math.floor(source.width * 0.65);
   crop.height = h;
   const ctx = crop.getContext('2d');
   ctx?.drawImage(source, 0, y, crop.width, h, 0, 0, crop.width, h);

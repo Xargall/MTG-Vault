@@ -132,7 +132,11 @@
 
 .manual-scan-button {
   position: absolute;
-  bottom: 48px;
+  // Was bottom: 48px - low enough to sit over the card's own bottom edge,
+  // where the set-code/collector-number line prints (see cropCollectorArea
+  // in scanner.ts, which reads that same bottom slice) - moved up so the
+  // button no longer covers what the scan itself needs to see.
+  bottom: 25%;
   left: 50%;
   transform: translateX(-50%);
   min-width: 200px;
