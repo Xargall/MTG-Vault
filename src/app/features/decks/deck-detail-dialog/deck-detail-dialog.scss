@@ -198,6 +198,12 @@
   }
 }
 
+.binding-detail-subnote {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  padding-left: 14px;
+}
+
 .release-link {
   background: transparent;
   border: 1px solid var(--color-border-strong);

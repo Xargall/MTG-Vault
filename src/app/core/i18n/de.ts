@@ -194,6 +194,7 @@ export const de = {
     plannedElsewhereHint: '(davon {{percent}}% in anderen Decks verplant)',
     bindingDetailsTitle: 'Details',
     substituteNote: 'Ersetzt {{name}} ({{print}})',
+    substituteOwnedNote: 'deine Version: {{name}} aus {{print}}',
     assignedElsewhereNote: 'Bereits in „{{deckName}}" verplant',
     availableNote: 'Verfügbar: {{available}} von {{needed}}',
     releaseButton: '🔓 Freigeben',

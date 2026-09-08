@@ -79,6 +79,16 @@
                       'deckDetail.substituteNote'
                         | translate
                           : {
+                              name: detail.entry.card.name,
+                              print: printLabel(detail.entry.card),
+                            }
+                    }}
+                  </span>
+                  <span class="binding-detail-subnote">
+                    {{
+                      'deckDetail.substituteOwnedNote'
+                        | translate
+                          : {
                               name: substitute.card.name,
                               print: printLabel(substitute.card),
                             }

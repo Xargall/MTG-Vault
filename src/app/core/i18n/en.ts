@@ -196,6 +196,7 @@ export const en: typeof de = {
     plannedElsewhereHint: '(of which {{percent}}% is planned in other decks)',
     bindingDetailsTitle: 'Details',
     substituteNote: 'Replaces {{name}} ({{print}})',
+    substituteOwnedNote: 'your copy: {{name}} from {{print}}',
     assignedElsewhereNote: 'Already assigned to "{{deckName}}"',
     availableNote: 'Available: {{available}} of {{needed}}',
     releaseButton: '🔓 Release',
