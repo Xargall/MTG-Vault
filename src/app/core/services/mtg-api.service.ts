@@ -43,6 +43,10 @@ export interface ScryfallRawCard {
   collector_number: string;
   rarity: string;
   released_at: string;
+  // Promo/finish treatments beyond Scryfall's plain "finishes" enum
+  // (nonfoil/foil/etched/glossy) - "halofoil" is the one relevant here, see
+  // resolveHaloCard.
+  promo_types?: string[];
   image_uris?: { normal: string; small: string; art_crop: string };
   card_faces?: ScryfallCardFace[];
   prices: { usd: string | null; usd_foil: string | null; eur: string | null; eur_foil: string | null };
@@ -292,10 +296,38 @@ export class MtgApiService implements CardApiService {
       : [{ setCode: match.setCode, number: match.collectorNumber }];
 
     for (const { setCode, number } of setCodesToTry) {
-      const raw = await this.lookupBySetAndNumber(setCode, number);
+      let raw = await this.lookupBySetAndNumber(setCode, number);
+      if (raw && finish === 'halo') raw = await this.resolveHaloCard(setCode, number, raw);
       if (raw) return { card: this.toCard(raw), finish, cardCategory };
     }
     return null;
+  }
+
+  /**
+   * "Halo" is a promo *treatment* (Scryfall's own "is:halofoil" search
+   * predicate, see scryfall.com/docs/syntax) - not one of Scryfall's actual
+   * `finishes` (nonfoil/foil/etched/glossy), and its print can share a
+   * literal set+number with a wholly unrelated card in the same set (a rare
+   * numbering overlap between a set's main sheet and its bonus/showcase
+   * sheet) - the plain `/cards/:code/:number` endpoint can only ever return
+   * one of them, silently giving back the wrong card (e.g. "mkm"/"21"
+   * resolving to a common instead of the Halo-foil card actually scanned).
+   * Confirms the naive hit via `promo_types` when the API/local cache
+   * happens to carry it; otherwise re-resolves with an authoritative
+   * `is:halofoil` search scoped to the same set+number, which Scryfall can
+   * disambiguate even though the direct endpoint can't. Falls back to the
+   * original hit if that search finds nothing, rather than dropping a
+   * still-plausible match entirely.
+   */
+  private async resolveHaloCard(
+    setCode: string,
+    collectorNumber: string,
+    naiveMatch: ScryfallRawCard,
+  ): Promise<ScryfallRawCard> {
+    if (naiveMatch.promo_types?.includes('halofoil')) return naiveMatch;
+
+    const haloMatches = await this.runSearch(`set:${setCode} number:${collectorNumber} is:halofoil`, 'unique=prints');
+    return haloMatches[0] ?? naiveMatch;
   }
 
   /**
@@ -346,8 +378,14 @@ export class MtgApiService implements CardApiService {
    * - before reusing the exact same set+number lookup.
    */
   async identifyByGeminiResult(text: string): Promise<CroppedIdentification | null> {
+    console.log('[Gemini MTG] raw result:', text);
     const match = parseGeminiMtgResult(text);
-    return match ? this.resolveSetCodeMatch(match) : null;
+    console.log('[Gemini MTG] parsed:', match);
+    if (!match) return null;
+
+    const resolved = await this.resolveSetCodeMatch(match);
+    console.log('[Gemini MTG] Scryfall result:', resolved?.card.name ?? null);
+    return resolved;
   }
 
   private async fetchCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {
