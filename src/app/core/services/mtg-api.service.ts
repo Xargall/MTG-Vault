@@ -715,10 +715,12 @@ export class MtgApiService implements CardApiService {
 
     for (let i = 0; i < identifiers.length; i += BATCH_SIZE) {
       const batch = identifiers.slice(i, i + BATCH_SIZE);
+      const requestBody = { identifiers: batch };
+      console.log('cards/collection request body:', JSON.stringify(requestBody));
       const response = await this.scryfallFetch(COLLECTION_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifiers: batch }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
