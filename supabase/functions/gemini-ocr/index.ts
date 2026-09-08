@@ -18,6 +18,7 @@
 // get_user_secret_for_service is deliberately not grantable to a plain
 // user's own JWT (see the SQL file).
 import { createClient } from 'npm:@supabase/supabase-js@2.112.4';
+import { corsHeaders as sdkCorsHeaders } from 'npm:@supabase/supabase-js@2.112.4/cors';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com';
 
@@ -81,13 +82,14 @@ Antworte NUR mit dem Namen, z.B.: "Glurak" oder "Professor Eichs Forschung"
 Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
 Keine weiteren Erklärungen, kein zusätzlicher Text.`;
 
+// Base headers from the SDK itself (@supabase/supabase-js/cors) rather than
+// hand-maintained - stays in sync with whatever headers/methods the SDK
+// actually sends, so a future SDK update can't silently start sending a
+// header this function doesn't allow and break preflight again. Max-Age
+// isn't part of that export, so it's added on top - see scryfall-proxy's
+// copy of this comment for why it matters on a flaky connection.
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  // Lets the browser cache a successful preflight for a day instead of
-  // re-issuing one before every call - see scryfall-proxy's copy of this
-  // comment for why that matters on a flaky connection.
+  ...sdkCorsHeaders,
   'Access-Control-Max-Age': '86400',
 };
 

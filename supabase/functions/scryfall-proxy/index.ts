@@ -8,6 +8,8 @@
 //
 // Deploy: supabase functions deploy scryfall-proxy
 
+import { corsHeaders as sdkCorsHeaders } from 'npm:@supabase/supabase-js@2.112.4/cors';
+
 const SCRYFALL_BASE = 'https://api.scryfall.com';
 // Was 15s. NB: this only bounds *this function's own* outbound call to
 // Scryfall (Supabase's edge region to api.scryfall.com) - it has no effect
@@ -26,17 +28,17 @@ const SCRYFALL_FETCH_HEADERS = {
   Accept: 'application/json',
 };
 
+// Base headers from the SDK itself (@supabase/supabase-js/cors) rather than
+// hand-maintained - see gemini-ocr's copy of this comment. Max-Age isn't
+// part of that export: without it, browsers can't cache a preflight OPTIONS
+// result at all (or only for a few seconds) and re-issue one before every
+// single real request - on a network where OPTIONS itself is unreliable
+// (confirmed: a user's connection could reach this function fine via a
+// plain GET but not via an authenticated call, which is preflighted), that
+// means every real call gets a fresh chance to hit the same flaky OPTIONS
+// round trip. 86400s (24h) is the widest most browsers actually honor.
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  // Without this, browsers can't cache a preflight OPTIONS result at all
-  // (or only for a few seconds) and re-issue one before every single real
-  // request - on a network where OPTIONS itself is unreliable (confirmed:
-  // a user's connection could reach this function fine via a plain GET but
-  // not via an authenticated call, which is preflighted), that means every
-  // real call gets a fresh chance to hit the same flaky OPTIONS round trip.
-  // 86400s (24h) is the widest most browsers actually honor.
+  ...sdkCorsHeaders,
   'Access-Control-Max-Age': '86400',
 };
 

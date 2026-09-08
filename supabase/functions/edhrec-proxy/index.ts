@@ -8,6 +8,8 @@
 //
 // Deploy: supabase functions deploy edhrec-proxy
 
+import { corsHeaders as sdkCorsHeaders } from 'npm:@supabase/supabase-js@2.112.4/cors';
+
 const EDHREC_BASE = 'https://json.edhrec.com';
 const EDHREC_TIMEOUT_MS = 15000;
 // EDHREC now also 403s a plain server-to-server request with no browser-like
@@ -28,13 +30,11 @@ const EDHREC_FETCH_HEADERS = {
 // fetch-any-url-on-our-behalf proxy.
 const ALLOWED_PATH_PATTERN = /^pages\/(average-decks|commanders)\/[a-z0-9-]+\.json$|^pages\/top\/salt\.json$/;
 
+// Base headers from the SDK itself (@supabase/supabase-js/cors) rather than
+// hand-maintained - see gemini-ocr's copy of this comment. Max-Age isn't
+// part of that export, so it's added on top.
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  // Lets the browser cache a successful preflight for a day instead of
-  // re-issuing one before every call - see scryfall-proxy's copy of this
-  // comment for why that matters on a flaky connection.
+  ...sdkCorsHeaders,
   'Access-Control-Max-Age': '86400',
 };
 
