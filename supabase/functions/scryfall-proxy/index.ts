@@ -9,7 +9,14 @@
 // Deploy: supabase functions deploy scryfall-proxy
 
 const SCRYFALL_BASE = 'https://api.scryfall.com';
-const SCRYFALL_TIMEOUT_MS = 15000;
+// Was 15s. NB: this only bounds *this function's own* outbound call to
+// Scryfall (Supabase's edge region to api.scryfall.com) - it has no effect
+// on how long a client takes to reach Supabase in the first place, which a
+// slow/degraded mobile connection is a separate, likely bigger factor in
+// (a 504 seen consistently on mobile but not on a better connection could
+// be either side). Widened as one cheap thing that can only help, not a
+// confirmed fix for that report.
+const SCRYFALL_TIMEOUT_MS = 25000;
 // Scryfall's API guidelines require a real identifying User-Agent and an
 // Accept header on every request (missing either risks a 403) - the client
 // tried to set this itself, but browsers largely ignore a script-set
@@ -23,6 +30,14 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  // Without this, browsers can't cache a preflight OPTIONS result at all
+  // (or only for a few seconds) and re-issue one before every single real
+  // request - on a network where OPTIONS itself is unreliable (confirmed:
+  // a user's connection could reach this function fine via a plain GET but
+  // not via an authenticated call, which is preflighted), that means every
+  // real call gets a fresh chance to hit the same flaky OPTIONS round trip.
+  // 86400s (24h) is the widest most browsers actually honor.
+  'Access-Control-Max-Age': '86400',
 };
 
 function errorResponse(message: string, status: number): Response {

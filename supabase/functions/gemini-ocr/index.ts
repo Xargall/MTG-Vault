@@ -85,6 +85,10 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  // Lets the browser cache a successful preflight for a day instead of
+  // re-issuing one before every call - see scryfall-proxy's copy of this
+  // comment for why that matters on a flaky connection.
+  'Access-Control-Max-Age': '86400',
 };
 
 /** The calling user's own Vault-stored key, via a service-role client that resolves their id from the request's own JWT (get_user_secret_for_service is only grantable to service_role, never to the user's own JWT - see supabase/sql/012_user_secrets.sql). Returns null on any failure (no session, no key on file, RPC/migration not applied yet) so the caller can fall through to the shared app key. */

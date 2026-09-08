@@ -32,6 +32,10 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  // Lets the browser cache a successful preflight for a day instead of
+  // re-issuing one before every call - see scryfall-proxy's copy of this
+  // comment for why that matters on a flaky connection.
+  'Access-Control-Max-Age': '86400',
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
