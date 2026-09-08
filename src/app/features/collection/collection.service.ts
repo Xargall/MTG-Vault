@@ -206,6 +206,12 @@ export class CollectionService {
     if (error) throw error;
   }
 
+  /** Manual correction of one collection row's own quantity/foil (see CardDetailDialog's edit form) - unlike addCards/reduceQuantities, sets these fields directly rather than incrementing/decrementing them. */
+  async updateEntry(rowId: string, changes: { quantity?: number; foil?: boolean }): Promise<void> {
+    const { error } = await this.supabase.client.from('collection_cards').update(changes).eq('id', rowId);
+    if (error) throw error;
+  }
+
   async removeCard(cardId: string): Promise<void> {
     await this.gameService.ready;
     const gameId = this.gameService.currentGameId();

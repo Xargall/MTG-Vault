@@ -127,6 +127,7 @@ export const de = {
   },
   cardDetail: {
     title: 'Kartendetails',
+    quantity: 'Menge',
     set: 'Set',
     rarity: 'Seltenheit',
     foil: 'Foil',
@@ -136,6 +137,10 @@ export const de = {
     finish_etched: 'Etched',
     price: 'Preis',
     cardmarketLink: 'Auf Cardmarket ansehen',
+    editLink: 'Menge / Foil bearbeiten',
+    saveButton: 'Speichern',
+    saveFailed: 'Änderungen konnten nicht gespeichert werden.',
+    invalidQuantity: 'Menge muss mindestens 1 sein.',
     deleteLink: 'Aus Sammlung entfernen',
     confirmDeleteText: 'Karte wirklich aus der Sammlung entfernen?',
     confirmDeleteButton: 'Ja, entfernen',

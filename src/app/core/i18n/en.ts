@@ -129,6 +129,7 @@ export const en: typeof de = {
   },
   cardDetail: {
     title: 'Card Details',
+    quantity: 'Quantity',
     set: 'Set',
     rarity: 'Rarity',
     foil: 'Foil',
@@ -138,6 +139,10 @@ export const en: typeof de = {
     finish_etched: 'Etched',
     price: 'Price',
     cardmarketLink: 'View on Cardmarket',
+    editLink: 'Edit quantity / foil',
+    saveButton: 'Save',
+    saveFailed: 'Changes could not be saved.',
+    invalidQuantity: 'Quantity must be at least 1.',
     deleteLink: 'Remove from collection',
     confirmDeleteText: 'Really remove this card from your collection?',
     confirmDeleteButton: 'Yes, remove',

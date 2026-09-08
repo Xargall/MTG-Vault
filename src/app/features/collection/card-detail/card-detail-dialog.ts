@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card, MtgCard, PokemonCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
@@ -39,7 +40,7 @@ const BANLIST_LABELS: Record<YugiohBanlistStatus, string> = {
 
 @Component({
   selector: 'app-card-detail-dialog',
-  imports: [DecimalPipe, TranslatePipe],
+  imports: [DecimalPipe, FormsModule, TranslatePipe],
   templateUrl: './card-detail-dialog.html',
   styleUrl: './card-detail-dialog.scss',
 })
@@ -50,6 +51,10 @@ export class CardDetailDialog {
   readonly entry = input.required<CollectionEntry>();
   readonly close = output<void>();
   readonly deleted = output<void>();
+  // Emitted after a quantity/foil edit is saved - the parent reloads the
+  // collection (same as `deleted`) so the grid/stats reflect the change too,
+  // not just this dialog.
+  readonly updated = output<void>();
 
   protected readonly confirmingDelete = signal(false);
   protected readonly deleting = signal(false);
@@ -68,6 +73,49 @@ export class CardDetailDialog {
       );
     } finally {
       this.deleting.set(false);
+    }
+  }
+
+  protected readonly editing = signal(false);
+  protected readonly editQuantity = signal(1);
+  protected readonly editFoil = signal(false);
+  protected readonly saving = signal(false);
+  protected readonly saveError = signal<string | null>(null);
+
+  protected startEdit() {
+    this.editQuantity.set(this.entry().row.quantity);
+    this.editFoil.set(this.entry().row.foil);
+    this.saveError.set(null);
+    this.editing.set(true);
+  }
+
+  protected cancelEdit() {
+    this.editing.set(false);
+    this.saveError.set(null);
+  }
+
+  async saveEdit() {
+    const quantity = Math.trunc(this.editQuantity());
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      this.saveError.set(this.translate.instant('cardDetail.invalidQuantity'));
+      return;
+    }
+
+    this.saving.set(true);
+    this.saveError.set(null);
+    try {
+      await this.collectionService.updateEntry(this.entry().row.id, {
+        quantity,
+        foil: this.entry().card.game === 'mtg' ? this.editFoil() : this.entry().row.foil,
+      });
+      this.editing.set(false);
+      this.updated.emit();
+    } catch (error) {
+      this.saveError.set(
+        error instanceof Error ? error.message : this.translate.instant('cardDetail.saveFailed'),
+      );
+    } finally {
+      this.saving.set(false);
     }
   }
 

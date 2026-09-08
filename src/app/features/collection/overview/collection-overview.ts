@@ -88,6 +88,14 @@ export class CollectionOverview {
     this.load();
   }
 
+  /** Keeps the still-open dialog showing the saved values too, not just the grid behind it - `entry` is a plain input bound to whatever object is in `selectedEntry`, which reloading `entries` alone wouldn't update in place. */
+  protected async onEntryUpdated() {
+    await this.load();
+    const current = this.selectedEntry();
+    if (!current) return;
+    this.selectedEntry.set(this.entries().find((e) => e.row.id === current.row.id) ?? null);
+  }
+
   protected async load() {
     this.loading.set(true);
     this.errorMessage.set(null);

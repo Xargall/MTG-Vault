@@ -48,6 +48,9 @@
         }
 
         <dl class="info-list">
+          <dt>{{ 'cardDetail.quantity' | translate }}</dt>
+          <dd>{{ entry().row.quantity }}</dd>
+
           <dt>{{ 'cardDetail.set' | translate }}</dt>
           <dd>{{ entry().card.setName ?? ('common.unknown' | translate) }}</dd>
 
@@ -98,6 +101,45 @@
             {{ 'cardDetail.cardmarketLink' | translate }}
           </a>
         }
+
+        <div class="edit-section">
+          @if (!editing()) {
+            <button type="button" class="edit-link" (click)="startEdit()">
+              {{ 'cardDetail.editLink' | translate }}
+            </button>
+          } @else {
+            <div class="edit-form">
+              @if (saveError()) {
+                <p class="state-message error">{{ saveError() }}</p>
+              }
+
+              <label for="edit-quantity">{{ 'cardDetail.quantity' | translate }}</label>
+              <input
+                id="edit-quantity"
+                type="number"
+                min="1"
+                [ngModel]="editQuantity()"
+                (ngModelChange)="editQuantity.set($event)"
+              />
+
+              @if (entry().card.game === 'mtg') {
+                <label class="checkbox-label">
+                  <input type="checkbox" [ngModel]="editFoil()" (ngModelChange)="editFoil.set($event)" />
+                  {{ 'cardDetail.foil' | translate }}
+                </label>
+              }
+
+              <div class="edit-actions">
+                <button type="button" class="save-button" [disabled]="saving()" (click)="saveEdit()">
+                  {{ 'cardDetail.saveButton' | translate }}
+                </button>
+                <button type="button" class="cancel-link" [disabled]="saving()" (click)="cancelEdit()">
+                  {{ 'cardDetail.cancel' | translate }}
+                </button>
+              </div>
+            </div>
+          }
+        </div>
 
         <div class="danger-zone">
           @if (deleteError()) {
