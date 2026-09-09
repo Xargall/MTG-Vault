@@ -33,6 +33,15 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 // hold up the download's incremental progress and risks a huge rollback
 // on any mid-stream error).
 const WRITE_BATCH_SIZE = 2000;
+// The bulk file is downloaded in Range-request chunks this size rather than
+// one long-lived fetch - on a flaky mobile connection a single ~150MB+
+// stream is prone to dying partway through with nothing to resume from
+// (confirmed: this exact download failing is why the local card cache
+// never warmed on iOS). A dropped chunk only costs re-fetching this many
+// bytes, not the whole file.
+const DOWNLOAD_CHUNK_SIZE = 3 * 1024 * 1024;
+const CHUNK_RETRY_ATTEMPTS = 5;
+const CHUNK_RETRY_BASE_DELAY_MS = 1000;
 // Only worth a full Levenshtein comparison against names within this many
 // characters of the query's length - cheaply prunes the vast majority of
 // the (~25k unique) name index before the expensive part runs.
@@ -113,6 +122,55 @@ function trimBulkCard(raw: Record<string, unknown>): StoredCard | null {
     setNumberKey: `${set.toLowerCase()}/${collectorNumber.toLowerCase()}`,
   };
   return card;
+}
+
+/** One Range-request chunk, retried with backoff before giving up - a single flaky-network drop only costs re-fetching this chunk, not the whole download. */
+async function fetchChunk(url: string, start: number, end: number): Promise<Uint8Array> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT, Range: `bytes=${start}-${end}` },
+      });
+      if (!response.ok) throw new Error(`Chunk-Download fehlgeschlagen (${response.status})`);
+      return new Uint8Array(await response.arrayBuffer());
+    } catch (error) {
+      if (attempt >= CHUNK_RETRY_ATTEMPTS - 1) throw error;
+      await new Promise((r) => setTimeout(r, CHUNK_RETRY_BASE_DELAY_MS * 2 ** attempt));
+    }
+  }
+}
+
+/** A 1-byte probe request - a 206 response with a parseable `Content-Range` total confirms the CDN honors Range requests (Scryfall's has, in practice) and gives the exact byte size to chunk against; anything else (200, missing/malformed header, network error) means "don't chunk, fall back to one plain fetch" rather than risk silently re-downloading the whole file per "chunk". */
+async function probeRangeSupport(url: string): Promise<number | null> {
+  try {
+    const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT, Range: 'bytes=0-0' } });
+    if (response.status !== 206) return null;
+    const total = Number(response.headers.get('content-range')?.split('/')[1]);
+    return Number.isFinite(total) && total > 0 ? total : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Sequential Range-chunked download as a ReadableStream, a drop-in replacement for a fetch response's `.body` - `pull` only requests the next chunk once the previous one has been consumed, so chunks stay strictly sequential (deliberately not parallelized - the point is to go easy on an already-struggling connection, not race it). */
+function chunkedDownloadStream(url: string, totalSize: number): ReadableStream<Uint8Array> {
+  let position = 0;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (position >= totalSize) {
+        controller.close();
+        return;
+      }
+      const end = Math.min(position + DOWNLOAD_CHUNK_SIZE, totalSize) - 1;
+      try {
+        const chunk = await fetchChunk(url, position, end);
+        position = end + 1;
+        controller.enqueue(chunk);
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+  });
 }
 
 /**
@@ -216,19 +274,33 @@ export class MtgBulkDataService {
     const defaultCards = infoBody.data.find((entry) => entry.type === 'default_cards');
     if (!defaultCards) throw new Error('"default_cards" nicht in Scryfalls Bulk-Data-Liste gefunden.');
 
-    const dataResponse = await fetch(defaultCards.jsonl_download_uri, { headers: { 'User-Agent': USER_AGENT } });
-    if (!dataResponse.ok || !dataResponse.body) {
-      throw new Error(`Bulk-Data-Download fehlgeschlagen (${dataResponse.status})`);
+    // Chunked (Range-request) download when the CDN supports it - see
+    // chunkedDownloadStream. Falls back to one plain long-lived fetch
+    // (the original behavior) only if the probe says Range isn't honored;
+    // that fetch is exactly as fragile on a bad connection as before, but
+    // there's no better option without Range support.
+    const url = defaultCards.jsonl_download_uri;
+    const totalSize = await probeRangeSupport(url);
+    let dataStream: ReadableStream<Uint8Array>;
+    if (totalSize) {
+      dataStream = chunkedDownloadStream(url, totalSize);
+    } else {
+      const dataResponse = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+      if (!dataResponse.ok || !dataResponse.body) {
+        throw new Error(`Bulk-Data-Download fehlgeschlagen (${dataResponse.status})`);
+      }
+      dataStream = dataResponse.body;
     }
 
     await idbClear(db, STORE_CARDS);
 
     let bytesReceived = 0;
-    const compressedSize = defaultCards.compressed_size || 1;
-    // Measures progress on the still-compressed byte stream (matching
-    // compressed_size from the bulk-data listing) - the decompressed size
-    // isn't known up front, so tracking it instead would give no usable
+    // Measures progress on the still-compressed byte stream - prefers the
+    // exact size the Range probe reported over the bulk-data listing's own
+    // (occasionally stale) compressed_size. The decompressed size isn't
+    // known up front, so tracking that instead would give no usable
     // percentage until the whole file had already downloaded.
+    const compressedSize = totalSize || defaultCards.compressed_size || 1;
     const progressStream = new TransformStream<Uint8Array, Uint8Array>({
       transform: (chunk, controller) => {
         bytesReceived += chunk.byteLength;
@@ -244,7 +316,7 @@ export class MtgBulkDataService {
     // this is exactly the documented, correct way to gunzip a fetch body.
     const gunzip = new DecompressionStream('gzip') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>;
     const decoder = new TextDecoderStream() as unknown as ReadableWritablePair<string, Uint8Array>;
-    const textStream = dataResponse.body.pipeThrough(progressStream).pipeThrough(gunzip).pipeThrough(decoder);
+    const textStream = dataStream.pipeThrough(progressStream).pipeThrough(gunzip).pipeThrough(decoder);
 
     let batch: Array<[string, StoredCard]> = [];
     let total = 0;
