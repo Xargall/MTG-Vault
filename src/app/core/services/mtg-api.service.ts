@@ -239,7 +239,6 @@ export class MtgApiService implements CardApiService {
   }
 
   private scryfallFetch(url: string, init?: RequestInit, queue: ScryfallQueue = this.queue): Promise<Response> {
-    console.log('scryfall-proxy URL:', url);
     return queue.add(async () => {
       for (let attempt = 0; ; attempt++) {
         try {
@@ -436,14 +435,10 @@ export class MtgApiService implements CardApiService {
    * - before reusing the exact same set+number lookup.
    */
   async identifyByGeminiResult(text: string): Promise<CroppedIdentification | null> {
-    console.log('[Gemini MTG] raw result:', text);
     const match = parseGeminiMtgResult(text);
-    console.log('[Gemini MTG] parsed:', match);
     if (!match) return null;
 
-    const resolved = await this.resolveSetCodeMatch(match);
-    console.log('[Gemini MTG] Scryfall result:', resolved?.card.name ?? null);
-    return resolved;
+    return this.resolveSetCodeMatch(match);
   }
 
   private async fetchCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<ScryfallRawCard | null> {

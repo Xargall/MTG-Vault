@@ -102,9 +102,6 @@ async function proxyBulkFile(req: Request, path: string, search: string): Promis
 }
 
 Deno.serve(async (req: Request) => {
-  console.log('Request received:', req.method);
-  console.log('Request URL:', req.url);
-
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -125,24 +122,20 @@ Deno.serve(async (req: Request) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SCRYFALL_TIMEOUT_MS);
   try {
-    console.log('Forwarding to Scryfall...');
     const isBodied = req.method !== 'GET' && req.method !== 'HEAD';
-    // The client deliberately sends 'text/plain' instead of 'application/
-    // json' (see MtgApiService.scryfallFetch) - 'application/json' isn't a
-    // CORS-safelisted content-type, so it forces a preflight on every POST;
-    // 'text/plain' doesn't. Scryfall itself still needs the real
-    // content-type to parse the (always-JSON, see fetchCollection) body
-    // correctly, so it's hardcoded here rather than forwarded verbatim from
-    // the client's (deliberately misleading) header.
+    // Every current caller sends GET only (see MtgApiService - the one
+    // remaining POST path, cards/collection, moved to querying
+    // scryfall_cards via PostgREST directly, see 016_scryfall_cards.sql).
+    // Kept for any future bodied call: Scryfall needs a real
+    // 'application/json' content-type to parse a JSON body regardless of
+    // what the client sent, so it's hardcoded here rather than forwarded
+    // verbatim.
     const response = await fetch(targetUrl, {
       method: req.method,
       headers: { ...SCRYFALL_FETCH_HEADERS, ...(isBodied ? { 'Content-Type': 'application/json' } : {}) },
       body: isBodied ? await req.text() : undefined,
       signal: controller.signal,
     });
-
-    console.log('Scryfall response status:', response.status);
-    console.log('Scryfall response headers:', Object.fromEntries(response.headers));
 
     const body = await response.text();
     return new Response(body, {

@@ -563,14 +563,6 @@ export class Scanner {
         });
       }
 
-      console.log(
-        '[Scanner] Video dimensions:',
-        videoEl.videoWidth,
-        videoEl.videoHeight,
-        'readyState:',
-        videoEl.readyState,
-      );
-
       // videoWidth/videoHeight can still be 0 at this point on some mobile
       // browsers - calling Gemini with an empty/near-empty crop would just
       // waste a rate-limited call and come back as a confusing "not
@@ -747,7 +739,6 @@ export class Scanner {
     if (!ctx) return null;
 
     ctx.drawImage(videoEl, 0, 0, width, height);
-    console.log('[Scanner] Canvas size:', this.rawFrameCanvas.width, this.rawFrameCanvas.height);
     return this.rawFrameCanvas;
   }
 

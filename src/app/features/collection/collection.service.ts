@@ -179,11 +179,8 @@ export class CollectionService {
 
     if (selectError) throw selectError;
 
-    console.log('[oracle_id debug] upsertOne received oracleId:', oracleId, 'for cardId:', cardId);
-
     if (existing) {
       const updatePayload = { quantity: existing.quantity + quantity, oracle_id: existing.oracle_id ?? oracleId };
-      console.log('[oracle_id debug] UPDATE payload:', JSON.stringify(updatePayload), 'existing.oracle_id was:', existing.oracle_id);
       const { error } = await this.supabase.client
         .from('collection_cards')
         // Backfills oracle_id on a legacy row (added before this column
@@ -206,7 +203,6 @@ export class CollectionService {
       card_category: cardCategory,
       oracle_id: oracleId,
     };
-    console.log('[oracle_id debug] INSERT payload:', JSON.stringify(insertPayload));
     const { error } = await this.supabase.client.from('collection_cards').insert(insertPayload);
     if (error) throw error;
   }

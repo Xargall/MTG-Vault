@@ -193,9 +193,6 @@ export class EdhrecService {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
     const slug = slugifyMtgName(commanderName);
-    const edhrecUrl = `https://json.edhrec.com/pages/average-decks/${slug}.json`;
-    console.log('Commander Slug:', slug);
-    console.log('EDHREC Commander URL:', edhrecUrl);
 
     let cached = this.averageDeckCache.get(slug);
     if (!cached) {
