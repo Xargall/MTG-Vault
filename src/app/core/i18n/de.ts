@@ -361,6 +361,12 @@ export const de = {
     geminiTitle: 'Gemini API Key',
     geminiDescription: 'Für die KI-gestützte Kartenerkennung beim Scannen.',
     manageGeminiKey: 'Gemini API Key verwalten',
+    bulkDataTitle: 'Kartendatenbank',
+    bulkDataDescription: 'Lokale Kopie aller Karten für Scanner und Sammlung - hilft, wenn Kartendaten wegen einer wackligen Verbindung nicht laden.',
+    bulkDataReady: '{{count}} Karten lokal gespeichert.',
+    bulkDataNotReady: 'Noch keine lokale Kartendatenbank vorhanden.',
+    bulkDataReloadSuccess: 'Kartendatenbank erfolgreich aktualisiert.',
+    reloadBulkData: 'Jetzt neu laden',
   },
   geminiKey: {
     backToSettings: '← Zurück zu den Einstellungen',

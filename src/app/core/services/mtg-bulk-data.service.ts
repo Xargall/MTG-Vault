@@ -154,6 +154,30 @@ export class MtgBulkDataService {
     return (this.ensurePromise ??= this.load());
   }
 
+  /**
+   * Unconditionally re-downloads, bypassing the 24h freshness check -
+   * backs the manual "reload card database" button in Settings, so a
+   * download that never finished (e.g. hit the same mobile-network
+   * hiccups as the live cards/collection lookups) can be retried on
+   * demand instead of waiting for the next automatic refresh. Resets
+   * `ensurePromise` first so a concurrent/later `ensureLoaded()` call
+   * doesn't just return this same in-flight attempt's result.
+   */
+  async forceReload(): Promise<void> {
+    this.ensurePromise = null;
+    try {
+      const db = await this.getDb();
+      await this.download(db);
+    } catch (error) {
+      console.error('Bulk-Data konnte nicht geladen werden:', error);
+      this.errorMessage.set(error instanceof Error ? error.message : 'Bulk-Data konnte nicht geladen werden.');
+      this.ready.set(false);
+      throw error;
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
   private async load(): Promise<void> {
     try {
       const db = await this.getDb();

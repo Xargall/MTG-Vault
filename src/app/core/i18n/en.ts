@@ -363,6 +363,12 @@ export const en: typeof de = {
     geminiTitle: 'Gemini API Key',
     geminiDescription: 'For AI-powered card recognition while scanning.',
     manageGeminiKey: 'Manage Gemini API Key',
+    bulkDataTitle: 'Card database',
+    bulkDataDescription: 'Local copy of every card for the scanner and collection - helps when card data fails to load over a shaky connection.',
+    bulkDataReady: '{{count}} cards stored locally.',
+    bulkDataNotReady: 'No local card database yet.',
+    bulkDataReloadSuccess: 'Card database updated successfully.',
+    reloadBulkData: 'Reload now',
   },
   geminiKey: {
     backToSettings: '← Back to Settings',

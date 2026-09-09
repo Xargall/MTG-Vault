@@ -29,4 +29,31 @@
       <a routerLink="/settings/gemini" class="cta-button">{{ 'settings.manageGeminiKey' | translate }}</a>
     </div>
   </section>
+
+  <section class="settings-section">
+    <h2>{{ 'settings.bulkDataTitle' | translate }}</h2>
+    <p class="section-hint">{{ 'settings.bulkDataDescription' | translate }}</p>
+
+    @if (bulkData.ready()) {
+      <p class="key-status key-status--set">
+        {{ 'settings.bulkDataReady' | translate: { count: bulkData.cardCount() } }}
+      </p>
+    } @else if (!bulkData.loading()) {
+      <p class="key-status key-status--unset">{{ 'settings.bulkDataNotReady' | translate }}</p>
+    }
+
+    @if (bulkData.loading()) {
+      <p class="section-hint">{{ 'scanner.bulkDataLoading' | translate: { percent: bulkData.progress() } }}</p>
+    } @else if (bulkDataReloadSuccess()) {
+      <p class="key-status key-status--set">{{ 'settings.bulkDataReloadSuccess' | translate }}</p>
+    } @else if (bulkData.errorMessage(); as err) {
+      <p class="key-status key-status--unset">{{ err }}</p>
+    }
+
+    <div class="button-row">
+      <button type="button" class="cta-button" (click)="reloadBulkData()" [disabled]="bulkData.loading()">
+        {{ 'settings.reloadBulkData' | translate }}
+      </button>
+    </div>
+  </section>
 </div>
