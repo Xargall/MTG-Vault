@@ -4,6 +4,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../../core/models/card.model';
 import { CardOwnedStatus, CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
 import { CollectionEntry } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
 import {
@@ -41,7 +42,7 @@ export interface DeckCardBindingDetail {
 
 @Component({
   selector: 'app-deck-detail-dialog',
-  imports: [CardTile, DecimalPipe, TranslatePipe],
+  imports: [CardTile, DecimalPipe, TranslatePipe, ScrollLockDirective],
   templateUrl: './deck-detail-dialog.html',
   styleUrl: './deck-detail-dialog.scss',
 })

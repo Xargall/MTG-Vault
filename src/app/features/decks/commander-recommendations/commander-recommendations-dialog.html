@@ -1,4 +1,4 @@
-<div class="backdrop" (click)="close.emit()">
+<div class="backdrop" appScrollLock (click)="close.emit()">
   <div class="dialog" (click)="$event.stopPropagation()">
     <header class="dialog-header">
       <h2>{{ 'commanderRecs.title' | translate }}</h2>

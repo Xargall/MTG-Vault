@@ -94,6 +94,13 @@ body {
   font-family: var(--font-body);
   background: var(--pattern-seal-faint) 0 0 / 80px 80px repeat, var(--color-bg);
   color: var(--color-text);
+
+  // Applied by ScrollLockDirective (see shared/directives/scroll-lock.directive.ts)
+  // while any dialog is open, so the page behind a modal backdrop can't be
+  // scrolled.
+  &.scroll-locked {
+    overflow: hidden;
+  }
 }
 
 h1,

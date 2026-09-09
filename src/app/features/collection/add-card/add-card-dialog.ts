@@ -5,6 +5,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Card } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
 import { CollectionService } from '../collection.service';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -12,7 +13,7 @@ const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
 @Component({
   selector: 'app-add-card-dialog',
-  imports: [FormsModule, CardTile, TranslatePipe],
+  imports: [FormsModule, CardTile, TranslatePipe, ScrollLockDirective],
   templateUrl: './add-card-dialog.html',
   styleUrl: './add-card-dialog.scss',
 })

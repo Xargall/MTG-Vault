@@ -4,6 +4,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { GameService } from '../../../core/services/game.service';
 import { MtgApiService } from '../../../core/services/mtg-api.service';
+import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
 import { DeckService } from '../deck.service';
 
 type ImportStatus = 'form' | 'importing' | 'done';
@@ -32,7 +33,7 @@ function parseLine(line: string): ParsedLine | null {
 
 @Component({
   selector: 'app-deck-import-dialog',
-  imports: [FormsModule, TranslatePipe],
+  imports: [FormsModule, TranslatePipe, ScrollLockDirective],
   templateUrl: './deck-import-dialog.html',
   styleUrl: './deck-import-dialog.scss',
 })

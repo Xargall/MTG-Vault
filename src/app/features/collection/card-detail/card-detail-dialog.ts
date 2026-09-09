@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card, MtgCard, PokemonCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
+import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
 import { ATTRIBUTE_CATEGORIES } from '../yugioh-collection-stats';
 import { COLOR_CATEGORIES, getEntryPrice } from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
@@ -40,7 +41,7 @@ const BANLIST_LABELS: Record<YugiohBanlistStatus, string> = {
 
 @Component({
   selector: 'app-card-detail-dialog',
-  imports: [DecimalPipe, FormsModule, TranslatePipe],
+  imports: [DecimalPipe, FormsModule, TranslatePipe, ScrollLockDirective],
   templateUrl: './card-detail-dialog.html',
   styleUrl: './card-detail-dialog.scss',
 })

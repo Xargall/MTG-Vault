@@ -5,13 +5,14 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Card } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
 import { WishlistService } from '../wishlist.service';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
 @Component({
   selector: 'app-add-wishlist-dialog',
-  imports: [FormsModule, CardTile, TranslatePipe],
+  imports: [FormsModule, CardTile, TranslatePipe, ScrollLockDirective],
   templateUrl: './add-wishlist-dialog.html',
   styleUrl: './add-wishlist-dialog.scss',
 })

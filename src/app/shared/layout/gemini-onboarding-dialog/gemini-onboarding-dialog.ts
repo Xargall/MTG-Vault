@@ -2,9 +2,11 @@ import { Component, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 
+import { ScrollLockDirective } from '../../directives/scroll-lock.directive';
+
 @Component({
   selector: 'app-gemini-onboarding-dialog',
-  imports: [RouterLink, TranslatePipe],
+  imports: [RouterLink, TranslatePipe, ScrollLockDirective],
   templateUrl: './gemini-onboarding-dialog.html',
   styleUrl: './gemini-onboarding-dialog.scss',
 })

@@ -5,6 +5,7 @@ import { Card } from '../../../core/models/card.model';
 import { EDHREC_COLOR_IDENTITIES, EdhrecService } from '../../../core/services/edhrec.service';
 import { MtgApiService } from '../../../core/services/mtg-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
 import {
@@ -70,7 +71,7 @@ function dedupeByCardName(entries: CollectionEntry[]): CollectionEntry[] {
 
 @Component({
   selector: 'app-commander-recommendations-dialog',
-  imports: [TranslatePipe, CardTile],
+  imports: [TranslatePipe, CardTile, ScrollLockDirective],
   templateUrl: './commander-recommendations-dialog.html',
   styleUrl: './commander-recommendations-dialog.scss',
 })

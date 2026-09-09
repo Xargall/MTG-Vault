@@ -5,6 +5,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Card } from '../../../core/models/card.model';
 import { YugiohApiService } from '../../../core/services/yugioh-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
 import { CollectionService } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
 
@@ -12,7 +13,7 @@ const SUGGESTION_LIMIT = 20;
 
 @Component({
   selector: 'app-archetype-browser-dialog',
-  imports: [FormsModule, CardTile, TranslatePipe],
+  imports: [FormsModule, CardTile, TranslatePipe, ScrollLockDirective],
   templateUrl: './archetype-browser-dialog.html',
   styleUrl: './archetype-browser-dialog.scss',
 })
