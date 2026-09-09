@@ -55,6 +55,39 @@ interface ScryfallCandidate {
   source: 'exact' | 'name' | 'filter';
 }
 
+/**
+ * Row shape of the `scryfall_cards` table (supabase/sql/016_scryfall_cards.sql),
+ * synced from Scryfall's bulk data by the sync-scryfall-cards Edge Function.
+ * Queried directly via PostgREST for searchCards/getCard/getCardBySetAndNumber/
+ * getCardsByIds/getCardsByNames/getPrints - a live-debugging session found
+ * scryfall-proxy failing consistently on at least one real network while
+ * PostgREST queries against this project's own tables never did. Flat and
+ * pre-resolved (a double-faced card's image/mana_cost already fell back to
+ * its first face during sync) - unlike ScryfallRawCard, there's no nested
+ * card_faces to unwrap here.
+ */
+interface ScryfallCardRow {
+  id: string;
+  oracle_id: string;
+  name: string;
+  printed_name: string | null;
+  image_url: string | null;
+  set_code: string;
+  set_name: string;
+  collector_number: string;
+  rarity: string;
+  released_at: string | null;
+  color_identity: string[];
+  mana_cost: string | null;
+  cmc: number;
+  type_line: string;
+  price_eur: number | null;
+  price_eur_foil: number | null;
+  price_usd: number | null;
+  price_usd_foil: number | null;
+  cardmarket_url: string | null;
+}
+
 // A token or halo-finish card gets its own collection bucket ("✨ Specials")
 // instead of the normal color grouping - see collection-stats.ts. Derived
 // once here (see categoryForMatch below) from the same parsed collector-
@@ -118,17 +151,25 @@ function escapeRegExp(value: string): string {
 
 // Routed through the scryfall-proxy Supabase Edge Function, not directly at
 // api.scryfall.com - the browser gets a CORS error calling Scryfall
-// cross-origin (most visibly the POST-based /cards/collection lookup, but
-// true of every endpoint here). The proxy mirrors Scryfall's URL structure
-// 1:1, so only these base URLs change - every path/query/method built from
-// them below is unchanged.
+// cross-origin. Still used for everything NOT migrated to query
+// scryfall_cards directly (see ScryfallCardRow's comment): the scanner's
+// identification methods and getPopularCards/getValidSetCodes. The proxy
+// mirrors Scryfall's URL structure 1:1, so only these base URLs change -
+// every path/query/method built from them below is unchanged.
 const SCRYFALL_PROXY_BASE = `${environment.supabaseUrl}/functions/v1/scryfall-proxy`;
 const CARD_ENDPOINT = `${SCRYFALL_PROXY_BASE}/cards`;
-const COLLECTION_ENDPOINT = `${SCRYFALL_PROXY_BASE}/cards/collection`;
 const SEARCH_ENDPOINT = `${SCRYFALL_PROXY_BASE}/cards/search`;
 const SETS_ENDPOINT = `${SCRYFALL_PROXY_BASE}/sets`;
-const BATCH_SIZE = 75;
 const SCRYFALL_USER_AGENT = 'TCGVault/1.0 (mathias-mayer.de)';
+// Batches an .in(column, [...]) PostgREST filter to keep the request's
+// query string comfortably under typical proxy/URL-length limits - a
+// user's full collection can run into the hundreds of ids.
+const POSTGRES_BATCH_SIZE = 200;
+// searchCards fetches this many rows per pass (prefix, then word-boundary)
+// before deduping by name client-side - generous enough that a common
+// query still surfaces plenty of distinct card names after every printing
+// of the same few cards is collapsed down to one.
+const SEARCH_ROW_LIMIT = 200;
 // Mobile networks hit Scryfall 504s (gateway timeout) far more often than
 // desktop - retried with exponential backoff (1s, 2s, 4s) rather than
 // surfacing the failure immediately. A thrown network error (offline blip,
@@ -238,42 +279,60 @@ export class MtgApiService implements CardApiService {
     });
   }
 
+  /**
+   * Two passes against scryfall_cards, one row per name kept (many rows
+   * share a name - every printing) so an exact-ish match (name starts with
+   * the query, e.g. "Sol" -> "Sol Ring") always ranks first - a plain
+   * word-boundary search alone sorts alphabetically across ALL word-start
+   * matches ("Sol" also matches "Agrus Kos, Eternal Soldier"), which can
+   * bury the obvious card behind less relevant ones.
+   */
   async searchCards(query: string): Promise<Card[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
-    const pattern = escapeRegExp(trimmed).replace(/\//g, '\\/');
-
-    // Two passes, one card per name (unique=cards) so an exact-ish match
-    // (name starts with the query, e.g. "Sol" -> "Sol Ring") always ranks
-    // first - a plain word-boundary search alone sorts alphabetically across
-    // ALL word-start matches ("Sol" also matches "Agrus Kos, Eternal
-    // Soldier"), which can bury the obvious card behind less relevant ones.
-    const params = 'order=name&unique=cards';
-    const [prefixMatches, wordMatches] = await Promise.all([
-      this.runSearch(`name:/^${pattern}/`, params),
-      this.runSearch(`name:/\\b${pattern}/`, params),
+    const pattern = escapeRegExp(trimmed);
+    const [prefixResult, wordResult] = await Promise.all([
+      this.supabase.client
+        .from('scryfall_cards')
+        .select('*')
+        .ilike('name', `${trimmed}%`)
+        .order('name')
+        .limit(SEARCH_ROW_LIMIT),
+      this.supabase.client
+        .from('scryfall_cards')
+        .select('*')
+        .filter('name', '~*', `\\y${pattern}`)
+        .order('name')
+        .limit(SEARCH_ROW_LIMIT),
     ]);
+    if (prefixResult.error) throw prefixResult.error;
+    if (wordResult.error) throw wordResult.error;
 
-    const seen = new Set(prefixMatches.map((card) => card.id));
-    const rest = wordMatches.filter((card) => !seen.has(card.id));
-    return [...prefixMatches, ...rest].map((raw) => this.toCard(raw));
+    const prefixRows = (prefixResult.data ?? []) as ScryfallCardRow[];
+    const wordRows = (wordResult.data ?? []) as ScryfallCardRow[];
+    return this.dedupeRowsByName([...prefixRows, ...wordRows]).map((row) => this.rowToCard(row));
   }
 
   async getCard(id: string): Promise<Card | null> {
-    const response = await this.scryfallFetch(`${CARD_ENDPOINT}/${id}`);
-    if (response.status === 404) return null;
-    if (!response.ok) {
-      throw new Error(`Scryfall-Anfrage fehlgeschlagen (${response.status})`);
-    }
-    const raw: ScryfallRawCard = await response.json();
-    return this.toCard(raw);
+    const { data, error } = await this.supabase.client.from('scryfall_cards').select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data ? this.rowToCard(data as ScryfallCardRow) : null;
   }
 
-  /** Exact, language-independent lookup by set code + collector number (e.g. "iko"/"123"). */
+  /** Exact, language-independent lookup by set code + collector number (e.g. "iko"/"123"). Tries both the unpadded and zero-padded 4-digit form (see collectorNumberVariants) - Scryfall's own stored collector_number isn't consistently one or the other across sets. */
   async getCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<Card | null> {
-    const raw = await this.fetchCardBySetAndNumber(setCode, collectorNumber);
-    return raw ? this.toCard(raw) : null;
+    for (const variant of this.collectorNumberVariants(collectorNumber)) {
+      const { data, error } = await this.supabase.client
+        .from('scryfall_cards')
+        .select('*')
+        .eq('set_code', setCode.toLowerCase())
+        .eq('collector_number', variant)
+        .maybeSingle();
+      if (error) throw error;
+      if (data) return this.rowToCard(data as ScryfallCardRow);
+    }
+    return null;
   }
 
   private categoryForMatch(match: { isToken: boolean; isHelper: boolean }): CardCategory {
@@ -424,47 +483,56 @@ export class MtgApiService implements CardApiService {
     return raw ? this.toCard(raw) : null;
   }
 
-  /**
-   * Live cards/collection first, same as ever - prices must stay
-   * network-fresh (never cached, see CLAUDE.md), so the local bulk cache
-   * (see MtgBulkDataService) only ever fills in ids a batch skipped (see
-   * fetchCollection's batch-skip handling), never replaces a successful
-   * fetch. Those filled-in cards carry whatever price the bulk cache last
-   * saw (up to 24h stale) - an acceptable tradeoff only because the
-   * alternative for them is no data at all, not because it's preferred.
-   */
+  /** Queries scryfall_cards directly - this is the method that used to matter most for reliability (Collection/Dashboard/Wishlist/Decks all resolve through here) and PostgREST has held up reliably where scryfall-proxy didn't. A batch that errors is skipped, not fatal - every caller here already looks results up by id and quietly drops whatever it doesn't find (see e.g. collection.service.ts). */
   async getCardsByIds(ids: string[]): Promise<Card[]> {
-    const raw = await this.fetchCollection(ids.map((id) => ({ id })));
-
-    const foundIds = new Set(raw.map((card) => card.id));
-    const missingIds = ids.filter((id) => !foundIds.has(id));
-    if (missingIds.length > 0) {
-      const fallback = await Promise.all(missingIds.map((id) => this.bulkData.findById(id)));
-      raw.push(...fallback.filter((card): card is ScryfallRawCard => card !== null));
-    }
-
-    return raw.map((card) => this.toCard(card));
+    const rows = await this.queryScryfallCards('id', ids);
+    return rows.map((row) => this.rowToCard(row));
   }
 
   /**
-   * `lowPriority` routes the batch through `decorativeQueue` instead of the
-   * main `queue` - for a call whose result is nice-to-have, not load-bearing
-   * (e.g. the dashboard's saltiest-cards widget), so it isn't stuck waiting
-   * behind whatever large, unrelated fetch (e.g. the user's full collection)
-   * happens to already be queued up on the main queue.
+   * `lowPriority` is accepted for source compatibility with existing call
+   * sites (e.g. the dashboard's saltiest-cards widget) but is a no-op now -
+   * it used to route around scryfall-proxy's rate-limited serial queue,
+   * which doesn't apply to a Postgres query at all.
    */
-  async getCardsByNames(names: string[], lowPriority = false): Promise<Card[]> {
-    const raw = await this.fetchCollection(
-      names.map((name) => ({ name })),
-      lowPriority ? this.decorativeQueue : undefined,
-    );
-    return raw.map((card) => this.toCard(card));
+  async getCardsByNames(names: string[], _lowPriority = false): Promise<Card[]> {
+    const rows = await this.queryScryfallCards('name', names);
+    return this.dedupeRowsByName(rows).map((row) => this.rowToCard(row));
   }
 
   async getPrints(name: string): Promise<Card[]> {
-    const escaped = name.replace(/"/g, '\\"');
-    const raw = await this.runSearch(`!"${escaped}"`, 'order=released&dir=desc&unique=prints');
-    return raw.map((card) => this.toCard(card));
+    const { data, error } = await this.supabase.client
+      .from('scryfall_cards')
+      .select('*')
+      .eq('name', name)
+      .order('released_at', { ascending: false });
+    if (error) throw error;
+    return ((data ?? []) as ScryfallCardRow[]).map((row) => this.rowToCard(row));
+  }
+
+  /** Shared batching for an `.in(column, [...])` PostgREST query (see POSTGRES_BATCH_SIZE) - a failed batch is logged and skipped rather than failing the whole call, same degrade-gracefully philosophy as everywhere else card lookups are batched in this file. */
+  private async queryScryfallCards(column: 'id' | 'name', values: string[]): Promise<ScryfallCardRow[]> {
+    const rows: ScryfallCardRow[] = [];
+    for (let i = 0; i < values.length; i += POSTGRES_BATCH_SIZE) {
+      const batch = values.slice(i, i + POSTGRES_BATCH_SIZE);
+      const { data, error } = await this.supabase.client.from('scryfall_cards').select('*').in(column, batch);
+      if (error) {
+        console.warn(`scryfall_cards ${column} batch failed, skipping ${batch.length} row(s):`, error);
+        continue;
+      }
+      rows.push(...((data ?? []) as ScryfallCardRow[]));
+    }
+    return rows;
+  }
+
+  /** Many rows can share a name (every printing) - keeps the first row seen per name, case-insensitively. Order of `rows` decides which printing wins for name-only callers (none of which need a *specific* printing - EDHREC candidate images, saltiest-cards, demo-seed, searchCards's dedup). */
+  private dedupeRowsByName(rows: ScryfallCardRow[]): ScryfallCardRow[] {
+    const byName = new Map<string, ScryfallCardRow>();
+    for (const row of rows) {
+      const key = row.name.toLowerCase();
+      if (!byName.has(key)) byName.set(key, row);
+    }
+    return [...byName.values()];
   }
 
   async identifyCard(rawText: string): Promise<CardIdentification | null> {
@@ -725,6 +793,32 @@ export class MtgApiService implements CardApiService {
     };
   }
 
+  /** Same shape as toCard(), sourced from a scryfall_cards row instead of a raw Scryfall API response - see ScryfallCardRow's comment for why these two exist side by side. */
+  private rowToCard(row: ScryfallCardRow): MtgCard {
+    return {
+      game: 'mtg',
+      id: row.id,
+      oracleId: row.oracle_id,
+      name: row.printed_name ?? row.name,
+      imageUrl: row.image_url,
+      setName: row.set_name,
+      rarity: row.rarity,
+      prices: {
+        usd: row.price_usd,
+        usdFoil: row.price_usd_foil,
+        eur: row.price_eur,
+        eurFoil: row.price_eur_foil,
+      },
+      colorIdentity: row.color_identity,
+      manaCost: row.mana_cost,
+      cmc: Number(row.cmc),
+      typeLine: row.type_line,
+      cardmarketUrl: row.cardmarket_url,
+      setCode: row.set_code,
+      collectorNumber: row.collector_number,
+    };
+  }
+
   private async runSearch(scryfallQuery: string, params: string, queue?: ScryfallQueue): Promise<ScryfallRawCard[]> {
     // Scryfall expects '+' between query terms, not a literal %20 space.
     const encodedQuery = encodeURIComponent(scryfallQuery).replace(/%20/g, '+');
@@ -742,42 +836,4 @@ export class MtgApiService implements CardApiService {
     return body.data;
   }
 
-  private async fetchCollection(
-    identifiers: Array<{ id: string } | { name: string }>,
-    queue?: ScryfallQueue,
-  ): Promise<ScryfallRawCard[]> {
-    const cards: ScryfallRawCard[] = [];
-
-    for (let i = 0; i < identifiers.length; i += BATCH_SIZE) {
-      const batch = identifiers.slice(i, i + BATCH_SIZE);
-      const requestBody = { identifiers: batch };
-      console.log('cards/collection request body:', JSON.stringify(requestBody));
-      const response = await this.scryfallFetch(
-        COLLECTION_ENDPOINT,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        },
-        queue,
-      );
-
-      // A single stuck batch (retries exhausted, still 504/non-ok) no
-      // longer takes down the whole collection/wishlist/deck view - every
-      // caller here already looks results up by id/name and quietly drops
-      // whatever it doesn't find (see e.g. collection.service.ts), so
-      // skipping just this batch's cards degrades gracefully instead of
-      // surfacing a hard error for what both here and on iOS has shown to
-      // be an intermittent single-batch failure, not a systemic one.
-      if (!response.ok) {
-        console.warn(`cards/collection batch failed (${response.status}), skipping ${batch.length} card(s)`);
-        continue;
-      }
-
-      const body: { data: ScryfallRawCard[] } = await response.json();
-      cards.push(...body.data);
-    }
-
-    return cards;
-  }
 }

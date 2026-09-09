@@ -1,0 +1,26 @@
+name: Sync scryfall_cards
+
+# Runs scripts/sync-scryfall-cards.mjs - originally a Supabase Edge
+# Function, moved here after that hit Edge Functions' CPU-time limit
+# processing Scryfall's ~120k-row bulk file in one invocation ("CPU Time
+# exceeded", confirmed live). A normal GitHub Actions runner has no
+# comparable CPU budget constraint.
+
+on:
+  schedule:
+    # Daily at 04:00 UTC.
+    - cron: '0 4 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/sync-scryfall-cards.mjs
+        env:
+          SUPABASE_URL: https://coxcqblefdlcmeumuglq.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
