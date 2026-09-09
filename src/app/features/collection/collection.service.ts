@@ -65,6 +65,17 @@ export class CollectionService {
     const cards = await this.gameService.cardApi().getCardsByIds(data.map((row) => row.card_id));
     const cardsById = new Map(cards.map((card) => [card.id, card]));
 
+    // Every lookup failing at once (e.g. Scryfall down and the local bulk
+    // cache wasn't warm either - see MtgApiService.getCardsByIds) would
+    // otherwise map to an empty array below, indistinguishable to every
+    // caller (see hasCards in DashboardComponent) from a genuinely empty
+    // collection - surfaced as a real error instead of a misleading "add
+    // your first card" empty state. A partial failure is left alone; it
+    // already degrades gracefully by just omitting the unresolved rows.
+    if (data.length > 0 && cardsById.size === 0) {
+      throw new Error('Kartendaten konnten nicht geladen werden. Bitte versuche es erneut.');
+    }
+
     return data
       .map((row) => {
         const card = cardsById.get(row.card_id);
