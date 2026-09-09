@@ -266,22 +266,31 @@ export class MtgBulkDataService {
     const dataResponse = await fetch(`${BULK_FILE_PROXY_BASE}${downloadPath}`, {
       headers: { 'User-Agent': USER_AGENT },
     });
-    if (!dataResponse.ok || !dataResponse.body) {
+    if (!dataResponse.ok) {
       throw new Error(`Bulk-Data-Download fehlgeschlagen (${dataResponse.status})`);
     }
 
+    // Buffered whole rather than read from the live network response as a
+    // stream - confirmed live: WebKit/Safari's fetch() reliably fails
+    // partway through reading `response.body` while data is still arriving
+    // over the network, but a plain buffered `response.arrayBuffer()` on
+    // the exact same request succeeds every time. The compressed file
+    // (tens of MB) comfortably fits in memory at once; only the
+    // decompressed ~600MB+ text below still needs to stay streamed, which
+    // is safe here because that stream is sourced from this already-
+    // in-memory buffer, not a live network connection.
+    const compressedBuffer = await dataResponse.arrayBuffer();
+    const bufferStream = new Response(compressedBuffer).body;
+    if (!bufferStream) throw new Error('Bulk-Data konnte nicht verarbeitet werden.');
+
     await idbClear(db, STORE_CARDS);
 
-    let bytesReceived = 0;
-    // Measures progress on the still-compressed byte stream (matching
-    // compressed_size from the bulk-data listing) - the decompressed size
-    // isn't known up front, so tracking it instead would give no usable
-    // percentage until the whole file had already downloaded.
-    const compressedSize = defaultCards.compressed_size || 1;
+    let bytesProcessed = 0;
+    const compressedSize = compressedBuffer.byteLength || defaultCards.compressed_size || 1;
     const progressStream = new TransformStream<Uint8Array, Uint8Array>({
       transform: (chunk, controller) => {
-        bytesReceived += chunk.byteLength;
-        this.progress.set(Math.min(99, Math.round((bytesReceived / compressedSize) * 100)));
+        bytesProcessed += chunk.byteLength;
+        this.progress.set(Math.min(99, Math.round((bytesProcessed / compressedSize) * 100)));
         controller.enqueue(chunk);
       },
     });
@@ -293,7 +302,7 @@ export class MtgBulkDataService {
     // this is exactly the documented, correct way to gunzip a fetch body.
     const gunzip = new DecompressionStream('gzip') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>;
     const decoder = new TextDecoderStream() as unknown as ReadableWritablePair<string, Uint8Array>;
-    const textStream = dataResponse.body.pipeThrough(progressStream).pipeThrough(gunzip).pipeThrough(decoder);
+    const textStream = bufferStream.pipeThrough(progressStream).pipeThrough(gunzip).pipeThrough(decoder);
 
     let batch: Array<[string, StoredCard]> = [];
     let total = 0;
