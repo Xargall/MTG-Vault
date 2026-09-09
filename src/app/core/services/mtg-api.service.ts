@@ -14,6 +14,7 @@ import {
 import { OcrLineLike, cleanOcrText, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification, MtgIdentificationResult, ScoredCandidate } from './card-api.interface';
 import { MtgBulkDataService } from './mtg-bulk-data.service';
+import { SupabaseService } from './supabase.service';
 
 // Exported so MtgBulkDataService (the local IndexedDB card cache) can trim
 // down and store bulk-data records in exactly this shape - anything read
@@ -149,6 +150,7 @@ export class MtgApiService implements CardApiService {
   // network - see MtgBulkDataService. This is a one-directional dependency
   // (that service never depends back on this one).
   private readonly bulkData = inject(MtgBulkDataService);
+  private readonly supabase = inject(SupabaseService);
 
   // Every Scryfall call funnels through this queue (max 10 req/s, per
   // Scryfall's documented limit) and carries an identifying User-Agent -
@@ -202,19 +204,20 @@ export class MtgApiService implements CardApiService {
         try {
           const response = await fetch(url, {
             ...init,
-            // Deliberately no apikey/Authorization here (scryfall-proxy is
-            // deployed with --no-verify-jwt, unlike every other function in
-            // this project) and, for a POST body, 'text/plain' rather than
-            // 'application/json' as its content-type (see fetchCollection) -
-            // together that keeps every call a CORS "simple request",
-            // needing no preflight (OPTIONS) round trip at all. That
-            // preflight is what's been shown to fail outright on some
-            // mobile networks/Safari - this function only ever proxies
-            // fully public Scryfall data, so skipping auth on it trades
-            // nothing security-sensitive for that reliability.
+            // TEMPORARY EXPERIMENT: back to apikey/Authorization (and
+            // scryfall-proxy back to its default verify_jwt) after the
+            // --no-verify-jwt + headerless "simple request" approach didn't
+            // fix the 504s on a real device after all - every OTHER
+            // function on this same Supabase project (edhrec-proxy,
+            // collection_cards, has_user_secret) succeeded on the exact
+            // same network while every scryfall-proxy route failed, and
+            // verify_jwt was the one structural difference between
+            // scryfall-proxy and those. Testing whether that's really it.
             headers: {
               ...init?.headers,
               'User-Agent': SCRYFALL_USER_AGENT,
+              apikey: environment.supabaseAnonKey,
+              Authorization: `Bearer ${this.supabase.session()?.access_token ?? environment.supabaseAnonKey}`,
             },
           });
           if (response.status === 403) throw new ScryfallRateLimitError();
@@ -753,11 +756,7 @@ export class MtgApiService implements CardApiService {
         COLLECTION_ENDPOINT,
         {
           method: 'POST',
-          // 'text/plain', not 'application/json' - see scryfallFetch's
-          // comment. scryfall-proxy hardcodes the real content-type when
-          // forwarding this to Scryfall, so the body is still parsed
-          // correctly server-side.
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody),
         },
         queue,
