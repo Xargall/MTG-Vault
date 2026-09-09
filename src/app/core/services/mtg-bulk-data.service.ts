@@ -1,5 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 
+import { environment } from '../../../environments/environment';
 import { similarity } from '../utils/string-similarity';
 import {
   idbClear,
@@ -13,6 +14,7 @@ import {
   openIndexedDb,
 } from './indexed-db.util';
 import { ScryfallCardFace, ScryfallRawCard } from './mtg-api.service';
+import { SupabaseService } from './supabase.service';
 
 const DB_NAME = 'tcg-collector-mtg-bulk';
 const DB_VERSION = 1;
@@ -22,6 +24,15 @@ const INDEX_SET_NUMBER = 'by_set_number';
 const INDEX_COLLECTOR_NUMBER = 'by_collector_number';
 
 const BULK_DATA_ENDPOINT = 'https://api.scryfall.com/bulk-data';
+// The actual bulk file (jsonl_download_uri, on data.scryfall.io) is routed
+// through the scryfall-proxy edge function's dedicated /bulk-file route
+// instead of fetched directly - that host serves every file with
+// `Content-Disposition: attachment`, which WebKit/Safari's fetch() has
+// documented issues handling cross-origin (confirmed live: a direct
+// browser download of the exact same URL always succeeds on iOS, while
+// every fetch() attempt from the app fails instantly). The proxy strips
+// that header before relaying the response. See scryfall-proxy/index.ts.
+const BULK_FILE_PROXY_BASE = `${environment.supabaseUrl}/functions/v1/scryfall-proxy/bulk-file`;
 // Same identifying UA MtgApiService sends - this service deliberately has no
 // dependency on it (MtgApiService depends on this service, not the other
 // way around), so the string is duplicated rather than shared.
@@ -138,6 +149,8 @@ function trimBulkCard(raw: Record<string, unknown>): StoredCard | null {
  */
 @Injectable({ providedIn: 'root' })
 export class MtgBulkDataService {
+  private readonly supabase = inject(SupabaseService);
+
   readonly ready = signal(false);
   readonly loading = signal(false);
   readonly progress = signal(0);
@@ -245,10 +258,20 @@ export class MtgBulkDataService {
   private async downloadOnce(db: IDBDatabase, defaultCards: BulkDataEntry): Promise<void> {
     this.progress.set(0);
 
-    // Deliberately no headers beyond User-Agent (which browsers silently
-    // drop from a script-set fetch() anyway) - see DOWNLOAD_RETRY_ATTEMPTS's
-    // comment for why this must stay a CORS "simple request".
-    const dataResponse = await fetch(defaultCards.jsonl_download_uri, { headers: { 'User-Agent': USER_AGENT } });
+    // Routed through scryfall-proxy's /bulk-file route (see
+    // BULK_FILE_PROXY_BASE) rather than fetched directly from
+    // data.scryfall.io - same auth pattern as MtgApiService.scryfallFetch,
+    // since every Supabase Edge Function call needs a real session JWT
+    // (the publishable key isn't one - sending it as the bearer fails
+    // verify_jwt's signature check).
+    const downloadPath = new URL(defaultCards.jsonl_download_uri).pathname;
+    const dataResponse = await fetch(`${BULK_FILE_PROXY_BASE}${downloadPath}`, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        apikey: environment.supabaseAnonKey,
+        Authorization: `Bearer ${this.supabase.session()?.access_token ?? environment.supabaseAnonKey}`,
+      },
+    });
     if (!dataResponse.ok || !dataResponse.body) {
       throw new Error(`Bulk-Data-Download fehlgeschlagen (${dataResponse.status})`);
     }
