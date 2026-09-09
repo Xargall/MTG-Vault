@@ -14,6 +14,7 @@ export const de = {
   },
   footer: {
     cardDataFrom: 'Kartendaten von',
+    impressum: 'Impressum',
   },
   common: {
     card: 'Karte',

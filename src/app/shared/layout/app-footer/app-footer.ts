@@ -1,11 +1,12 @@
 import { Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 
 import { GameService } from '../../../core/services/game.service';
 
 @Component({
   selector: 'app-footer',
-  imports: [TranslatePipe],
+  imports: [TranslatePipe, RouterLink],
   templateUrl: './app-footer.html',
   styleUrl: './app-footer.scss',
 })

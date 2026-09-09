@@ -26,6 +26,12 @@ export const routes: Routes = [
       import('./features/auth/callback/auth-callback').then((m) => m.AuthCallback),
   },
   {
+    // Outside the authGuard-protected shell on purpose - a German Impressum
+    // (§ 5 TMG) must be reachable without logging in first.
+    path: 'impressum',
+    loadComponent: () => import('./features/legal/impressum/impressum').then((m) => m.Impressum),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>

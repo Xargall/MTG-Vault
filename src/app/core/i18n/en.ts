@@ -16,6 +16,7 @@ export const en: typeof de = {
   },
   footer: {
     cardDataFrom: 'Card data from',
+    impressum: 'Legal Notice',
   },
   common: {
     card: 'card',
