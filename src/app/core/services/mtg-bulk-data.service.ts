@@ -138,6 +138,20 @@ function trimBulkCard(raw: Record<string, unknown>): StoredCard | null {
   return card;
 }
 
+/** Resolves immediately if the tab is already visible; otherwise waits for it to become visible - iOS Safari suspends network activity for backgrounded tabs, so a multi-second download should never start (or retry) while hidden. */
+function waitUntilVisible(): Promise<void> {
+  if (!document.hidden) return Promise.resolve();
+  return new Promise((resolve) => {
+    const onVisible = () => {
+      if (!document.hidden) {
+        document.removeEventListener('visibilitychange', onVisible);
+        resolve();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+  });
+}
+
 /**
  * Local, offline-capable card cache for the MTG scanner: downloads
  * Scryfall's "default_cards" bulk file (every printing, ~120k+ records)
@@ -245,6 +259,12 @@ export class MtgBulkDataService {
     // DOWNLOAD_RETRY_ATTEMPTS for why this stays a single plain fetch
     // instead of Range-chunked.
     for (let attempt = 0; ; attempt++) {
+      // iOS Safari aggressively suspends/kills network activity for a
+      // backgrounded tab - starting (or retrying) a multi-second download
+      // right as the tab goes to the background all but guarantees it
+      // fails partway through. Waiting for the tab to be visible first
+      // costs nothing when it already is (resolves immediately).
+      await waitUntilVisible();
       try {
         await this.downloadOnce(db, defaultCards);
         return;
