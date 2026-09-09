@@ -30,7 +30,22 @@
             <h4>{{ 'commanderRecs.ownedSection' | translate: { count: freeQuantityTotal() } }}</h4>
             <div class="results-grid">
               @for (entry of ownedCards(); track entry.card.id) {
-                <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
+                <div class="card-with-note">
+                  <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
+                  @if (entry.substitute; as substitute) {
+                    <div class="binding-detail-notes">
+                      <span class="binding-detail-note">
+                        {{ 'deckDetail.substituteNote' | translate: { name: entry.card.name, print: printLabel(entry.card) } }}
+                      </span>
+                      <span class="binding-detail-subnote">
+                        {{
+                          'deckDetail.substituteOwnedNote'
+                            | translate: { name: substitute.card.name, print: printLabel(substitute.card) }
+                        }}
+                      </span>
+                    </div>
+                  }
+                </div>
               }
             </div>
           }
@@ -39,15 +54,9 @@
             <h4>{{ 'commanderRecs.plannedElsewhereSection' | translate: { count: assignedElsewhereQuantityTotal() } }}</h4>
             <div class="results-grid">
               @for (entry of assignedElsewhereCards(); track entry.card.id) {
-                <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
-              }
-            </div>
-            <ul class="binding-details-list">
-              @for (entry of assignedElsewhereCards(); track entry.card.id) {
-                <li class="binding-detail-row">
-                  <div class="binding-detail-body">
-                    <span class="binding-detail-name">{{ entry.card.name }} ×{{ entry.quantity }}</span>
-
+                <div class="card-with-note">
+                  <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
+                  <div class="binding-detail-notes">
                     @if (entry.substitute; as substitute) {
                       <span class="binding-detail-note">
                         {{ 'deckDetail.substituteNote' | translate: { name: entry.card.name, print: printLabel(entry.card) } }}
@@ -67,9 +76,9 @@
                       </span>
                     }
                   </div>
-                </li>
+                </div>
               }
-            </ul>
+            </div>
           }
 
           @if (missingCards().length > 0) {
