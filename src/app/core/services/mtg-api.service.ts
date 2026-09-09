@@ -427,8 +427,25 @@ export class MtgApiService implements CardApiService {
     return raw ? this.toCard(raw) : null;
   }
 
+  /**
+   * Live cards/collection first, same as ever - prices must stay
+   * network-fresh (never cached, see CLAUDE.md), so the local bulk cache
+   * (see MtgBulkDataService) only ever fills in ids a batch skipped (see
+   * fetchCollection's batch-skip handling), never replaces a successful
+   * fetch. Those filled-in cards carry whatever price the bulk cache last
+   * saw (up to 24h stale) - an acceptable tradeoff only because the
+   * alternative for them is no data at all, not because it's preferred.
+   */
   async getCardsByIds(ids: string[]): Promise<Card[]> {
     const raw = await this.fetchCollection(ids.map((id) => ({ id })));
+
+    const foundIds = new Set(raw.map((card) => card.id));
+    const missingIds = ids.filter((id) => !foundIds.has(id));
+    if (missingIds.length > 0) {
+      const fallback = await Promise.all(missingIds.map((id) => this.bulkData.findById(id)));
+      raw.push(...fallback.filter((card): card is ScryfallRawCard => card !== null));
+    }
+
     return raw.map((card) => this.toCard(card));
   }
 
@@ -748,8 +765,16 @@ export class MtgApiService implements CardApiService {
         queue,
       );
 
+      // A single stuck batch (retries exhausted, still 504/non-ok) no
+      // longer takes down the whole collection/wishlist/deck view - every
+      // caller here already looks results up by id/name and quietly drops
+      // whatever it doesn't find (see e.g. collection.service.ts), so
+      // skipping just this batch's cards degrades gracefully instead of
+      // surfacing a hard error for what both here and on iOS has shown to
+      // be an intermittent single-batch failure, not a systemic one.
       if (!response.ok) {
-        throw new Error(`Scryfall-Anfrage fehlgeschlagen (${response.status})`);
+        console.warn(`cards/collection batch failed (${response.status}), skipping ${batch.length} card(s)`);
+        continue;
       }
 
       const body: { data: ScryfallRawCard[] } = await response.json();
