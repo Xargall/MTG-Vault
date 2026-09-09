@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 
 import { environment } from '../../../environments/environment';
 import { similarity } from '../utils/string-similarity';
@@ -14,7 +14,6 @@ import {
   openIndexedDb,
 } from './indexed-db.util';
 import { ScryfallCardFace, ScryfallRawCard } from './mtg-api.service';
-import { SupabaseService } from './supabase.service';
 
 const DB_NAME = 'tcg-collector-mtg-bulk';
 const DB_VERSION = 1;
@@ -149,8 +148,6 @@ function trimBulkCard(raw: Record<string, unknown>): StoredCard | null {
  */
 @Injectable({ providedIn: 'root' })
 export class MtgBulkDataService {
-  private readonly supabase = inject(SupabaseService);
-
   readonly ready = signal(false);
   readonly loading = signal(false);
   readonly progress = signal(0);
@@ -260,17 +257,14 @@ export class MtgBulkDataService {
 
     // Routed through scryfall-proxy's /bulk-file route (see
     // BULK_FILE_PROXY_BASE) rather than fetched directly from
-    // data.scryfall.io - same auth pattern as MtgApiService.scryfallFetch,
-    // since every Supabase Edge Function call needs a real session JWT
-    // (the publishable key isn't one - sending it as the bearer fails
-    // verify_jwt's signature check).
+    // data.scryfall.io. Deliberately no apikey/Authorization header -
+    // scryfall-proxy is deployed with --no-verify-jwt (see MtgApiService.
+    // scryfallFetch's comment), keeping this a CORS "simple request" with
+    // no preflight, which is what turned out to matter on some mobile
+    // networks/Safari.
     const downloadPath = new URL(defaultCards.jsonl_download_uri).pathname;
     const dataResponse = await fetch(`${BULK_FILE_PROXY_BASE}${downloadPath}`, {
-      headers: {
-        'User-Agent': USER_AGENT,
-        apikey: environment.supabaseAnonKey,
-        Authorization: `Bearer ${this.supabase.session()?.access_token ?? environment.supabaseAnonKey}`,
-      },
+      headers: { 'User-Agent': USER_AGENT },
     });
     if (!dataResponse.ok || !dataResponse.body) {
       throw new Error(`Bulk-Data-Download fehlgeschlagen (${dataResponse.status})`);

@@ -126,11 +126,18 @@ Deno.serve(async (req: Request) => {
   const timeoutId = setTimeout(() => controller.abort(), SCRYFALL_TIMEOUT_MS);
   try {
     console.log('Forwarding to Scryfall...');
-    const contentType = req.headers.get('content-type');
+    const isBodied = req.method !== 'GET' && req.method !== 'HEAD';
+    // The client deliberately sends 'text/plain' instead of 'application/
+    // json' (see MtgApiService.scryfallFetch) - 'application/json' isn't a
+    // CORS-safelisted content-type, so it forces a preflight on every POST;
+    // 'text/plain' doesn't. Scryfall itself still needs the real
+    // content-type to parse the (always-JSON, see fetchCollection) body
+    // correctly, so it's hardcoded here rather than forwarded verbatim from
+    // the client's (deliberately misleading) header.
     const response = await fetch(targetUrl, {
       method: req.method,
-      headers: { ...SCRYFALL_FETCH_HEADERS, ...(contentType ? { 'Content-Type': contentType } : {}) },
-      body: req.method === 'GET' || req.method === 'HEAD' ? undefined : await req.text(),
+      headers: { ...SCRYFALL_FETCH_HEADERS, ...(isBodied ? { 'Content-Type': 'application/json' } : {}) },
+      body: isBodied ? await req.text() : undefined,
       signal: controller.signal,
     });
 

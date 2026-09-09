@@ -14,7 +14,6 @@ import {
 import { OcrLineLike, cleanOcrText, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification, MtgIdentificationResult, ScoredCandidate } from './card-api.interface';
 import { MtgBulkDataService } from './mtg-bulk-data.service';
-import { SupabaseService } from './supabase.service';
 
 // Exported so MtgBulkDataService (the local IndexedDB card cache) can trim
 // down and store bulk-data records in exactly this shape - anything read
@@ -150,7 +149,6 @@ export class MtgApiService implements CardApiService {
   // network - see MtgBulkDataService. This is a one-directional dependency
   // (that service never depends back on this one).
   private readonly bulkData = inject(MtgBulkDataService);
-  private readonly supabase = inject(SupabaseService);
 
   // Every Scryfall call funnels through this queue (max 10 req/s, per
   // Scryfall's documented limit) and carries an identifying User-Agent -
@@ -204,23 +202,19 @@ export class MtgApiService implements CardApiService {
         try {
           const response = await fetch(url, {
             ...init,
-            // Every Supabase Edge Function requires a valid Authorization
-            // bearer (verify_jwt, left at its default). Supabase's newer
-            // "sb_publishable_..." key format isn't itself a JWT, so sending
-            // it verbatim as the bearer (as this used to) fails verify_jwt's
-            // signature check with 401 Unauthorized - the Supabase JS SDK's
-            // own functions.invoke() (used elsewhere, e.g. GeminiVisionService)
-            // already knows this and sends the real session token instead;
-            // this raw fetch() call has to do the same thing by hand. Every
-            // session - including a guest's - is a real anonymous-auth JWT
-            // (see SupabaseService), so this is available whenever a user
-            // could actually be browsing cards. Falls back to the publishable
-            // key only for the (normally unreachable) case of no session yet.
+            // Deliberately no apikey/Authorization here (scryfall-proxy is
+            // deployed with --no-verify-jwt, unlike every other function in
+            // this project) and, for a POST body, 'text/plain' rather than
+            // 'application/json' as its content-type (see fetchCollection) -
+            // together that keeps every call a CORS "simple request",
+            // needing no preflight (OPTIONS) round trip at all. That
+            // preflight is what's been shown to fail outright on some
+            // mobile networks/Safari - this function only ever proxies
+            // fully public Scryfall data, so skipping auth on it trades
+            // nothing security-sensitive for that reliability.
             headers: {
               ...init?.headers,
               'User-Agent': SCRYFALL_USER_AGENT,
-              apikey: environment.supabaseAnonKey,
-              Authorization: `Bearer ${this.supabase.session()?.access_token ?? environment.supabaseAnonKey}`,
             },
           });
           if (response.status === 403) throw new ScryfallRateLimitError();
@@ -759,7 +753,11 @@ export class MtgApiService implements CardApiService {
         COLLECTION_ENDPOINT,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // 'text/plain', not 'application/json' - see scryfallFetch's
+          // comment. scryfall-proxy hardcodes the real content-type when
+          // forwarding this to Scryfall, so the body is still parsed
+          // correctly server-side.
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify(requestBody),
         },
         queue,
