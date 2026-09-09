@@ -235,35 +235,15 @@ export class MtgBulkDataService {
     const infoResponse = await fetch(BULK_DATA_ENDPOINT, { headers: { 'User-Agent': USER_AGENT } });
     if (!infoResponse.ok) throw new Error(`Scryfall-Bulk-Data-Anfrage fehlgeschlagen (${infoResponse.status})`);
     const infoBody: { data: BulkDataEntry[] } = await infoResponse.json();
-    const findEntry = (type: string) => infoBody.data.find((entry) => entry.type === type);
-
-    const defaultCards = findEntry('default_cards');
+    const defaultCards = infoBody.data.find((entry) => entry.type === 'default_cards');
     if (!defaultCards) throw new Error('"default_cards" nicht in Scryfalls Bulk-Data-Liste gefunden.');
 
-    try {
-      await this.downloadWithRetry(db, defaultCards);
-    } catch (error) {
-      // Falls back to the much smaller "oracle_cards" file (one record per
-      // oracle_id rather than per printing - most exact set+number scanner
-      // lookups miss locally against this and fall back to the live API,
-      // only the fuzzy name match keeps its full value) only after the
-      // full file has already failed every retry above. A degraded local
-      // cache surviving on a connection where the full one couldn't beats
-      // no local cache at all.
-      const oracleCards = findEntry('oracle_cards');
-      if (!oracleCards) throw error;
-      console.warn('default_cards download failed, falling back to smaller oracle_cards:', error);
-      await this.downloadWithRetry(db, oracleCards);
-    }
-  }
-
-  // Retries the whole download rather than resuming a partial one - see
-  // DOWNLOAD_RETRY_ATTEMPTS for why this stays a single plain fetch instead
-  // of Range-chunked.
-  private async downloadWithRetry(db: IDBDatabase, entry: BulkDataEntry): Promise<void> {
+    // Retries the whole download rather than resuming a partial one - see
+    // DOWNLOAD_RETRY_ATTEMPTS for why this stays a single plain fetch
+    // instead of Range-chunked.
     for (let attempt = 0; ; attempt++) {
       try {
-        await this.downloadOnce(db, entry);
+        await this.downloadOnce(db, defaultCards);
         return;
       } catch (error) {
         if (attempt >= DOWNLOAD_RETRY_ATTEMPTS - 1) throw error;
