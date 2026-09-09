@@ -47,6 +47,17 @@ export class UserMenu {
     }
   }
 
+  // menuPosition is computed once, at open time - scrolling the page after
+  // that leaves the dropdown either detached from the avatar button (if its
+  // fixed-positioning containing block turns out to be an ancestor that
+  // itself scrolls) or simply stale. Closing on scroll sidesteps having to
+  // keep it repositioned live, and matches how most floating menus behave
+  // anyway.
+  @HostListener('window:scroll')
+  protected onWindowScroll() {
+    if (this.open()) this.close();
+  }
+
   protected async logout() {
     this.close();
     await this.authService.signOut();
