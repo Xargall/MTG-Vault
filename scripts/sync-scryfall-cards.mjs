@@ -78,6 +78,11 @@ function rowFromRawCard(raw) {
     price_usd: parsePrice(raw.prices?.usd),
     price_usd_foil: parsePrice(raw.prices?.usd_foil),
     cardmarket_url: raw.purchase_uris?.cardmarket ?? null,
+    // Set explicitly, not left to the column's `default now()` - that
+    // default only fires on a true INSERT, not on the UPDATE half of an
+    // upsert, so an already-existing row's synced_at would otherwise never
+    // move on subsequent runs, making it useless as a "last synced" signal.
+    synced_at: new Date().toISOString(),
   };
 }
 
