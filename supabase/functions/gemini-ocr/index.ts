@@ -47,9 +47,12 @@ Formate die vorkommen können:
 - Token alt:    "017/017T"    → Ausgabe: "MSH T17"
 - Halo neu:     "H 0020"      → Ausgabe: "MSH H20"
 - Halo alt:     "020/020 H"   → Ausgabe: "MSH H20"
+- Mit Rarität:  "U 0003"      → Ausgabe: "MSH 3"   (siehe unten - U ist KEIN Flag!)
 
 Wichtig bei X/Y Format: IMMER nur X nehmen, nie Y!
-Das Flag (T oder H) steht vor oder nach der Nummer.
+Das einzige echte Flag ist T (Token) oder H (Halo/Reminder-Karte) - steht vor oder nach der Nummer.
+Ein einzelner Buchstabe C, U, R oder M direkt vor/nach der Nummer ist KEIN Flag, sondern die Raritätsangabe
+(Common/Uncommon/Rare/Mythic) - diesen Buchstaben komplett ignorieren, nicht mit T/H verwechseln.
 
 Antworte NUR in diesem Format:
 - Normale Karte: "MSH 82"
