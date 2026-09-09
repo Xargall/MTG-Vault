@@ -224,6 +224,54 @@
   gap: var(--spacing-md);
 }
 
+// Per-card notes for the "planned elsewhere" section (which deck, and any
+// owned-under-a-different-printing substitute) - same look as
+// deck-detail-dialog.scss's binding-detail-* rules (duplicated rather than
+// shared: Angular's per-component style encapsulation doesn't let two
+// standalone dialogs share a stylesheet without a bigger refactor).
+.binding-details-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.binding-detail-row {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius);
+  background: var(--color-surface-alt);
+  border-left: 3px solid var(--color-text-muted);
+}
+
+.binding-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.binding-detail-name {
+  font-size: 0.9rem;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.binding-detail-note {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+
+  &::before {
+    content: '↳ ';
+  }
+}
+
+.binding-detail-subnote {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  padding-left: 14px;
+}
+
 .wishlist-row {
   display: flex;
   flex-wrap: wrap;

@@ -7,8 +7,17 @@ import { MtgApiService } from '../../../core/services/mtg-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
-import { buildOwnedOracleMap, getCardOwnedStatus, getMissingQuantity } from '../deck-stats';
-import { DeckService } from '../deck.service';
+import {
+  AssignedElsewhereEntry,
+  buildAssignedElsewhereMaps,
+  buildOwnedOracleMap,
+  findSubstitute,
+  getAssignedElsewhereDecks,
+  getCardOwnedStatus,
+  getMissingQuantity,
+  getOwnedQuantity,
+} from '../deck-stats';
+import { DeckEntry, DeckService } from '../deck.service';
 import {
   buildOwnedByNameMap,
   buildPlainOwnedByNameMap,
@@ -20,6 +29,13 @@ export interface CommanderDeckCard {
   card: Card;
   quantity: number;
   ownedQty: number;
+  substitute: CollectionEntry | null;
+}
+
+/** A "free" card, further split out from CommanderDeckCard's owned bucket - fully owned, but some/all copies are already `is_assigned` to one of the user's *other* decks (see deck-stats.ts's Feature 2). Display-only here: unlike DeckDetailDialog, this preview offers no "Freigeben" action - releasing a commitment still happens from the deck it's actually assigned to. */
+export interface CommanderAssignedCard extends CommanderDeckCard {
+  available: number;
+  assignedElsewhere: AssignedElsewhereEntry[];
 }
 
 const BATCH_SIZE = 5;
@@ -76,6 +92,10 @@ export class CommanderRecommendationsDialog {
   protected readonly total = signal(0);
   protected readonly recommendations = signal<CommanderRecommendation[]>([]);
   private readonly collectionEntries = signal<CollectionEntry[]>([]);
+  // Every one of the user's decks - needed for the "already planned
+  // elsewhere" split below (see buildAssignedElsewhereMaps). Fetched once
+  // alongside the collection, not per recommendation click.
+  private readonly allDecks = signal<DeckEntry[]>([]);
 
   protected readonly hasNoResults = computed(
     () => !this.loading() && !this.errorMessage() && this.recommendations().length === 0,
@@ -87,12 +107,23 @@ export class CommanderRecommendationsDialog {
   protected readonly selectedRecommendation = signal<CommanderRecommendation | null>(null);
   protected readonly loadingDetail = signal(false);
   protected readonly detailError = signal<string | null>(null);
+  // "Owned" is further split three ways: ownedCards are free to use as-is,
+  // assignedElsewhereCards are fully owned but committed to another deck
+  // (see CommanderAssignedCard), missingCards aren't owned in sufficient
+  // quantity at all regardless of assignment.
   protected readonly ownedCards = signal<CommanderDeckCard[]>([]);
+  protected readonly assignedElsewhereCards = signal<CommanderAssignedCard[]>([]);
   protected readonly missingCards = signal<CommanderDeckCard[]>([]);
 
-  /** Total copies, not distinct cards - a card needing 2 counts as 2 toward this. */
+  /** Total copies, not distinct cards - a card needing 2 counts as 2 toward this. Plain ownership, same as before this feature - includes assignedElsewhereCards too (still "owned", just not free), unaffected by the free/assigned-elsewhere split below. Drives detailMatchPercent; the section headers below use their own, narrower totals. */
   protected readonly ownedQuantityTotal = computed(() =>
+    [...this.ownedCards(), ...this.assignedElsewhereCards()].reduce((sum, c) => sum + c.quantity, 0),
+  );
+  protected readonly freeQuantityTotal = computed(() =>
     this.ownedCards().reduce((sum, c) => sum + c.quantity, 0),
+  );
+  protected readonly assignedElsewhereQuantityTotal = computed(() =>
+    this.assignedElsewhereCards().reduce((sum, c) => sum + c.quantity, 0),
   );
   protected readonly missingQuantityTotal = computed(() =>
     this.missingCards().reduce((sum, c) => sum + getMissingQuantity(c.quantity, c.ownedQty), 0),
@@ -123,10 +154,13 @@ export class CommanderRecommendationsDialog {
     this.errorMessage.set(null);
     this.recommendations.set([]);
     try {
-      const collection = (await this.collectionService.getCollectionWithCardData()).filter(
-        (entry) => entry.card.game === 'mtg',
-      );
+      const [allCollection, allDecks] = await Promise.all([
+        this.collectionService.getCollectionWithCardData(),
+        this.deckService.getMyDecks(),
+      ]);
+      const collection = allCollection.filter((entry) => entry.card.game === 'mtg');
       this.collectionEntries.set(collection);
+      this.allDecks.set(allDecks);
       // Plain name matching for the bulk scan below (not oracle-aware) -
       // resolving oracle_id for every card across every candidate's average
       // decklist at once used to fire far too many Scryfall lookups
@@ -236,6 +270,7 @@ export class CommanderRecommendationsDialog {
     this.wishlistAdded.set(false);
     this.wishlistError.set(null);
     this.ownedCards.set([]);
+    this.assignedElsewhereCards.set([]);
     this.missingCards.set([]);
 
     this.loadingDetail.set(true);
@@ -247,23 +282,63 @@ export class CommanderRecommendationsDialog {
       // in load() (which never resolves full cards, for performance).
       const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name));
       const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
-      const ownedByName = buildOwnedByNameMap(this.collectionEntries());
-      const ownedByOracle = buildOwnedOracleMap(this.collectionEntries());
+      const collectionEntries = this.collectionEntries();
+      const ownedByName = buildOwnedByNameMap(collectionEntries);
+      const ownedByOracle = buildOwnedOracleMap(collectionEntries);
+      // null-equivalent "no current deck to exclude" - this recommended
+      // deck doesn't exist yet, same reasoning as browse-decks-dialog.ts's
+      // precon preview (see buildAssignedElsewhereMaps's own doc comment).
+      const { byCardId: assignedByCardId, byOracleId: assignedByOracle } = buildAssignedElsewhereMaps(
+        this.allDecks(),
+        null,
+      );
 
       const owned: CommanderDeckCard[] = [];
+      const assignedElsewhere: CommanderAssignedCard[] = [];
       const missing: CommanderDeckCard[] = [];
       for (const { name, quantity } of deckCards) {
         const card = cardsByName.get(name.toLowerCase());
         if (!card) continue;
         const oracleQty = card.oracleId ? (ownedByOracle.get(card.oracleId) ?? 0) : 0;
         const ownedQty = oracleQty + (ownedByName.get(name.toLowerCase()) ?? 0);
-        const entry: CommanderDeckCard = { card, quantity, ownedQty };
-        (getCardOwnedStatus(quantity, ownedQty) === 'owned' ? owned : missing).push(entry);
+        const substitute = findSubstitute(card, quantity, collectionEntries);
+
+        if (getCardOwnedStatus(quantity, ownedQty) !== 'owned') {
+          missing.push({ card, quantity, ownedQty, substitute });
+          continue;
+        }
+
+        // Fully owned overall - but is it actually *free*, or is some/all
+        // of it already committed to another deck? Oracle-based match
+        // catches any assigned printing of the same card; the exact
+        // card_id match additionally covers the (rare, MTG-only-relevant)
+        // case where a legacy row with no recorded oracle_id is the one
+        // that's assigned.
+        const assignedQty = getOwnedQuantity(
+          { cardId: card.id, oracleId: card.oracleId },
+          assignedByCardId,
+          assignedByOracle,
+        );
+        const available = Math.max(0, ownedQty - assignedQty);
+        if (available >= quantity) {
+          owned.push({ card, quantity, ownedQty, substitute });
+        } else {
+          assignedElsewhere.push({
+            card,
+            quantity,
+            ownedQty,
+            substitute,
+            available,
+            assignedElsewhere: getAssignedElsewhereDecks({ cardId: card.id, oracleId: card.oracleId }, this.allDecks(), ''),
+          });
+        }
       }
       owned.sort((a, b) => a.card.name.localeCompare(b.card.name));
+      assignedElsewhere.sort((a, b) => a.card.name.localeCompare(b.card.name));
       missing.sort((a, b) => a.card.name.localeCompare(b.card.name));
 
       this.ownedCards.set(owned);
+      this.assignedElsewhereCards.set(assignedElsewhere);
       this.missingCards.set(missing);
     } catch (error) {
       this.detailError.set(
@@ -278,6 +353,11 @@ export class CommanderRecommendationsDialog {
     this.selectedRecommendation.set(null);
   }
 
+  /** "MSH #142" style short print label for the substitute callout - same as DeckDetailDialog.printLabel. */
+  protected printLabel(card: Card): string {
+    return card.game === 'mtg' ? `${card.setCode.toUpperCase()} #${card.collectorNumber}` : card.name;
+  }
+
   async addDeck() {
     const rec = this.selectedRecommendation();
     if (!rec) return;
@@ -285,10 +365,9 @@ export class CommanderRecommendationsDialog {
     this.addingDeck.set(true);
     this.addDeckError.set(null);
     try {
-      const cards = [...this.ownedCards(), ...this.missingCards()].map(({ card, quantity }) => ({
-        cardId: card.id,
-        quantity,
-      }));
+      const cards = [...this.ownedCards(), ...this.assignedElsewhereCards(), ...this.missingCards()].map(
+        ({ card, quantity }) => ({ cardId: card.id, quantity }),
+      );
       await this.deckService.addEdhrecDeck(rec.name, cards);
       this.deckAdded.set(true);
       this.added.emit();
