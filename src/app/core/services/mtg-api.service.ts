@@ -157,6 +157,14 @@ export class MtgApiService implements CardApiService {
   // both required to avoid the 403s a bursty, unidentified scanner triggers.
   private readonly queue = new ScryfallQueue();
 
+  // Purely decorative dashboard widgets (popular/saltiest cards) share this
+  // separate queue instead of `queue` above - on a large collection, `queue`
+  // can be backed up with a dozen-plus sequential collection-fetch batches,
+  // and these two calls fire at the same time as that fetch (see
+  // DashboardComponent). Queued behind that backlog, they'd only ever start
+  // once the whole collection load is done instead of showing promptly.
+  private readonly decorativeQueue = new ScryfallQueue();
+
   // Cached for the life of the service (and 24h across sessions via
   // localStorage) - null only means "no real list available", which callers
   // treat as "fall back to the cruder ignore-list heuristic", never as "no
@@ -189,9 +197,9 @@ export class MtgApiService implements CardApiService {
     }
   }
 
-  private scryfallFetch(url: string, init?: RequestInit): Promise<Response> {
+  private scryfallFetch(url: string, init?: RequestInit, queue: ScryfallQueue = this.queue): Promise<Response> {
     console.log('scryfall-proxy URL:', url);
-    return this.queue.add(async () => {
+    return queue.add(async () => {
       for (let attempt = 0; ; attempt++) {
         try {
           const response = await fetch(url, {
@@ -424,8 +432,18 @@ export class MtgApiService implements CardApiService {
     return raw.map((card) => this.toCard(card));
   }
 
-  async getCardsByNames(names: string[]): Promise<Card[]> {
-    const raw = await this.fetchCollection(names.map((name) => ({ name })));
+  /**
+   * `lowPriority` routes the batch through `decorativeQueue` instead of the
+   * main `queue` - for a call whose result is nice-to-have, not load-bearing
+   * (e.g. the dashboard's saltiest-cards widget), so it isn't stuck waiting
+   * behind whatever large, unrelated fetch (e.g. the user's full collection)
+   * happens to already be queued up on the main queue.
+   */
+  async getCardsByNames(names: string[], lowPriority = false): Promise<Card[]> {
+    const raw = await this.fetchCollection(
+      names.map((name) => ({ name })),
+      lowPriority ? this.decorativeQueue : undefined,
+    );
     return raw.map((card) => this.toCard(card));
   }
 
@@ -657,9 +675,11 @@ export class MtgApiService implements CardApiService {
   /** Most-played cards overall, via Scryfall's `edhrec_rank` sort (rank 1 = most popular). */
   async getPopularCards(limit: number): Promise<Card[]> {
     if (!this.popularCardsCache) {
-      this.popularCardsCache = this.runSearch('game:paper -t:basic', 'order=edhrec&unique=cards').then(
-        (raw) => raw.map((card) => this.toCard(card)),
-      );
+      this.popularCardsCache = this.runSearch(
+        'game:paper -t:basic',
+        'order=edhrec&unique=cards',
+        this.decorativeQueue,
+      ).then((raw) => raw.map((card) => this.toCard(card)));
     }
     const cards = await this.popularCardsCache;
     return cards.slice(0, limit);
@@ -691,11 +711,11 @@ export class MtgApiService implements CardApiService {
     };
   }
 
-  private async runSearch(scryfallQuery: string, params: string): Promise<ScryfallRawCard[]> {
+  private async runSearch(scryfallQuery: string, params: string, queue?: ScryfallQueue): Promise<ScryfallRawCard[]> {
     // Scryfall expects '+' between query terms, not a literal %20 space.
     const encodedQuery = encodeURIComponent(scryfallQuery).replace(/%20/g, '+');
     const url = `${SEARCH_ENDPOINT}?q=${encodedQuery}&${params}`;
-    const response = await this.scryfallFetch(url);
+    const response = await this.scryfallFetch(url, undefined, queue);
 
     if (response.status === 404) {
       return [];
@@ -710,6 +730,7 @@ export class MtgApiService implements CardApiService {
 
   private async fetchCollection(
     identifiers: Array<{ id: string } | { name: string }>,
+    queue?: ScryfallQueue,
   ): Promise<ScryfallRawCard[]> {
     const cards: ScryfallRawCard[] = [];
 
@@ -717,11 +738,15 @@ export class MtgApiService implements CardApiService {
       const batch = identifiers.slice(i, i + BATCH_SIZE);
       const requestBody = { identifiers: batch };
       console.log('cards/collection request body:', JSON.stringify(requestBody));
-      const response = await this.scryfallFetch(COLLECTION_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
+      const response = await this.scryfallFetch(
+        COLLECTION_ENDPOINT,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        },
+        queue,
+      );
 
       if (!response.ok) {
         throw new Error(`Scryfall-Anfrage fehlgeschlagen (${response.status})`);

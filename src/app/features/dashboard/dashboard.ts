@@ -147,7 +147,7 @@ export class Dashboard {
       );
       if (saltByName.size === 0) return;
 
-      const cards = await this.mtgApi.getCardsByNames([...saltByName.keys()]);
+      const cards = await this.mtgApi.getCardsByNames([...saltByName.keys()], true);
       const saltiest = cards
         .map((card) => ({ card, salt: saltByName.get(card.name) ?? 0 }))
         .sort((a, b) => b.salt - a.salt);

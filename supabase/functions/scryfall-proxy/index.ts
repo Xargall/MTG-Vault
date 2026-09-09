@@ -50,6 +50,9 @@ function errorResponse(message: string, status: number): Response {
 }
 
 Deno.serve(async (req: Request) => {
+  console.log('Request received:', req.method);
+  console.log('Request URL:', req.url);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -65,6 +68,7 @@ Deno.serve(async (req: Request) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SCRYFALL_TIMEOUT_MS);
   try {
+    console.log('Forwarding to Scryfall...');
     const contentType = req.headers.get('content-type');
     const response = await fetch(targetUrl, {
       method: req.method,
