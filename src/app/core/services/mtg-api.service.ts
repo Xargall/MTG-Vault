@@ -301,7 +301,13 @@ export class MtgApiService implements CardApiService {
       this.supabase.client
         .from('scryfall_cards')
         .select('*')
-        .filter('name', '~*', `\\y${pattern}`)
+        // PostgREST's case-insensitive regex operator is the keyword
+        // "imatch" (~*), not the raw symbol - passing "~*" as the operator
+        // string sends `name=~*.<value>` on the wire, which PostgREST
+        // rejects with a 400 ("unknown operator") for every query, silently
+        // breaking word-boundary search results (e.g. "Sol Ring") even
+        // though the prefix-match pass above still succeeds.
+        .filter('name', 'imatch', `\\y${pattern}`)
         .order('name')
         .limit(SEARCH_ROW_LIMIT),
     ]);
