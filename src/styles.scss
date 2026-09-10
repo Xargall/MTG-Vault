@@ -84,6 +84,33 @@
   box-sizing: border-box;
 }
 
+// Shared loading-placeholder shimmer - was duplicated per-component (first
+// written for the dashboard's skeleton grid); pulled up here so any image
+// that loads in place (card art, avatars) can use the same premium
+// loading feel instead of popping in over a blank void. See
+// card-tile.scss/.card-image-wrap for the reference usage.
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes skeleton-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--color-surface-solid) 25%,
+      var(--color-surface-alt) 50%,
+      var(--color-surface-solid) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s infinite;
+  }
+}
+
 html,
 body {
   margin: 0;
