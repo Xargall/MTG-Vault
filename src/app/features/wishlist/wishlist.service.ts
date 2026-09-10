@@ -73,6 +73,26 @@ export class WishlistService {
     return new Set((data ?? []).map((row) => row.card_id));
   }
 
+  /** Manual "add to wishlist" entry point (see AddWishlistDialog) - unlike upsertEntry, bumps quantity on top of whatever is already there instead of resetting it to 1, so adding the same card a second time is reflected as "2 wanted" rather than silently staying at 1. */
+  async addEntry({ cardId, priority, notes }: Omit<UpsertWishlistInput, 'quantity'>): Promise<void> {
+    await this.gameService.ready;
+    const userId = this.supabase.session()?.user.id;
+    if (!userId) throw new Error('Nicht eingeloggt.');
+    const gameId = this.gameService.currentGameId();
+    if (!gameId) throw new Error('Kein aktives Spiel.');
+
+    const { data: existing, error: selectError } = await this.supabase.client
+      .from('wishlist')
+      .select('quantity')
+      .eq('user_id', userId)
+      .eq('game_id', gameId)
+      .eq('card_id', cardId)
+      .maybeSingle<{ quantity: number }>();
+    if (selectError) throw selectError;
+
+    await this.upsertEntry({ cardId, priority, notes, quantity: (existing?.quantity ?? 0) + 1 });
+  }
+
   async upsertEntry({ cardId, priority, notes, quantity }: UpsertWishlistInput): Promise<void> {
     await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;

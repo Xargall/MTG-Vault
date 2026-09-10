@@ -107,11 +107,10 @@ export class AddWishlistDialog {
     this.submitting.set(true);
     this.submitError.set(null);
     try {
-      await this.wishlistService.upsertEntry({
+      await this.wishlistService.addEntry({
         cardId: card.id,
         priority: this.priority(),
         notes: this.notes().trim() || null,
-        quantity: 1,
       });
       this.added.emit();
       this.close.emit();
