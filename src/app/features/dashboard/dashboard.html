@@ -4,7 +4,7 @@
   @if (loading()) {
     <div class="skeleton-grid">
       @for (item of skeletonPlaceholders; track $index) {
-        <div class="skeleton-card"></div>
+        <div class="skeleton-card skeleton-shimmer"></div>
       }
     </div>
   } @else if (errorMessage()) {
@@ -50,7 +50,7 @@
           }
           <p class="popular-name">{{ entry.card.name }}</p>
           <span class="salt-badge salt-badge--{{ saltLevel(entry.salt) }}">
-            🧂 {{ entry.salt | number: '1.1-1' }} / 4.0
+            {{ entry.salt | number: '1.1-1' }} / 4.0
           </span>
         </section>
       }
