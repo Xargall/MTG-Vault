@@ -4,13 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { GameService } from '../../core/services/game.service';
+import { CardTile } from '../../shared/cards/card-tile/card-tile';
 import { AddWishlistDialog } from './add-wishlist-dialog/add-wishlist-dialog';
 import { getEntryPrice, getWishlistTotalValue } from './wishlist-stats';
 import { WishlistEntry, WishlistService } from './wishlist.service';
 
 @Component({
   selector: 'app-wishlist',
-  imports: [AddWishlistDialog, DecimalPipe, TranslatePipe, FormsModule],
+  imports: [AddWishlistDialog, CardTile, DecimalPipe, TranslatePipe, FormsModule],
   templateUrl: './wishlist.html',
   styleUrl: './wishlist.scss',
 })

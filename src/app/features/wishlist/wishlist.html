@@ -22,29 +22,26 @@
       {{ 'wishlist.totalValue' | translate: { value: (totalValue() | number: '1.2-2') + ' €' } }}
     </p>
 
-    <ul class="entry-list">
+    <ul class="entry-grid">
       @for (entry of entries(); track entry.row.id) {
-        <li class="entry-row">
-          @if (entry.card.imageUrl; as imageUrl) {
-            <img class="entry-image" [src]="imageUrl" [alt]="entry.card.name" loading="lazy" />
-          } @else {
-            <div class="entry-placeholder">{{ entry.card.name }}</div>
-          }
+        <li class="entry-card">
+          <button
+            type="button"
+            class="remove-button"
+            (click)="remove(entry)"
+            [attr.aria-label]="'wishlist.removeAria' | translate"
+          >
+            ✕
+          </button>
 
-          <div class="entry-info">
-            <p class="entry-name">
-              {{ entry.card.name }}
-              @if (entry.row.quantity > 1) {
-                <span class="entry-qty">— {{ 'wishlist.quantityNeeded' | translate: { count: entry.row.quantity } }}</span>
-              }
-            </p>
-            <p class="entry-price">{{ getEntryPrice(entry) | number: '1.2-2' }} €</p>
-            @if (entry.card.game === 'mtg' && entry.card.cardmarketUrl; as url) {
-              <a class="cardmarket-link" [href]="url" target="_blank" rel="noopener">
-                {{ 'wishlist.cardmarketLink' | translate }}
-              </a>
-            }
-          </div>
+          <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" />
+
+          <p class="entry-price">{{ getEntryPrice(entry) | number: '1.2-2' }} €</p>
+          @if (entry.card.game === 'mtg' && entry.card.cardmarketUrl; as url) {
+            <a class="cardmarket-link" [href]="url" target="_blank" rel="noopener">
+              {{ 'wishlist.cardmarketLink' | translate }}
+            </a>
+          }
 
           <select
             class="priority-select"
@@ -67,15 +64,6 @@
             [value]="entry.row.notes ?? ''"
             (blur)="updateNotes(entry, notesInput.value)"
           />
-
-          <button
-            type="button"
-            class="remove-button"
-            (click)="remove(entry)"
-            [attr.aria-label]="'wishlist.removeAria' | translate"
-          >
-            ✕
-          </button>
         </li>
       }
     </ul>

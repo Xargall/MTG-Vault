@@ -45,93 +45,58 @@
   color: var(--color-text);
 }
 
-.entry-list {
+.entry-grid {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--spacing-lg);
 }
 
-.entry-row {
+.entry-card {
   position: relative;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--spacing-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--spacing-sm) var(--spacing-md);
+  flex-direction: column;
+  gap: 6px;
 }
 
-// Below this, the row wraps (see .entry-row's flex-wrap) - inheriting the
-// remove button's normal end-of-row position would drop it to the bottom
-// of the stack, disconnected from the card it removes. Pin it to the
-// row's own top-right corner instead, which is where a remove/close
-// control belongs regardless of how the rest of the row has reflowed.
-@media (max-width: 700px) {
-  .entry-row {
-    padding-right: calc(var(--spacing-md) + 28px);
-  }
-
-  .remove-button {
-    position: absolute;
-    top: var(--spacing-sm);
-    right: var(--spacing-sm);
-  }
-}
-
-.entry-image {
-  width: 64px;
-  border-radius: 6px;
-  aspect-ratio: 5 / 7;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.entry-placeholder {
-  width: 64px;
-  aspect-ratio: 5 / 7;
-  border-radius: 6px;
-  background: var(--color-surface-alt);
-  color: var(--color-text-muted);
-  font-size: 0.65rem;
+.remove-button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  flex-shrink: 0;
-}
 
-.entry-info {
-  flex: 1 1 220px;
-  min-width: 160px;
-}
-
-.entry-name {
-  margin: 0;
-  font-weight: 600;
-  color: var(--color-text);
-
-  .entry-qty {
-    font-weight: 400;
-    font-size: 0.85rem;
-    color: var(--color-text-muted);
+  &:hover {
+    background: var(--color-danger);
   }
 }
 
 .entry-price {
-  margin: 2px 0;
+  margin: 0;
   font-size: 0.85rem;
-  color: var(--color-text-muted);
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
 }
 
 .cardmarket-link {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--color-accent);
   text-decoration: none;
+  text-align: center;
 
   &:hover {
     text-decoration: underline;
@@ -139,14 +104,16 @@
 }
 
 .priority-select {
+  width: 100%;
   padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid transparent;
   background: var(--color-surface-alt);
   color: var(--color-text-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  flex-shrink: 0;
+  text-align: center;
+  text-align-last: center;
 
   &.priority-1 {
     background: var(--color-surface-alt);
@@ -165,29 +132,11 @@
 }
 
 .notes-input {
-  flex: 1 1 180px;
-  max-width: 320px;
-  min-width: 120px;
+  width: 100%;
   padding: 4px 8px;
   border-radius: var(--radius);
   border: 1px solid var(--color-border-strong);
   background: var(--color-bg);
   color: var(--color-text);
-  font-size: 0.85rem;
-}
-
-.remove-button {
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: var(--radius);
-  flex-shrink: 0;
-
-  &:hover {
-    color: var(--color-danger);
-    background: var(--color-surface-alt);
-  }
+  font-size: 0.8rem;
 }
