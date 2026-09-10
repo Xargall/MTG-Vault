@@ -16,7 +16,14 @@
   }
 
   @if (card().imageUrl; as url) {
-    <img class="card-image" [src]="url" [alt]="card().name" loading="lazy" />
+    <img
+      class="card-image"
+      [class.skeleton-shimmer]="!imageLoaded()"
+      [src]="url"
+      [alt]="card().name"
+      loading="lazy"
+      (load)="imageLoaded.set(true)"
+    />
   } @else {
     <div class="card-placeholder">{{ card().name }}</div>
   }
