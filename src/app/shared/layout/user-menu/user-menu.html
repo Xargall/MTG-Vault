@@ -25,18 +25,22 @@
         </div>
         <div class="dropdown-divider"></div>
         <a routerLink="/profile" class="dropdown-item" (click)="close()">
-          <span class="dropdown-icon">👤</span> {{ 'userMenu.profile' | translate }}
+          <svg class="dropdown-icon" aria-hidden="true"><use href="#icon-person" /></svg>
+          {{ 'userMenu.profile' | translate }}
         </a>
         <a routerLink="/settings" class="dropdown-item" (click)="close()">
-          <span class="dropdown-icon">⚙️</span> {{ 'userMenu.settings' | translate }}
+          <svg class="dropdown-icon" aria-hidden="true"><use href="#icon-gear" /></svg>
+          {{ 'userMenu.settings' | translate }}
         </a>
         <a routerLink="/settings/gemini" class="dropdown-item" (click)="close()">
-          <span class="dropdown-icon">🔑</span> {{ 'userMenu.geminiKey' | translate }}
+          <svg class="dropdown-icon" aria-hidden="true"><use href="#icon-key" /></svg>
+          {{ 'userMenu.geminiKey' | translate }}
         </a>
         <div class="dropdown-divider"></div>
       }
       <button type="button" class="dropdown-item dropdown-item--button" (click)="logout()">
-        <span class="dropdown-icon">🚪</span> {{ 'nav.logout' | translate }}
+        <svg class="dropdown-icon" aria-hidden="true"><use href="#icon-exit" /></svg>
+        {{ 'nav.logout' | translate }}
       </button>
     </div>
   }

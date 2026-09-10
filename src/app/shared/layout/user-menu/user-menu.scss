@@ -104,6 +104,12 @@
 }
 
 .dropdown-icon {
-  font-size: 0.9rem;
-  line-height: 1;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.dropdown-item:hover .dropdown-icon {
+  color: var(--color-accent-hover);
 }
