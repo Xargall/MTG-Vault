@@ -55,13 +55,15 @@
     </div>
   </section>
 
-  <section class="settings-section">
-    <h2>{{ 'profile.emailTitle' | translate }}</h2>
-    <p class="email-row">
-      {{ authService.session()?.user?.email }}
-      @if (authService.isGoogleAccount()) {
-        <span class="provider-badge">{{ 'profile.viaGoogle' | translate }}</span>
-      }
-    </p>
-  </section>
+  @if (!authService.isGuest()) {
+    <section class="settings-section">
+      <h2>{{ 'profile.emailTitle' | translate }}</h2>
+      <p class="email-row">
+        {{ authService.session()?.user?.email }}
+        @if (authService.isGoogleAccount()) {
+          <span class="provider-badge">{{ 'profile.viaGoogle' | translate }}</span>
+        }
+      </p>
+    </section>
+  }
 </div>
