@@ -350,6 +350,7 @@ export class Scanner {
       if (this.autoAddTimeout) clearTimeout(this.autoAddTimeout);
       this.stream?.getTracks().forEach((track) => track.stop());
       void this.ocrService.terminate();
+      this.bulkData.releaseNameIndex();
     });
 
     afterNextRender(() => void this.startCamera());

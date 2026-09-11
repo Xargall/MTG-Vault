@@ -439,6 +439,19 @@ export class MtgBulkDataService {
     return (this.nameIndexPromise ??= this.buildNameIndex());
   }
 
+  /**
+   * Drops the cached fuzzy-name index (~120k+ {id, name} entries) once
+   * nothing needs it anymore - called from Scanner's own teardown (see
+   * findBestFuzzyNameMatch's only real caller), same reasoning as that
+   * component already terminating its Tesseract worker on exit rather than
+   * keeping it warm for the rest of the app session. Safe to call even if
+   * no index was ever built; getNameIndex() lazily rebuilds it on the next
+   * fuzzy lookup regardless of which scanning session asks for it.
+   */
+  releaseNameIndex(): void {
+    this.nameIndexPromise = null;
+  }
+
   private async buildNameIndex(): Promise<NameIndexEntry[]> {
     const db = await this.getDb();
     const index: NameIndexEntry[] = [];
