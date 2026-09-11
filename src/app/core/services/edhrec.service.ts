@@ -9,7 +9,8 @@ import { SupabaseService } from './supabase.service';
 // longer window since this is an IP-level block, not a per-second quota.
 const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
 
-export interface EdhrecCard {
+/** One card+quantity in a computed "average deck" - shared shape between EDHREC's own precomputed average (Commander) and MoxfieldService's client-side aggregation (60-card formats), so the matching logic in commander-recommendations-stats.ts and deck-stats.ts stays source-agnostic. */
+export interface AverageDeckCard {
   name: string;
   quantity: number;
 }
@@ -183,20 +184,20 @@ function parseQuantity(card: EdhrecCardviewRaw): number {
 export class EdhrecService {
   private readonly supabase = inject(SupabaseService);
 
-  private readonly averageDeckCache = new Map<string, Promise<EdhrecCard[]>>();
+  private readonly averageDeckCache = new Map<string, Promise<AverageDeckCard[]>>();
   // Set once a 403 comes back from the proxy - checked *before* touching
   // either cache above, so a cooled-off skip never gets memoized as if it
   // were a real (empty) EDHREC result for that slug.
   private rateLimitedUntil = 0;
 
-  getAverageDeck(commanderName: string): Promise<EdhrecCard[]> {
+  getAverageDeck(commanderName: string): Promise<AverageDeckCard[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
     const slug = slugifyMtgName(commanderName);
 
     let cached = this.averageDeckCache.get(slug);
     if (!cached) {
-      cached = this.fetchPage<EdhrecCard>(`pages/average-decks/${slug}.json`, (cardlists) =>
+      cached = this.fetchPage<AverageDeckCard>(`pages/average-decks/${slug}.json`, (cardlists) =>
         cardlists.flatMap((list) =>
           list.cardviews.map((card) => ({ name: card.name, quantity: parseQuantity(card) })),
         ),

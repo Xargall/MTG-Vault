@@ -1,3 +1,5 @@
+import { Card } from '../../core/models/card.model';
+import { AverageDeckCard } from '../../core/services/edhrec.service';
 import { CardOwnedStatus } from '../../shared/cards/card-tile/card-tile';
 import { CollectionEntry } from '../collection/collection.service';
 import { DeckCardEntry, DeckEntry } from './deck.service';
@@ -194,6 +196,161 @@ export function getAssignedElsewhereDecks(
     }
   }
   return results;
+}
+
+// --- Average-decklist matching (Feature 3): resolving a computed
+// {name, quantity} decklist - EDHREC's own precomputed Commander average, or
+// MoxfieldService's client-side aggregation for 60-card formats - against
+// the user's collection and other decks. Name-keyed throughout (not
+// oracle_id), matching the bulk-scan performance reasoning below. ---
+
+/** Every collection row counted by name, regardless of oracle_id - for a *bulk* scan across many candidate average-decklists at once (e.g. CommanderRecommendationsDialog.load()'s per-color-identity pass, or an analogous per-hub pass for 60-card formats), which deliberately does *not* resolve each card's oracle_id - doing that for hundreds of names across dozens of candidates at once used to hammer Scryfall and trigger 429s. See buildOwnedByNameMap below for the oracle-aware variant used once a single recommendation is actually opened. */
+export function buildPlainOwnedByNameMap(entries: CollectionEntry[]): Map<string, number> {
+  const owned = new Map<string, number>();
+  for (const { row, card } of entries) {
+    const key = card.name.toLowerCase();
+    owned.set(key, (owned.get(key) ?? 0) + row.quantity);
+  }
+  return owned;
+}
+
+/** Keyed by name, but only from rows with no recorded oracle_id - a row that has one is already covered by the oracle-keyed buildOwnedOracleMap above, so leaving it out here keeps the two maps disjoint and safely summable. Used once a single recommendation's detail view is open, which (unlike the bulk scan above) already resolves full Card objects (oracleId included). */
+export function buildOwnedByNameMap(entries: CollectionEntry[]): Map<string, number> {
+  const owned = new Map<string, number>();
+  for (const { row, card } of entries) {
+    if (row.oracle_id) continue;
+    const key = card.name.toLowerCase();
+    owned.set(key, (owned.get(key) ?? 0) + row.quantity);
+  }
+  return owned;
+}
+
+/** Name-keyed sum of every is_assigned deck_card quantity across ALL of the user's decks - the bulk-scan counterpart to buildAssignedElsewhereMaps above. No "current deck" to exclude here (none of them can be the not-yet-created recommended deck, same reasoning as that function's null-currentDeckId case), and kept name-keyed rather than oracle_id-keyed to match buildPlainOwnedByNameMap's own bulk-scan matching. */
+export function buildAssignedElsewhereByNameMap(allDecks: DeckEntry[]): Map<string, number> {
+  const assigned = new Map<string, number>();
+  for (const deckEntry of allDecks) {
+    for (const { row, card } of deckEntry.cards) {
+      if (!row.is_assigned) continue;
+      const key = card.name.toLowerCase();
+      assigned.set(key, (assigned.get(key) ?? 0) + row.quantity);
+    }
+  }
+  return assigned;
+}
+
+export interface AverageDeckMatch {
+  /** Plain ownership match - includes copies already committed to other decks. */
+  matchedCount: number;
+  totalCount: number;
+  /** matchedCount minus whatever's already committed elsewhere - what the deck is actually buildable with right now. */
+  freeMatchedCount: number;
+}
+
+/** Bulk-scan match against a computed average decklist (see buildPlainOwnedByNameMap) - drives a recommendation list's dual free/total % badges before the user opens any single one. */
+export function getAverageDeckMatch(
+  deckCards: AverageDeckCard[],
+  ownedByName: Map<string, number>,
+  assignedElsewhereByName: Map<string, number>,
+): AverageDeckMatch {
+  let matched = 0;
+  let freeMatched = 0;
+  let total = 0;
+  for (const { name, quantity } of deckCards) {
+    total += quantity;
+    const key = name.toLowerCase();
+    const ownedQty = ownedByName.get(key) ?? 0;
+    matched += Math.min(quantity, ownedQty);
+
+    const assignedQty = assignedElsewhereByName.get(key) ?? 0;
+    const availableQty = Math.max(0, ownedQty - assignedQty);
+    freeMatched += Math.min(quantity, availableQty);
+  }
+  return { matchedCount: matched, totalCount: total, freeMatchedCount: freeMatched };
+}
+
+export interface AverageDeckCardMatch {
+  card: Card;
+  quantity: number;
+  ownedQty: number;
+  substitute: CollectionEntry | null;
+}
+
+/** A "free" card, further split out of AverageDeckCardMatch's owned bucket - fully owned, but some/all copies are already `is_assigned` to one of the user's *other* decks. Display-only: unlike DeckDetailDialog, a recommendation preview offers no "Freigeben" action - releasing a commitment still happens from the deck it's actually assigned to. */
+export interface AverageDeckAssignedCardMatch extends AverageDeckCardMatch {
+  available: number;
+  assignedElsewhere: AssignedElsewhereEntry[];
+}
+
+export interface AverageDeckSplit {
+  owned: AverageDeckCardMatch[];
+  assignedElsewhere: AverageDeckAssignedCardMatch[];
+  missing: AverageDeckCardMatch[];
+}
+
+/**
+ * Resolves one computed average decklist (EDHREC's Commander average, or
+ * MoxfieldService's per-hub aggregation) against the user's collection and
+ * other decks - the shared detail-view logic behind both
+ * CommanderRecommendationsDialog and FormatDeckRecommendationsDialog. Splits
+ * every card three ways: free to use as-is, fully owned but committed to
+ * another deck, or not owned in sufficient quantity at all.
+ */
+export function splitAverageDeckByAvailability(
+  deckCards: AverageDeckCard[],
+  cardsByName: Map<string, Card>,
+  collectionEntries: CollectionEntry[],
+  allDecks: DeckEntry[],
+): AverageDeckSplit {
+  const ownedByName = buildOwnedByNameMap(collectionEntries);
+  const ownedByOracle = buildOwnedOracleMap(collectionEntries);
+  // null-equivalent "no current deck to exclude" - the recommended deck
+  // doesn't exist yet, same reasoning as browse-decks-dialog.ts's precon
+  // preview (see buildAssignedElsewhereMaps's own doc comment).
+  const { byCardId: assignedByCardId, byOracleId: assignedByOracle } = buildAssignedElsewhereMaps(allDecks, null);
+
+  const owned: AverageDeckCardMatch[] = [];
+  const assignedElsewhere: AverageDeckAssignedCardMatch[] = [];
+  const missing: AverageDeckCardMatch[] = [];
+
+  for (const { name, quantity } of deckCards) {
+    const card = cardsByName.get(name.toLowerCase());
+    if (!card) continue;
+
+    const oracleQty = card.oracleId ? (ownedByOracle.get(card.oracleId) ?? 0) : 0;
+    const ownedQty = oracleQty + (ownedByName.get(name.toLowerCase()) ?? 0);
+    const substitute = findSubstitute(card, quantity, collectionEntries);
+
+    if (getCardOwnedStatus(quantity, ownedQty) !== 'owned') {
+      missing.push({ card, quantity, ownedQty, substitute });
+      continue;
+    }
+
+    // Fully owned overall - but is it actually *free*, or is some/all of it
+    // already committed to another deck? Oracle-based match catches any
+    // assigned printing of the same card; the exact card_id match
+    // additionally covers the (rare) case where a legacy row with no
+    // recorded oracle_id is the one that's assigned.
+    const assignedQty = getOwnedQuantity({ cardId: card.id, oracleId: card.oracleId }, assignedByCardId, assignedByOracle);
+    const available = Math.max(0, ownedQty - assignedQty);
+    if (available >= quantity) {
+      owned.push({ card, quantity, ownedQty, substitute });
+    } else {
+      assignedElsewhere.push({
+        card,
+        quantity,
+        ownedQty,
+        substitute,
+        available,
+        assignedElsewhere: getAssignedElsewhereDecks({ cardId: card.id, oracleId: card.oracleId }, allDecks, ''),
+      });
+    }
+  }
+
+  owned.sort((a, b) => a.card.name.localeCompare(b.card.name));
+  assignedElsewhere.sort((a, b) => a.card.name.localeCompare(b.card.name));
+  missing.sort((a, b) => a.card.name.localeCompare(b.card.name));
+
+  return { owned, assignedElsewhere, missing };
 }
 
 /** A deck card the user owns under a *different* printing than the one the deck actually lists - e.g. the deck calls for Sol Ring (Fallout #285) but the collection only has Sol Ring (MSH #142). Null when the exact printing is already owned in sufficient quantity (nothing to substitute) or no oracle match exists at all. */
