@@ -20,6 +20,7 @@ import {
 } from '../deck-stats';
 import { DeckEntry, DeckService } from '../deck.service';
 import {
+  buildAssignedElsewhereByNameMap,
   buildOwnedByNameMap,
   buildPlainOwnedByNameMap,
   getEdhrecMatch,
@@ -52,9 +53,15 @@ interface CommanderRecommendation {
   name: string;
   imageUrl: string | null;
   owned: boolean;
+  // Plain ownership - includes copies already committed to other decks.
   matchPercent: number;
   matchedCount: number;
   totalCount: number;
+  // What the deck is actually buildable with right now, i.e. matchPercent
+  // minus whatever's tied up elsewhere - the primary, sort-driving number
+  // (see the list's dual badge and its sort in load()).
+  freeMatchPercent: number;
+  freeMatchedCount: number;
 }
 
 function dedupeByCardName(entries: CollectionEntry[]): CollectionEntry[] {
@@ -137,6 +144,11 @@ export class CommanderRecommendationsDialog {
     const total = this.totalQuantityNeeded();
     return total > 0 ? Math.round((this.ownedQuantityTotal() / total) * 100) : 0;
   });
+  /** Same split as the list's dual badge (see load()) - what's actually buildable with free cards alone, vs. detailMatchPercent's plain ownership total. */
+  protected readonly freeDetailMatchPercent = computed(() => {
+    const total = this.totalQuantityNeeded();
+    return total > 0 ? Math.round((this.freeQuantityTotal() / total) * 100) : 0;
+  });
 
   protected readonly addingDeck = signal(false);
   protected readonly addDeckError = signal<string | null>(null);
@@ -170,6 +182,10 @@ export class CommanderRecommendationsDialog {
       // selectRecommendation(), which already has full Card objects (and
       // their oracleId) for free at that point.
       const ownedByName = buildPlainOwnedByNameMap(collection);
+      // Free of any charge, network-wise - allDecks is already loaded above,
+      // and this stays name-keyed (see its own doc comment) so it lines up
+      // with ownedByName's name-only matching in the bulk scan below.
+      const assignedElsewhereByName = buildAssignedElsewhereByNameMap(allDecks);
 
       const ownedCommanders = dedupeByCardName(
         collection.filter(({ card }) => card.game === 'mtg' && isLegendaryCreature(card.typeLine)),
@@ -245,14 +261,24 @@ export class CommanderRecommendationsDialog {
         const batchResults = await Promise.all(
           batch.map(async (candidate) => {
             const deckCards = await this.edhrec.getAverageDeck(candidate.name).catch(() => []);
-            const { matchedCount, totalCount } = getEdhrecMatch(deckCards, ownedByName);
+            const { matchedCount, totalCount, freeMatchedCount } = getEdhrecMatch(
+              deckCards,
+              ownedByName,
+              assignedElsewhereByName,
+            );
             const matchPercent = totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0;
-            return { ...candidate, matchPercent, matchedCount, totalCount };
+            const freeMatchPercent = totalCount > 0 ? Math.round((freeMatchedCount / totalCount) * 100) : 0;
+            return { ...candidate, matchPercent, matchedCount, totalCount, freeMatchPercent, freeMatchedCount };
           }),
         );
         results.push(...batchResults.filter((result) => result.totalCount > 0));
         this.checked.update((value) => value + batch.length);
-        this.recommendations.set([...results].sort((a, b) => b.matchPercent - a.matchPercent));
+        // Sorted by what's actually buildable right now, not raw ownership -
+        // a commander you "match" 95% on but can't build because it's all
+        // committed to another deck shouldn't outrank one you can build today.
+        this.recommendations.set(
+          [...results].sort((a, b) => b.freeMatchPercent - a.freeMatchPercent || b.matchPercent - a.matchPercent),
+        );
       }
     } catch (error) {
       this.errorMessage.set(

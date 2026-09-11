@@ -217,6 +217,8 @@ export const de = {
     checkingCommanders: 'Prüfe Commander… ({{progress}})',
     noResults: 'Keine passenden Commander gefunden.',
     cardsCount: '{{matched}} / {{total}} Karten',
+    freeMatchBadge: '{{percent}}% frei',
+    totalMatchBadge: '{{percent}}% gesamt',
     missingTag: 'Commander fehlt in Sammlung',
     loadFailed: 'Empfehlungen konnten nicht geladen werden.',
     backToList: '← Zurück zur Liste',

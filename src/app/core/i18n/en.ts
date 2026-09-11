@@ -219,6 +219,8 @@ export const en: typeof de = {
     checkingCommanders: 'Checking commanders… ({{progress}})',
     noResults: 'No matching commanders found.',
     cardsCount: '{{matched}} / {{total}} cards',
+    freeMatchBadge: '{{percent}}% free',
+    totalMatchBadge: '{{percent}}% total',
     missingTag: 'Commander missing from collection',
     loadFailed: 'Recommendations could not be loaded.',
     backToList: '← Back to list',

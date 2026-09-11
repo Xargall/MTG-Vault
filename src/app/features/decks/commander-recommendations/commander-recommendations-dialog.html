@@ -21,9 +21,13 @@
         } @else if (detailError()) {
           <p class="state-message error">{{ detailError() }}</p>
         } @else {
-          <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="detailMatchPercent()" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar-fill" [style.width.%]="detailMatchPercent()"></div>
-            <span class="progress-bar-label">{{ detailMatchPercent() }}%</span>
+          <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="freeDetailMatchPercent()" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar-fill progress-bar-fill--total" [style.width.%]="detailMatchPercent()"></div>
+            <div class="progress-bar-fill progress-bar-fill--free" [style.width.%]="freeDetailMatchPercent()"></div>
+            <span class="progress-bar-label">
+              {{ 'commanderRecs.freeMatchBadge' | translate: { percent: freeDetailMatchPercent() } }} ·
+              {{ 'commanderRecs.totalMatchBadge' | translate: { percent: detailMatchPercent() } }}
+            </span>
           </div>
 
           @if (ownedCards().length > 0) {
@@ -163,9 +167,14 @@
                   }
                 </div>
 
-                <span class="match-badge" [class.is-complete]="rec.matchPercent === 100">
-                  {{ rec.matchPercent }}%
-                </span>
+                <div class="match-badges">
+                  <span class="match-badge match-badge--free" [class.is-complete]="rec.freeMatchPercent === 100">
+                    {{ 'commanderRecs.freeMatchBadge' | translate: { percent: rec.freeMatchPercent } }}
+                  </span>
+                  <span class="match-badge match-badge--total">
+                    {{ 'commanderRecs.totalMatchBadge' | translate: { percent: rec.matchPercent } }}
+                  </span>
+                </div>
               </button>
             </li>
           }
