@@ -10,9 +10,9 @@
       <button type="button" class="commander-recs-button" (click)="showCommanderRecs.set(true)">
         {{ 'decks.commanderRecsButton' | translate }}
       </button>
-      <button type="button" class="commander-recs-button" (click)="showFormatRecs.set(true)">
-        {{ 'decks.formatRecsButton' | translate }}
-      </button>
+      <!-- Format-Deck-Empfehlungen (Moxfield) pausiert bis zur schriftlichen Freigabe durch Moxfield
+           (siehe ~/.claude/plans/crispy-gathering-wand.md) - Button/Dialog-Einbindung bewusst entfernt,
+           nicht nur versteckt, damit im laufenden Betrieb garantiert keine Anfrage an Moxfield geht. -->
     } @else if (gameService.currentSlug() === 'yugioh') {
       <button type="button" class="commander-recs-button" (click)="showArchetypeBrowser.set(true)">
         {{ 'archetypeBrowser.openButton' | translate }}
@@ -132,10 +132,6 @@
 
 @if (showCommanderRecs()) {
   <app-commander-recommendations-dialog (close)="showCommanderRecs.set(false)" (added)="onDeckAdded()" />
-}
-
-@if (showFormatRecs()) {
-  <app-format-deck-recommendations-dialog (close)="showFormatRecs.set(false)" (added)="onDeckAdded()" />
 }
 
 @if (showArchetypeBrowser()) {
