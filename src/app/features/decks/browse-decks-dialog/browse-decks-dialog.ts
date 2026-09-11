@@ -1,4 +1,12 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -32,6 +40,7 @@ export interface PreconDetailCard {
 const SEARCH_DEBOUNCE_MS = 300;
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-browse-decks-dialog',
   imports: [FormsModule, TranslatePipe, CardTile, ScrollLockDirective],
   templateUrl: './browse-decks-dialog.html',

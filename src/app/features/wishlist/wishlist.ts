@@ -1,5 +1,13 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -10,6 +18,7 @@ import { getEntryPrice, getWishlistTotalValue } from './wishlist-stats';
 import { WishlistEntry, WishlistService } from './wishlist.service';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-wishlist',
   imports: [AddWishlistDialog, CardTile, DecimalPipe, TranslatePipe, FormsModule],
   templateUrl: './wishlist.html',

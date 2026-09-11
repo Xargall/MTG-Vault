@@ -1,4 +1,11 @@
-import { Component, computed, inject, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  output,
+  signal,
+} from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../../core/models/card.model';
@@ -57,6 +64,7 @@ function dedupeByCardName(entries: CollectionEntry[]): CollectionEntry[] {
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-commander-recommendations-dialog',
   imports: [TranslatePipe, CardTile, ScrollLockDirective],
   templateUrl: './commander-recommendations-dialog.html',

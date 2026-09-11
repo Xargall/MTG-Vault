@@ -1,9 +1,17 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  signal,
+} from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-guest-banner',
   imports: [TranslatePipe],
   templateUrl: './guest-banner.html',

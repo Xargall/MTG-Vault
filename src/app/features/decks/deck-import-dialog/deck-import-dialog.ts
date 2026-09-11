@@ -1,4 +1,4 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -32,6 +32,7 @@ function parseLine(line: string): ParsedLine | null {
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-deck-import-dialog',
   imports: [FormsModule, TranslatePipe, ScrollLockDirective],
   templateUrl: './deck-import-dialog.html',

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 
@@ -9,6 +9,7 @@ import { LANG_STORAGE_KEY } from './core/utils/language.util';
 import { GlobalToast } from './shared/layout/global-toast/global-toast';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-root',
   imports: [RouterOutlet, GlobalToast],
   templateUrl: './app.html',

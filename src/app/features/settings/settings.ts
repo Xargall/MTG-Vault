@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -7,6 +7,7 @@ import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
 import { UserSecretsService } from '../../core/services/user-secrets.service';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-settings',
   imports: [RouterLink, TranslatePipe],
   templateUrl: './settings.html',

@@ -1,10 +1,11 @@
-import { Component, effect, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-auth-callback',
   imports: [TranslatePipe],
   template: `<p class="callback-message">{{ 'auth.completing' | translate }}</p>`,

@@ -1,4 +1,4 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -11,6 +11,7 @@ import { WishlistService } from '../wishlist.service';
 const SEARCH_DEBOUNCE_MS = 300;
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-add-wishlist-dialog',
   imports: [FormsModule, CardTile, TranslatePipe, ScrollLockDirective],
   templateUrl: './add-wishlist-dialog.html',

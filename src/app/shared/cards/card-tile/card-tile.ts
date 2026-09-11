@@ -1,10 +1,11 @@
-import { Component, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, signal } from '@angular/core';
 
 import { Card } from '../../../core/models/card.model';
 
 export type CardOwnedStatus = 'owned' | 'partial' | 'missing';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-card-tile',
   templateUrl: './card-tile.html',
   styleUrl: './card-tile.scss',

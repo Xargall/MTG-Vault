@@ -1,4 +1,4 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { TranslatePipe } from '@ngx-translate/core';
 
 import { BarChartDatum } from '../bar-chart/bar-chart';
@@ -15,6 +15,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const SEGMENT_GAP = 2;
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-donut-chart',
   imports: [TranslatePipe],
   templateUrl: './donut-chart.html',

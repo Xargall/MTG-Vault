@@ -1,5 +1,14 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -34,6 +43,7 @@ export function saltLevel(salt: number): SaltLevel {
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-dashboard',
   imports: [DonutChart, BarChart, RouterLink, DecimalPipe, TranslatePipe],
   templateUrl: './dashboard.html',

@@ -1,4 +1,11 @@
-import { Component, ElementRef, inject, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -7,6 +14,7 @@ import { AuthService } from '../../core/services/auth.service';
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-profile',
   imports: [FormsModule, TranslatePipe],
   templateUrl: './profile.html',

@@ -1,9 +1,10 @@
 import {
+  ChangeDetectionStrategy,
   Component,
-  DestroyRef,
-  ElementRef,
   computed,
+  DestroyRef,
   effect,
+  ElementRef,
   inject,
   signal,
   untracked,
@@ -35,6 +36,7 @@ const INITIAL_RENDER_LIMIT = 60;
 const RENDER_LIMIT_STEP = 60;
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-collection-overview',
   imports: [
     BarChart,

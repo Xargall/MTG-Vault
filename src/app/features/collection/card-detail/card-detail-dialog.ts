@@ -1,5 +1,13 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -40,6 +48,7 @@ const BANLIST_LABELS: Record<YugiohBanlistStatus, string> = {
 };
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-card-detail-dialog',
   imports: [DecimalPipe, FormsModule, TranslatePipe, ScrollLockDirective],
   templateUrl: './card-detail-dialog.html',

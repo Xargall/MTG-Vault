@@ -1,4 +1,12 @@
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { PreconListEntry } from '../../core/models/precon.model';
@@ -79,6 +87,7 @@ function pickBannerSample(list: PreconListEntry[], count: number): PreconListEnt
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-decks',
   imports: [
     DeckBanner,

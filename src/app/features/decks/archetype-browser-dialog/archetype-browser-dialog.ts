@@ -1,4 +1,11 @@
-import { Component, computed, inject, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -12,6 +19,7 @@ import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.se
 const SUGGESTION_LIMIT = 20;
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-archetype-browser-dialog',
   imports: [FormsModule, CardTile, TranslatePipe, ScrollLockDirective],
   templateUrl: './archetype-browser-dialog.html',

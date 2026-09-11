@@ -1,4 +1,11 @@
-import { Component, computed, inject, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  output,
+  signal,
+} from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../../core/models/card.model';
@@ -32,6 +39,7 @@ interface HubRecommendation extends MoxfieldHub {
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-format-deck-recommendations-dialog',
   imports: [TranslatePipe, CardTile, ScrollLockDirective],
   templateUrl: './format-deck-recommendations-dialog.html',

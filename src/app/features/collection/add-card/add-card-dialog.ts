@@ -1,4 +1,4 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -12,6 +12,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-add-card-dialog',
   imports: [FormsModule, CardTile, TranslatePipe, ScrollLockDirective],
   templateUrl: './add-card-dialog.html',

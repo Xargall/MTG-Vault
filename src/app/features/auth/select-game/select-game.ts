@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -7,6 +7,7 @@ import { GameService } from '../../../core/services/game.service';
 import { CollectionService } from '../../collection/collection.service';
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-select-game',
   imports: [TranslatePipe],
   templateUrl: './select-game.html',

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 // Content here is deliberately hardcoded German, not run through
@@ -7,6 +7,7 @@ import { RouterLink } from '@angular/router';
 // UI language the visitor has selected, the same way a real-world
 // Impressum stays in German on bilingual German sites.
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-impressum',
   imports: [RouterLink],
   templateUrl: './impressum.html',

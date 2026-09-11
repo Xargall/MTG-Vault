@@ -1,8 +1,9 @@
 import {
+  afterNextRender,
+  ChangeDetectionStrategy,
   Component,
   DestroyRef,
   ElementRef,
-  afterNextRender,
   inject,
   signal,
   viewChild,
@@ -245,6 +246,7 @@ interface FocusRange {
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-scanner',
   imports: [FormsModule, RouterLink, CardTile, TranslatePipe],
   templateUrl: './scanner.html',

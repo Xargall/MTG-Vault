@@ -1,5 +1,13 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../../core/models/card.model';
@@ -41,6 +49,7 @@ export interface DeckCardBindingDetail {
 }
 
 @Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-deck-detail-dialog',
   imports: [CardTile, DecimalPipe, TranslatePipe, ScrollLockDirective],
   templateUrl: './deck-detail-dialog.html',
