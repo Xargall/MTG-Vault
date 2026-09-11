@@ -59,7 +59,11 @@ Antworte NUR in diesem Format:
 - Token-Karte:   "MSH T3"
 - Halo-Karte:    "MSH H20"
 
-Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
+WICHTIG: Wenn das Bild leer, unscharf, zu dunkel ist oder du keine tatsächlich lesbaren Zeichen erkennst,
+antworte IMMER mit "UNKNOWN". Errate NIEMALS einen plausibel aussehenden Set-Code oder eine Nummer nur weil
+das Format bekannt ist - nur Zeichen zählen, die du wirklich im Bild siehst. Ein falscher, aber gültig
+formatierter Code ist schlimmer als ehrliches "UNKNOWN".
+
 Keine weiteren Erklärungen, kein zusätzlicher Text.`;
 
 const YUGIOH_PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Yu-Gi-Oh! Karte mit dem Karten-Code unten links oder unten rechts.
@@ -69,7 +73,11 @@ Lies NUR diesen Code, exakt wie aufgedruckt (Bindestrich, Sprachkürzel und füh
 
 Antworte NUR mit dem Code, z.B.: "SDAZ-DE001"
 
-Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
+WICHTIG: Wenn das Bild leer, unscharf, zu dunkel ist oder du keine tatsächlich lesbaren Zeichen erkennst,
+antworte IMMER mit "UNKNOWN". Errate NIEMALS einen plausibel aussehenden Code nur weil das Format bekannt
+ist - nur Zeichen zählen, die du wirklich im Bild siehst. Ein falscher, aber gültig formatierter Code ist
+schlimmer als ehrliches "UNKNOWN".
+
 Keine weiteren Erklärungen, kein zusätzlicher Text.`;
 
 // Unlike MTG/Yu-Gi-Oh, Pokémon has no compact printed code to read (its
@@ -82,7 +90,10 @@ Lies NUR den Namen des Pokémon (oder Trainer-/Energiekarten-Namen), so wie er o
 
 Antworte NUR mit dem Namen, z.B.: "Glurak" oder "Professor Eichs Forschung"
 
-Antworte NUR mit "UNKNOWN", wenn du dir nicht sicher bist oder nichts lesbares erkennst.
+WICHTIG: Wenn das Bild leer, unscharf, zu dunkel ist oder du keinen tatsächlich lesbaren Namen erkennst,
+antworte IMMER mit "UNKNOWN". Errate NIEMALS einen plausibel klingenden Namen - nur ein Name zählt, den du
+wirklich im Bild siehst. Ein falscher, aber plausibler Name ist schlimmer als ehrliches "UNKNOWN".
+
 Keine weiteren Erklärungen, kein zusätzlicher Text.`;
 
 // Base headers from the SDK itself (@supabase/supabase-js/cors) rather than
@@ -189,6 +200,12 @@ Deno.serve(async (req: Request) => {
                 parts: [{ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } }, { text: prompt }],
               },
             ],
+            // Default sampling temperature let the model "creatively" guess
+            // a plausible-looking code on an unclear/blank crop instead of
+            // admitting UNKNOWN (confirmed via a direct test call) - this is
+            // an exact-text-reading task, not a generative one, so pin it to
+            // the most deterministic, least speculative setting.
+            generationConfig: { temperature: 0 },
           }),
           signal: controller.signal,
         },
