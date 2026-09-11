@@ -1,4 +1,14 @@
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -12,6 +22,17 @@ import { DemoScanBlockedDialog } from '../demo-scan-blocked-dialog/demo-scan-blo
 import { categoryKeyFor, getCategoriesForGame } from '../card-category-stats';
 import { getManaCurve } from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
+
+// How many grid cells render at once, and how many more get added per
+// scroll-triggered step - a large collection (see perf audit: 1400+ cards is
+// a real case, not a hypothetical) otherwise dumps every entry's DOM node in
+// at once on load/filter-change regardless of what's actually on screen.
+// Not full virtual scrolling (nothing already rendered ever gets removed
+// again) - deliberately simpler, since the real memory cost (decoded
+// full-size images) is already solved by card-tile's small-image switch;
+// this only caps the initial/filter-change render spike.
+const INITIAL_RENDER_LIMIT = 60;
+const RENDER_LIMIT_STEP = 60;
 
 @Component({
   selector: 'app-collection-overview',
@@ -31,6 +52,7 @@ export class CollectionOverview {
   private readonly collectionService = inject(CollectionService);
   private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly gameService = inject(GameService);
   protected readonly authService = inject(AuthService);
 
@@ -61,6 +83,17 @@ export class CollectionOverview {
 
   protected readonly manaCurve = computed<BarChartDatum[]>(() => getManaCurve(this.filteredEntries()));
 
+  // How many of filteredEntries() actually get a DOM node right now - see
+  // INITIAL_RENDER_LIMIT. manaCurve above deliberately still reads
+  // filteredEntries() directly, not this - the stats must reflect every
+  // filtered card, not just the ones currently rendered.
+  protected readonly renderLimit = signal(INITIAL_RENDER_LIMIT);
+  protected readonly visibleEntries = computed(() => this.filteredEntries().slice(0, this.renderLimit()));
+  protected readonly hasMoreEntries = computed(() => this.filteredEntries().length > this.renderLimit());
+
+  private readonly loadMoreSentinel = viewChild<ElementRef<HTMLElement>>('loadMoreSentinel');
+  private observer: IntersectionObserver | null = null;
+
   constructor() {
     const colorParam = this.route.snapshot.queryParamMap.get('color');
     if (colorParam) {
@@ -71,6 +104,31 @@ export class CollectionOverview {
       this.gameService.currentSlug();
       untracked(() => this.load());
     });
+
+    // A new search/filter is a different result set - start over at the top
+    // of it rather than keep whatever render count the previous one grew to.
+    effect(() => {
+      this.searchQuery();
+      this.selectedCategory();
+      untracked(() => this.renderLimit.set(INITIAL_RENDER_LIMIT));
+    });
+
+    // Re-attaches whenever the sentinel element enters/leaves the DOM (it
+    // only exists while hasMoreEntries() is true - see the template) -
+    // loadMoreSentinel() is itself a signal, so this effect naturally reruns
+    // each time that toggles.
+    effect(() => {
+      const sentinel = this.loadMoreSentinel();
+      this.observer?.disconnect();
+      if (!sentinel) return;
+
+      this.observer = new IntersectionObserver(([entry]) => {
+        if (entry?.isIntersecting) this.renderLimit.update((limit) => limit + RENDER_LIMIT_STEP);
+      });
+      this.observer.observe(sentinel.nativeElement);
+    });
+
+    this.destroyRef.onDestroy(() => this.observer?.disconnect());
   }
 
   toggleCategory(key: string) {

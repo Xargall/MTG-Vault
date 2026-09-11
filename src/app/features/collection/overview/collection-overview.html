@@ -86,12 +86,15 @@
       <p class="state-message">{{ 'collection.noResults' | translate }}</p>
     } @else {
       <div class="card-grid">
-        @for (entry of filteredEntries(); track entry.row.id) {
+        @for (entry of visibleEntries(); track entry.row.id) {
           <button type="button" class="card-link" (click)="selectedEntry.set(entry)">
             <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" />
           </button>
         }
       </div>
+      @if (hasMoreEntries()) {
+        <div #loadMoreSentinel class="load-more-sentinel" aria-hidden="true"></div>
+      }
     }
   }
 </div>

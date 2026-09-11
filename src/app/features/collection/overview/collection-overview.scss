@@ -14,6 +14,15 @@ h1 {
   }
 }
 
+// Invisible trigger for the IntersectionObserver that renders more of the
+// grid (see collection-overview.ts) - given real height/margin so it
+// intersects the viewport a little before the true bottom of the grid,
+// rather than only firing once the user has already scrolled past it.
+.load-more-sentinel {
+  height: 1px;
+  margin-top: -200px;
+}
+
 .chart-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
