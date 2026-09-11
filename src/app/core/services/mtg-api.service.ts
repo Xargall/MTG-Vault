@@ -359,6 +359,14 @@ export class MtgApiService implements CardApiService {
    * API: the latter 404s, the former is a real card) - tried second as a
    * fallback covering that case.
    *
+   * Both candidates are always tried, even when match.setCode itself already
+   * starts with "t" - an earlier version skipped the "t"+setCode fallback in
+   * that case on the assumption that setCode must already be a token set,
+   * but plenty of real parent sets legitimately start with the letter T too
+   * (e.g. "tla" - Avatar: The Last Airbender; token set "ttla" - verified
+   * live: "tla/T6" 404s, "ttla/6" is a real card). Worst case the extra
+   * candidate just 404s harmlessly.
+   *
    * The "H" flag looks like a finish marker but isn't one - confirmed
    * against Scryfall that it marks a Reminder/"Helper" card (e.g. a
    * hideaway/disguise explainer), which - like a token - lives in the
@@ -374,11 +382,11 @@ export class MtgApiService implements CardApiService {
     const setCodesToTry: Array<{ setCode: string; number: string }> = match.isToken
       ? [
           { setCode: match.setCode, number: `T${match.collectorNumber}` },
-          ...(match.setCode.startsWith('t') ? [] : [{ setCode: `t${match.setCode}`, number: match.collectorNumber }]),
+          { setCode: `t${match.setCode}`, number: match.collectorNumber },
         ]
       : match.isHelper
         ? [
-            ...(match.setCode.startsWith('t') ? [] : [{ setCode: `t${match.setCode}`, number: match.collectorNumber }]),
+            { setCode: `t${match.setCode}`, number: match.collectorNumber },
             { setCode: match.setCode, number: `H${match.collectorNumber}` },
             { setCode: match.setCode, number: match.collectorNumber },
           ]
