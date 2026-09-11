@@ -173,8 +173,12 @@ export class DeckService {
     await this.grantMissingCards(deck.id, cards);
   }
 
-  /** Deck built from an EDHREC average-decklist (see CommanderRecommendationsDialog) - same shape/side effects as importDeck (grants any missing cards into the collection), just tagged with a fixed 'Commander' format instead of a free-text one. */
-  async addEdhrecDeck(commanderName: string, cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
+  /** Deck built from a computed average-decklist (EDHREC for Commander via CommanderRecommendationsDialog, Moxfield for 60-card formats via FormatDeckRecommendationsDialog) - same shape/side effects as importDeck (grants any missing cards into the collection), just tagged with the given format instead of a free-text one. */
+  async addArchetypeDeck(
+    name: string,
+    format: string,
+    cards: Array<{ cardId: string; quantity: number }>,
+  ): Promise<void> {
     await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Nicht eingeloggt.');
@@ -186,8 +190,8 @@ export class DeckService {
       .insert({
         user_id: userId,
         game_id: gameId,
-        name: commanderName,
-        format: 'Commander',
+        name,
+        format,
         is_precon: false,
         release_date: null,
         mtgjson_file_name: null,
@@ -207,6 +211,11 @@ export class DeckService {
     if (cardsError) throw cardsError;
 
     await this.grantMissingCards(deck.id, cards);
+  }
+
+  /** Thin wrapper around addArchetypeDeck for the Commander case - kept as its own method since CommanderRecommendationsDialog already calls it by this name. */
+  addEdhrecDeck(commanderName: string, cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
+    return this.addArchetypeDeck(commanderName, 'Commander', cards);
   }
 
   /**

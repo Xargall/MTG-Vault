@@ -13,6 +13,7 @@ import { ArchetypeBrowserDialog } from './archetype-browser-dialog/archetype-bro
 import { CommanderRecommendationsDialog } from './commander-recommendations/commander-recommendations-dialog';
 import { DeckDetailDialog } from './deck-detail-dialog/deck-detail-dialog';
 import { DeckImportDialog } from './deck-import-dialog/deck-import-dialog';
+import { FormatDeckRecommendationsDialog } from './format-deck-recommendations/format-deck-recommendations-dialog';
 import {
   buildAssignedElsewhereMaps,
   buildOwnedMap,
@@ -81,6 +82,7 @@ function pickBannerSample(list: PreconListEntry[], count: number): PreconListEnt
     BrowseDecksDialog,
     DeckDetailDialog,
     CommanderRecommendationsDialog,
+    FormatDeckRecommendationsDialog,
     ArchetypeBrowserDialog,
     DeckImportDialog,
     TranslatePipe,
@@ -118,6 +120,7 @@ export class Decks {
   protected readonly bannerImages = signal<string[]>([]);
   protected readonly showBrowseDialog = signal(false);
   protected readonly showCommanderRecs = signal(false);
+  protected readonly showFormatRecs = signal(false);
   protected readonly showArchetypeBrowser = signal(false);
   protected readonly showDeckImport = signal(false);
   protected readonly selectedDeck = signal<DeckEntry | null>(null);

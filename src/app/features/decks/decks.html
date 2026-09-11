@@ -10,6 +10,9 @@
       <button type="button" class="commander-recs-button" (click)="showCommanderRecs.set(true)">
         {{ 'decks.commanderRecsButton' | translate }}
       </button>
+      <button type="button" class="commander-recs-button" (click)="showFormatRecs.set(true)">
+        {{ 'decks.formatRecsButton' | translate }}
+      </button>
     } @else if (gameService.currentSlug() === 'yugioh') {
       <button type="button" class="commander-recs-button" (click)="showArchetypeBrowser.set(true)">
         {{ 'archetypeBrowser.openButton' | translate }}
@@ -129,6 +132,10 @@
 
 @if (showCommanderRecs()) {
   <app-commander-recommendations-dialog (close)="showCommanderRecs.set(false)" (added)="onDeckAdded()" />
+}
+
+@if (showFormatRecs()) {
+  <app-format-deck-recommendations-dialog (close)="showFormatRecs.set(false)" (added)="onDeckAdded()" />
 }
 
 @if (showArchetypeBrowser()) {
