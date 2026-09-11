@@ -64,6 +64,7 @@ function rowFromRawCard(raw) {
     name: String(raw.name ?? ''),
     printed_name: raw.printed_name ?? null,
     image_url: raw.image_uris?.normal ?? rawFaces?.[0]?.image_uris?.normal ?? null,
+    image_url_small: raw.image_uris?.small ?? rawFaces?.[0]?.image_uris?.small ?? null,
     set_code: set,
     set_name: String(raw.set_name ?? ''),
     collector_number: collectorNumber,

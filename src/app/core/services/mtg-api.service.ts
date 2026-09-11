@@ -86,6 +86,7 @@ interface ScryfallCardRow {
   price_usd: number | null;
   price_usd_foil: number | null;
   cardmarket_url: string | null;
+  image_url_small: string | null;
 }
 
 // A token or halo-finish card gets its own collection bucket ("✨ Specials")
@@ -784,6 +785,7 @@ export class MtgApiService implements CardApiService {
       oracleId: raw.oracle_id,
       name: raw.printed_name ?? raw.name,
       imageUrl: raw.image_uris?.normal ?? raw.card_faces?.[0]?.image_uris?.normal ?? null,
+      imageUrlSmall: raw.image_uris?.small ?? raw.card_faces?.[0]?.image_uris?.small ?? null,
       setName: raw.set_name,
       rarity: raw.rarity,
       prices: {
@@ -810,6 +812,7 @@ export class MtgApiService implements CardApiService {
       oracleId: row.oracle_id,
       name: row.printed_name ?? row.name,
       imageUrl: row.image_url,
+      imageUrlSmall: row.image_url_small,
       setName: row.set_name,
       rarity: row.rarity,
       prices: {

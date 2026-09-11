@@ -13,6 +13,12 @@ interface CardBase {
   id: string;
   name: string;
   imageUrl: string | null;
+  // Small thumbnail variant, for grid contexts (see card-tile.html) - a full
+  // "normal"-size image decodes to ~1.3MB in memory each, which adds up fast
+  // across a collection grid of hundreds/thousands of cards rendered at
+  // ~100-150px wide. Null for a card/print this wasn't resolved for yet
+  // (falls back to imageUrl in card-tile.html) - never assume non-null.
+  imageUrlSmall: string | null;
   setName: string | null;
   rarity: string | null;
   prices: CardPrice;

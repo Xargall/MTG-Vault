@@ -140,6 +140,12 @@ export class PokemonApiService implements CardApiService {
       oracleId: null,
       name: raw.name,
       imageUrl: raw.image ? `${raw.image}/high.webp` : null,
+      // TCGdex's documented quality suffixes are "low"/"high" - same base
+      // URL, smaller variant for the grid thumbnail (see card-tile.html).
+      // Not live-verified against a real response the way MTG/Yu-Gi-Oh were
+      // (Pokémon decks are still pending, see CLAUDE.md) - worth a quick
+      // sanity check once Pokémon sees real usage.
+      imageUrlSmall: raw.image ? `${raw.image}/low.webp` : null,
       setName: raw.set?.name ?? null,
       rarity: raw.rarity ?? null,
       prices: {

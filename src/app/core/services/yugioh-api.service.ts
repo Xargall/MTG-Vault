@@ -14,6 +14,7 @@ interface YgoCardSet {
 
 interface YgoCardImage {
   image_url: string;
+  image_url_small: string;
 }
 
 interface YgoCardPrice {
@@ -162,6 +163,7 @@ export class YugiohApiService implements CardApiService {
       oracleId: null,
       name: raw.name,
       imageUrl: raw.card_images?.[0]?.image_url ?? null,
+      imageUrlSmall: raw.card_images?.[0]?.image_url_small ?? null,
       setName: raw.card_sets?.[0]?.set_name ?? null,
       rarity: raw.card_sets?.[0]?.set_rarity ?? null,
       prices: {

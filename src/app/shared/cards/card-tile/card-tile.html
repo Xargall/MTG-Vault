@@ -15,7 +15,7 @@
     </span>
   }
 
-  @if (card().imageUrl; as url) {
+  @if (card().imageUrlSmall ?? card().imageUrl; as url) {
     <img
       class="card-image"
       [class.skeleton-shimmer]="!imageLoaded()"
