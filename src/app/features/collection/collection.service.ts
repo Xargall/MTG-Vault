@@ -43,6 +43,12 @@ export interface AddCardInput {
   oracleId?: string | null;
 }
 
+// Discriminated on `merged` so undoAdd() can't be called with a
+// previousQuantity-less merged result - see Scanner's "delete last scan".
+export type AddCardResult =
+  | { rowId: string; merged: true; previousQuantity: number }
+  | { rowId: string; merged: false };
+
 @Injectable({ providedIn: 'root' })
 export class CollectionService {
   private readonly supabase = inject(SupabaseService);
@@ -142,7 +148,7 @@ export class CollectionService {
     return totals;
   }
 
-  async addCard(input: AddCardInput): Promise<void> {
+  async addCard(input: AddCardInput): Promise<AddCardResult> {
     return this.upsertOne(input);
   }
 
@@ -158,7 +164,7 @@ export class CollectionService {
     finish = 'nonfoil',
     cardCategory = 'normal',
     oracleId = null,
-  }: AddCardInput): Promise<void> {
+  }: AddCardInput): Promise<AddCardResult> {
     await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Nicht eingeloggt.');
@@ -189,7 +195,7 @@ export class CollectionService {
         .update(updatePayload)
         .eq('id', existing.id);
       if (error) throw error;
-      return;
+      return { rowId: existing.id, merged: true, previousQuantity: existing.quantity };
     }
 
     const insertPayload = {
@@ -203,8 +209,22 @@ export class CollectionService {
       card_category: cardCategory,
       oracle_id: oracleId,
     };
-    const { error } = await this.supabase.client.from('collection_cards').insert(insertPayload);
+    const { data, error } = await this.supabase.client
+      .from('collection_cards')
+      .insert(insertPayload)
+      .select('id')
+      .single<{ id: string }>();
     if (error) throw error;
+    return { rowId: data.id, merged: false };
+  }
+
+  /** Reverses one addCard() call - deletes the row if it created a fresh stack, or decrements it back to its pre-add quantity if it merged into an existing one (never just deletes that row, which would also wipe out the copies that were already there). */
+  async undoAdd(result: AddCardResult): Promise<void> {
+    if (result.merged) {
+      await this.updateEntry(result.rowId, { quantity: result.previousQuantity });
+    } else {
+      await this.deleteEntry(result.rowId);
+    }
   }
 
   /** Deletes one specific collection row (a single card/foil/condition stack), unlike removeCard() which drops every row for that card. */

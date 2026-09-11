@@ -14,7 +14,7 @@ import { PSM } from 'tesseract.js';
 
 import { Card } from '../../core/models/card.model';
 import { CardIdentification, MtgIdentificationResult, ScoredCandidate } from '../../core/services/card-api.interface';
-import { CollectionService } from '../collection/collection.service';
+import { AddCardResult, CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
 import { GeminiVisionService } from '../../core/services/gemini-vision.service';
 import { CardCategory, MtgApiService } from '../../core/services/mtg-api.service';
@@ -72,10 +72,10 @@ const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]{2,6}-[A-Z]{2}\d{2,4}$/;
 /** Gemini's own crop for its collector-number guess - deliberately looser than CROP_STRATEGIES (a vision model reads a wider region fine) and left as unfiltered color, since Gemini isn't Tesseract's binarize-first pipeline. */
 function cropCollectorArea(source: HTMLCanvasElement): HTMLCanvasElement {
   const crop = document.createElement('canvas');
-  // 20%→25% / 60%→65%: the "Jetzt scannen" button (see .scan-button in
-  // scanner.html/.scss) sat low enough to overlap this corner on real
-  // devices, clipping the collector number out of the captured frame
-  // before it ever reached Gemini - widened to give it room.
+  // 20%→25% / 60%→65%: overlay UI elements sitting low on the viewport can
+  // clip into this corner on real devices, cutting the collector number out
+  // of the captured frame before it ever reached Gemini - widened to give
+  // it room.
   const h = Math.floor(source.height * 0.25);
   const y = source.height - h;
   crop.width = Math.floor(source.width * 0.65);
@@ -187,13 +187,40 @@ const CONSISTENT_MATCHES_REQUIRED = 2;
 const AUTO_CONFIRM_THRESHOLD = 70;
 const SUCCESS_TOAST_DURATION_MS = 3000;
 const FAILURE_TOAST_DURATION_MS = 2000;
-const AUTO_RESUME_DELAY_MS = 2000;
+// Just long enough that "added" doesn't feel like an instant UI flash -
+// not a "let the user read the confirmation" delay, since the toast (its
+// own SUCCESS_TOAST_DURATION_MS) and the top-left undo thumbnail both keep
+// that confirmation visible well after scanning has already resumed.
+const AUTO_RESUME_DELAY_MS = 400;
 const RATE_LIMIT_TOAST_DURATION_MS = 3000;
 const LIMIT_TOAST_DURATION_MS = 6000;
 // Non-blocking: a 403 sets a "cool off until" timestamp rather than
 // awaiting a delay inline, so the loop (and the UI) never freezes for it.
 const RATE_LIMIT_PAUSE_MS = 5000;
 const RATE_LIMIT_RETRY_DELAY_MS = 1000;
+
+// How long a matched card sits in the panel before it's added automatically -
+// long enough to glance at the result and tap "keep scanning" if it's wrong,
+// short enough to keep a stack of cards moving (this plus AUTO_RESUME_DELAY_MS
+// is dead time on every single card, so it's worth keeping tight - the
+// top-left undo thumbnail is the real safety net once scanning has already
+// moved on). Kept in sync with the .auto-add-progress animation duration in
+// scanner.scss (no shared source of truth between TS and CSS here, so the
+// two must be updated together).
+const AUTO_ADD_DELAY_MS = 3000;
+
+// Gate that decides when the automatic loop is even allowed to spend a
+// (rate-limited) Gemini call - firing on every tick regardless of what's in
+// frame would burn through the shared quota on hands, table, or a card
+// mid-swap. A downsampled grayscale frame is compared tick-to-tick: low
+// diff means the camera image has stopped changing (a card just got placed
+// and held still, not swapped/moved), and high variance means there's
+// actually something detailed in view rather than a blank surface. Gemini
+// only fires once both hold for a few consecutive ticks.
+const GATE_SAMPLE_SIZE = 32;
+const GATE_STABILITY_THRESHOLD = 6;
+const GATE_MIN_VARIANCE = 350;
+const GATE_STABLE_TICKS_REQUIRED = 3;
 
 type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'choosing' | 'error';
 type ScannerToast = { title?: string; message: string; variant: 'success' | 'warning' };
@@ -238,13 +265,22 @@ export class Scanner {
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
   private readonly captureCanvas = document.createElement('canvas');
   private readonly rawFrameCanvas = document.createElement('canvas');
+  private readonly gateCanvas = document.createElement('canvas');
   private stream: MediaStream | null = null;
   private videoTrack: MediaStreamTrack | null = null;
   private timerHandle: ReturnType<typeof setTimeout> | null = null;
   private toastTimeout: ReturnType<typeof setTimeout> | null = null;
   private autoResumeTimeout: ReturnType<typeof setTimeout> | null = null;
+  private autoAddTimeout: ReturnType<typeof setTimeout> | null = null;
   private isScanning = false;
   private noMatchStreak = 0;
+  // Tick-to-tick baseline for the Gemini trigger gate (see GATE_* constants
+  // above) - reset whenever the frame stream restarts (camera switch) or a
+  // card finishes its cycle (keepScanning), so a stale comparison from
+  // before never leaks into the next card's stability check.
+  private lastGateSample: Uint8ClampedArray | null = null;
+  private gateStableTicks = 0;
+  private geminiInFlight = false;
   // Rolling window of the last few frames' resolved cards (null for a frame
   // with no result at all) - see getConsistentResult(). Carries the parsed
   // finish/category alongside each card, so confirming a match doesn't lose
@@ -266,22 +302,28 @@ export class Scanner {
   // "🤖 Gemini" / "📝 Tesseract" / "⚠️ Limit" indicator; null while nothing
   // has read yet.
   protected readonly ocrEngine = signal<'gemini' | 'tesseract' | 'limit' | null>(null);
-  // Drives the manual "Jetzt scannen" button vs. the "set up your own key"
-  // hint - null (not checked yet) fails open and still shows the button, so
-  // a flaky/unmigrated status check never hides a working feature.
+  // Gates the automatic Gemini path (see updateGeminiGate) and drives the
+  // "set up your own key" hint - null (not checked yet) fails open, so a
+  // flaky/unmigrated status check never silently disables a working feature.
   protected readonly hasGeminiKey = this.userSecrets.hasGeminiKey;
   // Gemini's 429 is shown to the user only the first time per session -
   // it's already handled gracefully (falls back silently otherwise), so
   // repeating the same explanation every subsequent hit would just be noise.
   private limitWarningShown = false;
-  // True while the manual "Jetzt scannen" button's single Gemini call is in
-  // flight - drives the button's disabled state and spinner.
-  protected readonly geminiLoading = signal(false);
+  // A real Gemini/edge-function failure (bad key, 500, timeout - anything
+  // other than "no card in frame") is shown once per session too - it would
+  // otherwise repeat every retry (see GeminiVisionService's own pacing) and
+  // look identical to a plain miss, which is exactly what made this
+  // undiagnosable on a device without a hooked-up console.
+  private geminiErrorShown = false;
   protected readonly detectedCard = signal<Card | null>(null);
+  // Drives the match panel's countdown progress bar - true from the moment
+  // a card is matched until it's added (auto or manual) or skipped.
+  protected readonly autoAddArmed = signal(false);
   // Set alongside detectedCard whenever the crop-based MTG path resolved it
-  // (Tesseract auto-loop or the manual Gemini scan) - stays at the defaults
-  // for every other path (picker selection, Yu-Gi-Oh, Pokémon), since only
-  // MTG's collector-number corner carries a token/halo flag to read.
+  // (Tesseract auto-loop or the gate-triggered Gemini scan) - stays at the
+  // defaults for every other path (picker selection, Yu-Gi-Oh, Pokémon),
+  // since only MTG's collector-number corner carries a token/halo flag to read.
   protected readonly detectedFinish = signal<CollectorFinish>('nonfoil');
   protected readonly detectedCardCategory = signal<CardCategory>('normal');
   protected readonly candidateChoices = signal<ScoredCandidate[] | null>(null);
@@ -290,10 +332,14 @@ export class Scanner {
   // many runners MtgApiService already decided to include, not recomputed
   // from a duplicated threshold here.
   protected readonly pickerTier = signal<'medium' | 'low'>('medium');
-  protected readonly quantity = signal(1);
-  protected readonly foil = signal(false);
   protected readonly adding = signal(false);
   protected readonly addError = signal<string | null>(null);
+  // Last card added this session, kept around (top-left, next to the camera
+  // picker) so a wrong auto-add can be caught and undone even after the
+  // scanner has already moved on to the next card - not just during that
+  // card's own brief match-panel window.
+  protected readonly lastAdded = signal<{ card: Card; result: AddCardResult } | null>(null);
+  protected readonly undoingLastAdd = signal(false);
 
   constructor() {
     this.destroyRef.onDestroy(() => {
@@ -301,6 +347,7 @@ export class Scanner {
       if (this.timerHandle) clearTimeout(this.timerHandle);
       if (this.toastTimeout) clearTimeout(this.toastTimeout);
       if (this.autoResumeTimeout) clearTimeout(this.autoResumeTimeout);
+      if (this.autoAddTimeout) clearTimeout(this.autoAddTimeout);
       this.stream?.getTracks().forEach((track) => track.stop());
       void this.ocrService.terminate();
     });
@@ -321,6 +368,10 @@ export class Scanner {
       this.timerHandle = null;
     }
     this.stream?.getTracks().forEach((track) => track.stop());
+    // A new stream means a new baseline - otherwise the first tick would
+    // diff against a frame from the old camera/angle.
+    this.lastGateSample = null;
+    this.gateStableTicks = 0;
 
     let preferredDeviceId = deviceId ?? null;
     if (!preferredDeviceId) {
@@ -453,13 +504,24 @@ export class Scanner {
       return;
     }
 
+    const videoEl = this.video()?.nativeElement;
+    if (!videoEl || videoEl.readyState < 2) {
+      this.scheduleNextCapture();
+      return;
+    }
+
+    // Fire-and-forget: the gate's own Gemini call paces and awaits itself
+    // (see GeminiVisionService), so it must never block this tick's fast
+    // local OCR path below it.
+    this.updateGeminiGate(videoEl);
+
     const start = Date.now();
     try {
-      const matched = await this.analyzeFrame();
-      // MTG's automatic loop is Tesseract-only now (Gemini only runs on the
-      // manual "Jetzt scannen" tap, which already gives its own feedback on
-      // a miss) - it runs silently in the background with no "not
-      // recognized" noise. Yu-Gi-Oh has no manual alternative, so it keeps
+      const matched = await this.analyzeFrame(videoEl);
+      // MTG has two silent local/automatic paths (Tesseract crop loop above,
+      // gate-triggered Gemini below) with no "not recognized" noise, so a
+      // miss there just means "keep holding it steady." Yu-Gi-Oh/Pokémon's
+      // whole-frame Tesseract path has no such local fallback, so it keeps
       // this streak-based toast as its only feedback.
       if (matched) {
         this.noMatchStreak = 0;
@@ -489,10 +551,7 @@ export class Scanner {
     }
   }
 
-  private async analyzeFrame(): Promise<boolean> {
-    const videoEl = this.video()?.nativeElement;
-    if (!videoEl || videoEl.readyState < 2) return false;
-
+  private async analyzeFrame(videoEl: HTMLVideoElement): Promise<boolean> {
     // MTG no longer OCRs the whole frame at all - only its own cropped
     // set-code/collector-number corner (see handleMtgFrame), so it branches
     // out before the whole-frame capture below even runs.
@@ -521,9 +580,9 @@ export class Scanner {
   }
 
   /**
-   * Gemini is no longer part of this automatic per-tick loop - it only runs
-   * on the user's explicit "Jetzt scannen" tap (see onManualScan). The
-   * background loop stays Tesseract-only, unchanged otherwise.
+   * MTG's own crop-based Tesseract pass, run on every tick regardless of the
+   * Gemini gate below - it's cheap, local, and often confirms a match before
+   * Gemini's rate-limited call would even have fired.
    */
   private async handleMtgFrame(videoEl: HTMLVideoElement): Promise<boolean> {
     const result = await this.tryTesseractPath(videoEl);
@@ -536,50 +595,79 @@ export class Scanner {
   }
 
   /**
-   * Manual, single-shot Gemini scan triggered by the "Jetzt scannen"
-   * button - reuses tryGeminiPath as-is (same crop, same rate limiting,
-   * same identifyByGeminiResult pipeline). A deliberate one-frame user
-   * action is trusted immediately on success rather than routed through
-   * confirmMtgCard's 2-of-3 sliding window, which exists to smooth out
-   * noise across the *automatic* stream of frames - not applicable here.
-   * The background Tesseract loop keeps running unaffected.
+   * Downsamples the frame to a small grayscale grid and compares it against
+   * the previous tick's sample to decide whether Gemini is even allowed to
+   * fire this tick (see GATE_* constants). Two independent signals must both
+   * hold for a few consecutive ticks: low tick-to-tick diff (the image has
+   * stopped changing - a card was just placed and is being held still, not
+   * swapped or in motion) and high variance (there's actual detail in view,
+   * not a blank hand/table/background). Only edge-triggers a single Gemini
+   * attempt per stable session - as long as the card stays in view it keeps
+   * retrying (paced by GeminiVisionService's own call-interval), but a miss
+   * doesn't turn into a tight retry loop within the same tick.
    */
-  protected async onManualScan(): Promise<void> {
-    if (this.geminiLoading()) return;
-    const videoEl = this.video()?.nativeElement;
-    if (!videoEl) return;
+  private updateGeminiGate(videoEl: HTMLVideoElement): void {
+    const sample = this.sampleGateFrame(videoEl);
+    if (!sample) return;
 
-    this.geminiLoading.set(true);
+    const previous = this.lastGateSample;
+    this.lastGateSample = sample;
+    if (!previous) return;
+
+    const pixelCount = sample.length / 4;
+    let mean = 0;
+    for (let i = 0; i < sample.length; i += 4) mean += sample[i];
+    mean /= pixelCount;
+
+    let diffSum = 0;
+    let variance = 0;
+    for (let i = 0; i < sample.length; i += 4) {
+      diffSum += Math.abs(sample[i] - previous[i]);
+      variance += (sample[i] - mean) ** 2;
+    }
+
+    const isStable = diffSum / pixelCount < GATE_STABILITY_THRESHOLD;
+    const hasContent = variance / pixelCount > GATE_MIN_VARIANCE;
+
+    if (!isStable || !hasContent) {
+      this.gateStableTicks = 0;
+      return;
+    }
+
+    this.gateStableTicks++;
+    if (this.gateStableTicks < GATE_STABLE_TICKS_REQUIRED) return;
+    if (this.geminiInFlight || this.hasGeminiKey() === false) return;
+
+    void this.autoGeminiScan(videoEl);
+  }
+
+  /** Small grayscale downsample used only for the gate's stability/variance check - deliberately tiny since it's read back with getImageData every tick. */
+  private sampleGateFrame(videoEl: HTMLVideoElement): Uint8ClampedArray | null {
+    if (videoEl.videoWidth < 10 || videoEl.videoHeight < 10) return null;
+
+    this.gateCanvas.width = GATE_SAMPLE_SIZE;
+    this.gateCanvas.height = GATE_SAMPLE_SIZE;
+    const ctx = this.gateCanvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+
+    ctx.filter = 'grayscale(1)';
+    ctx.drawImage(videoEl, 0, 0, GATE_SAMPLE_SIZE, GATE_SAMPLE_SIZE);
+    return ctx.getImageData(0, 0, GATE_SAMPLE_SIZE, GATE_SAMPLE_SIZE).data;
+  }
+
+  /**
+   * The gate-triggered Gemini attempt - reuses tryGeminiPath as-is (same
+   * crop, same rate limiting, same per-game identification). Runs
+   * independently of the tick loop's own scheduling; onMatch guards against
+   * landing after the Tesseract path (or a previous call) already matched.
+   */
+  private async autoGeminiScan(videoEl: HTMLVideoElement): Promise<void> {
+    this.geminiInFlight = true;
     try {
-      // Mobile browsers (esp. iOS Safari) can still report readyState < 2
-      // right after the stream attaches, even though the button is already
-      // visible and tappable - previously this bailed out silently, which
-      // is exactly what made the button look dead on mobile. Give the
-      // stream a moment to deliver its first real frame before giving up.
-      if (videoEl.readyState < 2) {
-        await new Promise<void>((resolve) => {
-          videoEl.addEventListener('loadeddata', () => resolve(), { once: true });
-          setTimeout(resolve, 2000);
-        });
-      }
-
-      // videoWidth/videoHeight can still be 0 at this point on some mobile
-      // browsers - calling Gemini with an empty/near-empty crop would just
-      // waste a rate-limited call and come back as a confusing "not
-      // recognized" result, so surface the real reason instead.
-      if (videoEl.videoWidth < 10 || videoEl.videoHeight < 10) {
-        this.showToast(this.translate.instant('scanner.cameraNotReady'), 'warning', FAILURE_TOAST_DURATION_MS);
-        return;
-      }
-
       const result = await this.tryGeminiPath(videoEl);
-      if (result) {
-        this.onMatch({ card: result.card, confidence: 1 }, result);
-      } else if (this.ocrEngine() !== 'limit') {
-        this.showToast(this.translate.instant('scanner.manualScanNotRecognized'), 'warning', FAILURE_TOAST_DURATION_MS);
-      }
+      if (result) this.onMatch({ card: result.card, confidence: 1 }, result);
     } finally {
-      this.geminiLoading.set(false);
+      this.geminiInFlight = false;
     }
   }
 
@@ -633,6 +721,15 @@ export class Scanner {
       return await this.mtgApi.identifyByGeminiResult(text);
     } catch (error) {
       console.error('Gemini Vision fehlgeschlagen, Tesseract-Fallback:', error);
+      if (!this.geminiErrorShown) {
+        this.geminiErrorShown = true;
+        this.showToast(
+          error instanceof Error ? error.message : this.translate.instant('scanner.geminiErrorFallback'),
+          'warning',
+          LIMIT_TOAST_DURATION_MS,
+          this.translate.instant('scanner.geminiErrorTitle'),
+        );
+      }
       return null;
     }
   }
@@ -801,8 +898,12 @@ export class Scanner {
   }
 
   private onMatch(result: CardIdentification, meta?: { finish: CollectorFinish; cardCategory: CardCategory }) {
-    this.quantity.set(1);
-    this.foil.set(false);
+    // Guards against a race between the two concurrent auto-detection paths
+    // (MTG's per-tick Tesseract crop and the gate-triggered Gemini call) -
+    // whichever resolves first wins; the other lands here after the panel
+    // is already showing and must be a no-op instead of overwriting it.
+    if (this.status() !== 'scanning') return;
+
     this.addError.set(null);
     this.candidateChoices.set(null);
     this.detectedCard.set(result.card);
@@ -810,6 +911,20 @@ export class Scanner {
     this.detectedCardCategory.set(meta?.cardCategory ?? 'normal');
     this.status.set('matched');
     if (navigator.vibrate) navigator.vibrate(200);
+
+    this.autoAddArmed.set(true);
+    this.autoAddTimeout = setTimeout(() => {
+      this.autoAddTimeout = null;
+      void this.addToCollection();
+    }, AUTO_ADD_DELAY_MS);
+  }
+
+  private clearAutoAddTimeout() {
+    if (this.autoAddTimeout) {
+      clearTimeout(this.autoAddTimeout);
+      this.autoAddTimeout = null;
+    }
+    this.autoAddArmed.set(false);
   }
 
   private onAmbiguousMatch(result: MtgIdentificationResult) {
@@ -824,18 +939,19 @@ export class Scanner {
 
   // Picking a candidate is itself the confirming action - add it straight
   // away (quantity 1, no foil) with a success toast, rather than routing
-  // through the quantity/foil form the auto-confirm path uses.
+  // through the match panel's auto-add countdown.
   protected async selectCandidate(candidate: ScoredCandidate) {
     this.candidateChoices.set(null);
     this.status.set('scanning');
     try {
-      await this.collectionService.addCard({
+      const result = await this.collectionService.addCard({
         cardId: candidate.card.id,
         quantity: 1,
         foil: false,
         condition: 'NM',
         oracleId: candidate.card.oracleId,
       });
+      this.lastAdded.set({ card: candidate.card, result });
       this.showToast(
         this.translate.instant('scanner.addedToast', { name: candidate.card.name }),
         'success',
@@ -863,30 +979,27 @@ export class Scanner {
     this.toastTimeout = setTimeout(() => this.toast.set(null), durationMs);
   }
 
-  protected increaseQuantity() {
-    this.quantity.update((q) => q + 1);
-  }
-
-  protected decreaseQuantity() {
-    this.quantity.update((q) => Math.max(1, q - 1));
-  }
-
   protected async addToCollection() {
     const card = this.detectedCard();
     if (!card) return;
+    this.clearAutoAddTimeout();
 
     this.adding.set(true);
     this.addError.set(null);
     try {
-      await this.collectionService.addCard({
+      // Always 1x, non-foil - a physical scan is one copy at a time, and
+      // foil status is corrected afterward in the Collection editor rather
+      // than editable mid-countdown here (see AUTO_ADD_DELAY_MS).
+      const result = await this.collectionService.addCard({
         cardId: card.id,
-        quantity: this.quantity(),
-        foil: this.foil(),
+        quantity: 1,
+        foil: false,
         condition: 'NM',
         finish: this.detectedFinish(),
         cardCategory: this.detectedCardCategory(),
         oracleId: card.oracleId,
       });
+      this.lastAdded.set({ card, result });
       this.showToast(
         this.translate.instant('scanner.addedToast', { name: card.name }),
         'success',
@@ -907,12 +1020,42 @@ export class Scanner {
       clearTimeout(this.autoResumeTimeout);
       this.autoResumeTimeout = null;
     }
+    this.clearAutoAddTimeout();
     this.frameHistory = [];
+    // Fresh baseline for the next card - otherwise its first tick would
+    // diff against whatever was in frame before this one was matched/added.
+    this.lastGateSample = null;
+    this.gateStableTicks = 0;
     this.detectedCard.set(null);
     this.detectedFinish.set('nonfoil');
     this.detectedCardCategory.set('normal');
     this.candidateChoices.set(null);
     this.status.set('scanning');
     this.scheduleNextCapture();
+  }
+
+  /** Reverses the most recent add - the safety net for a wrong auto-add now that nothing pauses for manual confirmation by default (see AUTO_ADD_DELAY_MS). */
+  protected async undoLastAdd() {
+    const entry = this.lastAdded();
+    if (!entry || this.undoingLastAdd()) return;
+
+    this.undoingLastAdd.set(true);
+    try {
+      await this.collectionService.undoAdd(entry.result);
+      this.lastAdded.set(null);
+      this.showToast(
+        this.translate.instant('scanner.undoToast', { name: entry.card.name }),
+        'success',
+        SUCCESS_TOAST_DURATION_MS,
+      );
+    } catch (error) {
+      this.showToast(
+        error instanceof Error ? error.message : this.translate.instant('scanner.undoFailed'),
+        'warning',
+        FAILURE_TOAST_DURATION_MS,
+      );
+    } finally {
+      this.undoingLastAdd.set(false);
+    }
   }
 }

@@ -55,17 +55,69 @@
   white-space: nowrap;
 }
 
-.camera-select {
+// Groups the pulse dot, camera picker, and last-scanned undo thumbnail into
+// one top-left column instead of each hardcoding its own top/left offset -
+// they stack in document order regardless of which ones are present.
+.top-left-stack {
   position: absolute;
-  top: calc(var(--spacing-md) + 36px + var(--spacing-sm));
+  top: var(--spacing-md);
   left: var(--spacing-md);
-  max-width: calc(100% - var(--spacing-md) * 2);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.camera-select {
+  max-width: calc(100vw - var(--spacing-md) * 2);
   padding: 4px 10px;
   border-radius: var(--radius);
   border: 1px solid var(--color-border-strong);
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
   font-size: 0.8rem;
+}
+
+.last-added {
+  position: relative;
+}
+
+.last-added-thumb {
+  display: block;
+  width: 40px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.5);
+
+  &--placeholder {
+    background: var(--color-surface-alt);
+  }
+}
+
+.last-added-undo {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-danger, #dc2626);
+  color: #fff;
+  font-size: 0.65rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 }
 
 .scanner-error {
@@ -86,9 +138,6 @@
 }
 
 .scan-pulse {
-  position: absolute;
-  top: var(--spacing-md);
-  left: var(--spacing-md);
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -130,34 +179,6 @@
   }
 }
 
-.manual-scan-button {
-  position: absolute;
-  // Was bottom: 48px - low enough to sit over the card's own bottom edge,
-  // where the set-code/collector-number line prints (see cropCollectorArea
-  // in scanner.ts, which reads that same bottom slice) - moved up so the
-  // button no longer covers what the scan itself needs to see.
-  bottom: 25%;
-  left: 50%;
-  transform: translateX(-50%);
-  min-width: 200px;
-  padding: 14px 28px;
-  border: none;
-  border-radius: 999px;
-  background: var(--color-accent);
-  color: #fff;
-  font-size: 1.05rem;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-}
-
 .gemini-key-hint {
   position: absolute;
   bottom: 48px;
@@ -183,21 +204,6 @@
     &:hover {
       text-decoration: underline;
     }
-  }
-}
-
-.manual-scan-spinner {
-  width: 20px;
-  height: 20px;
-  border: 3px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 
@@ -247,10 +253,37 @@
   gap: var(--spacing-lg);
   align-items: flex-start;
   animation: slide-up 0.25s ease-out;
+  overflow: hidden;
 
   app-card-tile {
     width: 120px;
     flex-shrink: 0;
+  }
+}
+
+.auto-add-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+// Drains from full to empty over AUTO_ADD_DELAY_MS (scanner.ts) - a fresh
+// DOM node each time a card matches, so the animation always restarts.
+.auto-add-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--color-accent);
+  animation: auto-add-countdown 3s linear forwards;
+}
+
+@keyframes auto-add-countdown {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
   }
 }
 
@@ -360,37 +393,6 @@
   flex-direction: column;
   gap: var(--spacing-sm);
   min-width: 0;
-}
-
-.quantity-control {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-
-  button {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: 1px solid var(--color-border-strong);
-    background: var(--color-bg);
-    color: var(--color-text);
-    font-size: 1.1rem;
-    cursor: pointer;
-  }
-
-  span {
-    min-width: 1.5rem;
-    text-align: center;
-    color: var(--color-text);
-    font-weight: 600;
-  }
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--color-text);
 }
 
 .form-error {

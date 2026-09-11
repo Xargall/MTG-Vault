@@ -51,6 +51,19 @@ export class GeminiVisionService {
         this.rateLimited.set(true);
         return null;
       }
+      // The SDK's own error.message is a generic "Edge Function returned a
+      // non-2xx status code" - the actual reason (NO_API_KEY, a bad Gemini
+      // response, a timeout) is in the response body the function sent back,
+      // which the caller needs surfaced (see Scanner's onGeminiError) instead
+      // of a swallowed, silent failure that looks identical to "no card in
+      // frame" from the outside.
+      if (error instanceof FunctionsHttpError) {
+        const body = await error.context
+          .clone()
+          .json()
+          .catch(() => null);
+        throw new Error(body?.message ?? body?.error ?? error.message);
+      }
       throw error;
     }
 

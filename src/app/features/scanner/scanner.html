@@ -17,8 +17,6 @@
 
   @if (status() === 'starting') {
     <p class="scanner-hint">{{ 'scanner.starting' | translate }}</p>
-  } @else if (status() === 'scanning') {
-    <div class="scan-pulse" aria-hidden="true"></div>
   }
 
   @if (ocrEngine(); as engine) {
@@ -37,20 +35,45 @@
     </p>
   }
 
-  @if (availableCameras().length > 1) {
-    <select
-      class="camera-select"
-      [ngModel]="selectedDeviceId()"
-      (ngModelChange)="onCameraChange($event)"
-      [attr.aria-label]="'scanner.cameraSelect' | translate"
-    >
-      @for (device of availableCameras(); track device.deviceId) {
-        <option [value]="device.deviceId">
-          {{ device.label || ('scanner.cameraFallbackLabel' | translate: { index: $index + 1 }) }}
-        </option>
-      }
-    </select>
-  }
+  <div class="top-left-stack">
+    @if (status() === 'scanning') {
+      <div class="scan-pulse" aria-hidden="true"></div>
+    }
+
+    @if (availableCameras().length > 1) {
+      <select
+        class="camera-select"
+        [ngModel]="selectedDeviceId()"
+        (ngModelChange)="onCameraChange($event)"
+        [attr.aria-label]="'scanner.cameraSelect' | translate"
+      >
+        @for (device of availableCameras(); track device.deviceId) {
+          <option [value]="device.deviceId">
+            {{ device.label || ('scanner.cameraFallbackLabel' | translate: { index: $index + 1 }) }}
+          </option>
+        }
+      </select>
+    }
+
+    @if (lastAdded(); as last) {
+      <div class="last-added">
+        @if (last.card.imageUrl) {
+          <img class="last-added-thumb" [src]="last.card.imageUrl" [alt]="last.card.name" />
+        } @else {
+          <div class="last-added-thumb last-added-thumb--placeholder"></div>
+        }
+        <button
+          type="button"
+          class="last-added-undo"
+          [disabled]="undoingLastAdd()"
+          (click)="undoLastAdd()"
+          [attr.aria-label]="'scanner.undoLastAdd' | translate: { name: last.card.name }"
+        >
+          ✕
+        </button>
+      </div>
+    }
+  </div>
 
   @if (supportsManualFocus() && status() === 'scanning') {
     <input
@@ -65,21 +88,11 @@
     />
   }
 
-  @if (status() === 'scanning') {
-    @if (hasGeminiKey() === false) {
-      <div class="gemini-key-hint">
-        <p>{{ 'scanner.noGeminiKeyHint' | translate }}</p>
-        <a routerLink="/settings/gemini">{{ 'scanner.goToSettings' | translate }}</a>
-      </div>
-    } @else {
-      <button type="button" class="manual-scan-button" [disabled]="geminiLoading()" (click)="onManualScan()">
-        @if (geminiLoading()) {
-          <span class="manual-scan-spinner" aria-hidden="true"></span>
-        } @else {
-          {{ 'scanner.manualScanButton' | translate }}
-        }
-      </button>
-    }
+  @if (status() === 'scanning' && hasGeminiKey() === false) {
+    <div class="gemini-key-hint">
+      <p>{{ 'scanner.noGeminiKeyHint' | translate }}</p>
+      <a routerLink="/settings/gemini">{{ 'scanner.goToSettings' | translate }}</a>
+    </div>
   }
 
   @if (toast(); as t) {
@@ -129,17 +142,8 @@
       }
 
       <div class="match-form">
-        <div class="quantity-control">
-          <button type="button" (click)="decreaseQuantity()" aria-label="-">−</button>
-          <span>{{ quantity() }}</span>
-          <button type="button" (click)="increaseQuantity()" aria-label="+">+</button>
-        </div>
-
-        @if (card.game === 'mtg') {
-          <label class="checkbox-label">
-            <input type="checkbox" [ngModel]="foil()" (ngModelChange)="foil.set($event)" />
-            {{ 'scanner.foil' | translate }}
-          </label>
+        @if (autoAddArmed()) {
+          <p class="auto-add-hint">{{ 'scanner.autoAddHint' | translate }}</p>
         }
 
         @if (addError()) {
@@ -153,6 +157,10 @@
           {{ 'scanner.keepScanning' | translate }}
         </button>
       </div>
+
+      @if (autoAddArmed()) {
+        <div class="auto-add-progress" aria-hidden="true"></div>
+      }
     </div>
   }
 }
