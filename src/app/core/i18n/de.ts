@@ -291,6 +291,9 @@ export const de = {
     geminiErrorTitle: '⚠️ Gemini-Fehler',
     geminiErrorFallback: 'Gemini-Erkennung fehlgeschlagen — Details siehe Konsole',
     goToSettings: 'Zu den Einstellungen',
+    tesseractFallbackTitle: '📝 Basis-Modus aktiv',
+    tesseractFallbackMessage:
+      'Gemini war mehrfach nicht erreichbar — der Scanner nutzt vorübergehend die lokale Texterkennung.',
   },
   demoScanBlocked: {
     title: 'Scanner im Demo-Modus gesperrt',

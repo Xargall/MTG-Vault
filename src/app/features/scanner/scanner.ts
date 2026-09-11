@@ -200,6 +200,14 @@ const LIMIT_TOAST_DURATION_MS = 6000;
 const RATE_LIMIT_PAUSE_MS = 5000;
 const RATE_LIMIT_RETRY_DELAY_MS = 1000;
 
+// Gemini alone already recognizes ~97% of scans, so Tesseract stays idle by
+// default (no worker spun up, no CPU spent on a redundant local pass) -
+// it's only woken up once Gemini has failed this many gate-triggered
+// attempts in a row within the current session (unreachable, rate-limited,
+// or genuinely misread), and goes back to sleep as soon as Gemini succeeds
+// again. See geminiFailureStreak/tesseractFallbackActive().
+const GEMINI_FAILURE_STREAK_FOR_TESSERACT_FALLBACK = 5;
+
 // How long a matched card sits in the panel before it's added automatically -
 // long enough to glance at the result and tap "keep scanning" if it's wrong,
 // short enough to keep a stack of cards moving (this plus AUTO_RESUME_DELAY_MS
@@ -276,6 +284,15 @@ export class Scanner {
   private autoAddTimeout: ReturnType<typeof setTimeout> | null = null;
   private isScanning = false;
   private noMatchStreak = 0;
+  // Consecutive gate-triggered Gemini attempts (autoGeminiScan) that ended
+  // without a match - drives tesseractFallbackActive(). Reset to 0 on the
+  // next Gemini success, not on a Tesseract-sourced match, so the fallback
+  // stays engaged for as long as Gemini itself keeps failing.
+  private geminiFailureStreak = 0;
+  // "Basis-Modus aktiv" toast, shown once per session the moment the
+  // fallback first engages - same one-shot pattern as limitWarningShown/
+  // geminiErrorShown below.
+  private tesseractFallbackToastShown = false;
   // Tick-to-tick baseline for the Gemini trigger gate (see GATE_* constants
   // above) - reset whenever the frame stream restarts (camera switch) or a
   // card finishes its cycle (keepScanning), so a stale comparison from
@@ -528,7 +545,11 @@ export class Scanner {
       // this streak-based toast as its only feedback.
       if (matched) {
         this.noMatchStreak = 0;
-      } else if (this.gameService.currentSlug() !== 'mtg') {
+      } else if (this.gameService.currentSlug() !== 'mtg' && this.tesseractFallbackActive()) {
+        // Only meaningful while Tesseract's whole-frame pass is actually the
+        // one running each tick (see analyzeFrame) - during normal
+        // Gemini-only operation there's no per-tick local read to have
+        // failed, so this streak would otherwise fire on every single tick.
         this.noMatchStreak++;
         if (this.noMatchStreak >= NO_MATCH_STREAK_FOR_TOAST) {
           this.showToast(this.translate.instant('scanner.notRecognized'), 'warning', FAILURE_TOAST_DURATION_MS);
@@ -554,6 +575,21 @@ export class Scanner {
     }
   }
 
+  /**
+   * True when Tesseract is allowed to spend CPU on a per-tick local pass:
+   * either there's no Gemini key configured at all (updateGeminiGate's own
+   * guard means autoGeminiScan - and so geminiFailureStreak - would never
+   * even run for these users, so Tesseract has to be their only detector,
+   * exactly as before this fallback existed), or Gemini has a key but has
+   * failed enough gate-triggered attempts in a row this session - see
+   * GEMINI_FAILURE_STREAK_FOR_TESSERACT_FALLBACK.
+   */
+  private tesseractFallbackActive(): boolean {
+    return (
+      this.hasGeminiKey() === false || this.geminiFailureStreak >= GEMINI_FAILURE_STREAK_FOR_TESSERACT_FALLBACK
+    );
+  }
+
   private async analyzeFrame(videoEl: HTMLVideoElement): Promise<boolean> {
     // MTG no longer OCRs the whole frame at all - only its own cropped
     // set-code/collector-number corner (see handleMtgFrame), so it branches
@@ -561,6 +597,11 @@ export class Scanner {
     if (this.gameService.currentSlug() === 'mtg') {
       return this.handleMtgFrame(videoEl);
     }
+
+    // Tesseract stays idle until Gemini has proven unreliable this session -
+    // gate-triggered Gemini (via updateGeminiGate above) is the only active
+    // path otherwise.
+    if (!this.tesseractFallbackActive()) return false;
 
     // Yu-Gi-Oh and Pokémon: whole-frame OCR feeding the name-only lookup -
     // neither has MTG's structured Scryfall set-code/collector-number
@@ -583,11 +624,13 @@ export class Scanner {
   }
 
   /**
-   * MTG's own crop-based Tesseract pass, run on every tick regardless of the
-   * Gemini gate below - it's cheap, local, and often confirms a match before
-   * Gemini's rate-limited call would even have fired.
+   * MTG's own crop-based Tesseract pass - only runs once tesseractFallbackActive()
+   * (Gemini has failed enough gate-triggered attempts in a row this session);
+   * otherwise the gate-triggered Gemini call below is the only detection path.
    */
   private async handleMtgFrame(videoEl: HTMLVideoElement): Promise<boolean> {
+    if (!this.tesseractFallbackActive()) return false;
+
     const result = await this.tryTesseractPath(videoEl);
 
     const confirmed = this.confirmMtgCard(result);
@@ -668,7 +711,26 @@ export class Scanner {
     this.geminiInFlight = true;
     try {
       const result = await this.tryGeminiPath(videoEl);
-      if (result) this.onMatch({ card: result.card, confidence: 1 }, result);
+      if (result) {
+        // A live Gemini success is the only thing that proves it's working
+        // again - a Tesseract-sourced match during the fallback window
+        // deliberately does NOT reset this, so the fallback stays engaged
+        // for as long as Gemini itself keeps failing.
+        this.geminiFailureStreak = 0;
+        this.tesseractFallbackToastShown = false;
+        this.onMatch({ card: result.card, confidence: 1 }, result);
+      } else {
+        this.geminiFailureStreak++;
+        if (this.tesseractFallbackActive() && !this.tesseractFallbackToastShown) {
+          this.tesseractFallbackToastShown = true;
+          this.showToast(
+            this.translate.instant('scanner.tesseractFallbackMessage'),
+            'warning',
+            LIMIT_TOAST_DURATION_MS,
+            this.translate.instant('scanner.tesseractFallbackTitle'),
+          );
+        }
+      }
     } finally {
       this.geminiInFlight = false;
     }

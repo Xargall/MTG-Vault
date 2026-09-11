@@ -293,6 +293,9 @@ export const en: typeof de = {
     geminiErrorTitle: '⚠️ Gemini error',
     geminiErrorFallback: 'Gemini recognition failed — see console for details',
     goToSettings: 'Go to Settings',
+    tesseractFallbackTitle: '📝 Basic mode active',
+    tesseractFallbackMessage:
+      'Gemini was unreachable several times in a row — the scanner is temporarily using local text recognition instead.',
   },
   demoScanBlocked: {
     title: 'Scanner locked in demo mode',

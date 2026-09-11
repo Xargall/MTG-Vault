@@ -14,6 +14,14 @@ const MIN_CALL_INTERVAL_MS = 10000;
 // scanner already uses for Scryfall's rate limit (see ScryfallRateLimitError
 // handling in scanner.ts).
 const RATE_LIMIT_COOLDOWN_MS = 15000;
+// WebKit/iOS has a documented history in this project of fetch calls to
+// Supabase Edge Functions occasionally hanging indefinitely instead of
+// erroring out (see the scryfall-proxy investigation) - without a bound,
+// such a stall here would leave `geminiInFlight` stuck true forever and the
+// scanner would silently never try Gemini again for the rest of the
+// session. The SDK's own `timeout` option (a client-side AbortController)
+// guarantees this call always settles one way or another.
+const REQUEST_TIMEOUT_MS = 15000;
 
 /**
  * Thin client for the `gemini-ocr` Supabase Edge Function. The Gemini API
@@ -43,7 +51,7 @@ export class GeminiVisionService {
 
     const { data, error } = await this.supabase.client.functions.invoke<{ text?: string; error?: string }>(
       'gemini-ocr',
-      { body: { imageBase64, game } },
+      { body: { imageBase64, game }, timeout: REQUEST_TIMEOUT_MS },
     );
     if (error) {
       if (error instanceof FunctionsHttpError && error.context?.status === 429) {
