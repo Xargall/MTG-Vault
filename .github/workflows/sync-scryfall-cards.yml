@@ -8,8 +8,8 @@ name: Sync scryfall_cards
 
 on:
   schedule:
-    # Daily at 04:00 UTC.
-    - cron: '0 4 * * *'
+    # Daily at 02:00 UTC.
+    - cron: '0 2 * * *'
   workflow_dispatch: {}
 
 jobs:
