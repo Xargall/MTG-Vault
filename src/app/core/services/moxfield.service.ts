@@ -3,6 +3,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { AverageDeckCard } from './edhrec.service';
 import { SupabaseService } from './supabase.service';
+import { RequestQueue } from '../utils/request-queue';
 
 // Same reasoning as EdhrecService's own cooldown - a 403 from the proxy
 // means Moxfield itself blocked the outbound request (bot/hotlink
@@ -10,6 +11,15 @@ import { SupabaseService } from './supabase.service';
 // one query, so every Moxfield call pauses for a while rather than
 // hammering it with more requests that would just 403 again too.
 const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
+
+// Moxfield's own stated condition for handing out a user-agent at all: at
+// most 1 request/second, or the IP gets firewalled and the user-agent
+// revoked - unlike Scryfall's 10/sec, this leaves no margin for the
+// existing HUB_PROBE_BATCH_SIZE/DECK_FETCH_BATCH_SIZE concurrent batches
+// below to fire at once, so every actual network call funnels through this
+// one queue (see invoke()) regardless of how many the caller kicks off
+// together.
+const MOXFIELD_MIN_DELAY_MS = 1000;
 
 // Moxfield's own format slugs, exactly as they appear in a real deck's
 // "format" field (confirmed live: "modern") - not guessed, but the other
@@ -104,6 +114,7 @@ interface MoxfieldDeckResponse {
 export class MoxfieldService {
   private readonly supabase = inject(SupabaseService);
 
+  private readonly queue = new RequestQueue(MOXFIELD_MIN_DELAY_MS);
   private rateLimitedUntil = 0;
 
   private readonly hubsCache = new Map<string, Promise<MoxfieldHub[]>>();
@@ -218,8 +229,15 @@ export class MoxfieldService {
     return this.invoke<MoxfieldDeckResponse>({ mode: 'deck', deckId });
   }
 
+  // Every caller (loadArchetypeHubs/loadAverageDeck) kicks off its own
+  // Promise.all batch of several of these at once - the queue is what
+  // actually turns that into a strictly serialized, ≥1s-apart stream of
+  // real network calls, so those batch sizes stay about local concurrency
+  // of bookkeeping, not actual request pacing.
   private async invoke<T>(body: Record<string, unknown>): Promise<T> {
-    const { data, error } = await this.supabase.client.functions.invoke<T>('moxfield-proxy', { body });
+    const { data, error } = await this.queue.add(() =>
+      this.supabase.client.functions.invoke<T>('moxfield-proxy', { body }),
+    );
     if (error) {
       if (error instanceof FunctionsHttpError && error.context?.status === 403) {
         this.rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
