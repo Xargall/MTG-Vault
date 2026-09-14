@@ -236,11 +236,21 @@ export const en: typeof de = {
     title: 'Format Deck Recommendations',
     hint: "Pick a format - the most-liked real community decks get checked against your collection, including what's already planned in other decks.",
     formatStandard: 'Standard',
+    formatStandardDescription:
+      'A rotating format using only the newest sets from roughly the last 2 years - cheap to get into, but the card pool keeps changing.',
     formatPioneer: 'Pioneer',
+    formatPioneerDescription: 'Non-rotating, every set since Return to Ravnica (2012) - a stable card pool at a moderate power level.',
     formatModern: 'Modern',
+    formatModernDescription:
+      'Non-rotating, every set since the 8th Edition core set (2003) - one of the most popular competitive formats.',
     formatLegacy: 'Legacy',
+    formatLegacyDescription:
+      'Non-rotating, almost the entire history of Magic is legal - high power level, including the original dual lands.',
     formatVintage: 'Vintage',
+    formatVintageDescription:
+      "Almost no restrictions - even the infamous Power Nine are legal (mostly limited to 1 copy/restricted). The highest power level there is.",
     formatPauper: 'Pauper',
+    formatPauperDescription: 'Only common-rarity cards are legal - cheap to build, with its own distinct metagame.',
     backToFormats: '← Different format',
     backToList: '← Back to list',
     scanningHubs: 'Searching popular decks…',

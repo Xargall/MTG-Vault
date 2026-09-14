@@ -136,6 +136,10 @@
         {{ 'formatRecs.backToFormats' | translate }}
       </button>
 
+      @if (selectedFormatDescriptionKey(); as descriptionKey) {
+        <p class="format-description">{{ descriptionKey | translate }}</p>
+      }
+
       @if (errorMessage()) {
         <p class="state-message error">{{ errorMessage() }}</p>
       } @else {

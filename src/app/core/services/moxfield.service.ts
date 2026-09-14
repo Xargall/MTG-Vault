@@ -60,13 +60,13 @@ function writeMoxfieldCache<T>(key: string, data: Record<string, T>): void {
 // "format" field (confirmed live: "modern") - not guessed, but the other
 // five follow the same obvious pattern and haven't all been individually
 // re-verified.
-export const MOXFIELD_FORMATS: readonly { slug: string; labelKey: string }[] = [
-  { slug: 'standard', labelKey: 'formatRecs.formatStandard' },
-  { slug: 'pioneer', labelKey: 'formatRecs.formatPioneer' },
-  { slug: 'modern', labelKey: 'formatRecs.formatModern' },
-  { slug: 'legacy', labelKey: 'formatRecs.formatLegacy' },
-  { slug: 'vintage', labelKey: 'formatRecs.formatVintage' },
-  { slug: 'pauper', labelKey: 'formatRecs.formatPauper' },
+export const MOXFIELD_FORMATS: readonly { slug: string; labelKey: string; descriptionKey: string }[] = [
+  { slug: 'standard', labelKey: 'formatRecs.formatStandard', descriptionKey: 'formatRecs.formatStandardDescription' },
+  { slug: 'pioneer', labelKey: 'formatRecs.formatPioneer', descriptionKey: 'formatRecs.formatPioneerDescription' },
+  { slug: 'modern', labelKey: 'formatRecs.formatModern', descriptionKey: 'formatRecs.formatModernDescription' },
+  { slug: 'legacy', labelKey: 'formatRecs.formatLegacy', descriptionKey: 'formatRecs.formatLegacyDescription' },
+  { slug: 'vintage', labelKey: 'formatRecs.formatVintage', descriptionKey: 'formatRecs.formatVintageDescription' },
+  { slug: 'pauper', labelKey: 'formatRecs.formatPauper', descriptionKey: 'formatRecs.formatPauperDescription' },
 ];
 
 // How many of a format's most-liked decks to offer as recommendations.

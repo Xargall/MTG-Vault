@@ -8,6 +8,16 @@
   gap: var(--spacing-sm);
 }
 
+.format-description {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius);
+  background: var(--color-surface-alt);
+  border-left: 3px solid var(--color-accent);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
 .format-button {
   padding: var(--spacing-md);
   border-radius: var(--radius);

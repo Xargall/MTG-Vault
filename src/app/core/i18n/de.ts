@@ -234,11 +234,22 @@ export const de = {
     title: 'Format-Deck-Empfehlungen',
     hint: 'Wähle ein Format - die beliebtesten echten Community-Decks werden gegen deine Sammlung geprüft, inklusive was schon in anderen Decks verplant ist.',
     formatStandard: 'Standard',
+    formatStandardDescription:
+      'Rotierendes Format mit nur den neuesten Sets der letzten ~2 Jahre - günstiger Einstieg, aber der Kartenpool ändert sich laufend.',
     formatPioneer: 'Pioneer',
+    formatPioneerDescription:
+      'Nicht-rotierend, alle Sets seit Return to Ravnica (2012) - stabiler Kartenpool mit moderatem Powerlevel.',
     formatModern: 'Modern',
+    formatModernDescription:
+      'Nicht-rotierend, alle Sets seit dem 8th-Edition-Grundset (2003) - eines der beliebtesten kompetitiven Formate.',
     formatLegacy: 'Legacy',
+    formatLegacyDescription:
+      'Nicht-rotierend, fast die komplette Kartengeschichte erlaubt - hohes Powerlevel, inklusive der Original-Duallands.',
     formatVintage: 'Vintage',
+    formatVintageDescription:
+      'Kaum Einschränkungen - selbst die berüchtigten Power Nine sind erlaubt (meist nur 1 Exemplar/restricted). Das höchste Powerlevel überhaupt.',
     formatPauper: 'Pauper',
+    formatPauperDescription: 'Nur Karten der Seltenheit "Common" sind erlaubt - günstig, mit eigenem, sehr eigenständigem Metagame.',
     backToFormats: '← Anderes Format',
     backToList: '← Zurück zur Liste',
     scanningHubs: 'Suche beliebte Decks…',

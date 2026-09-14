@@ -68,6 +68,12 @@ export class FormatDeckRecommendationsDialog {
   // null = format picker shown; set once the user chooses one, cleared by
   // backToFormats().
   protected readonly selectedFormat = signal<string | null>(null);
+  // Short "what even is this format" blurb shown above the recommendations,
+  // since the format names alone (Modern, Legacy, ...) don't tell a reader
+  // what's actually different about them.
+  protected readonly selectedFormatDescriptionKey = computed(
+    () => this.formats.find((format) => format.slug === this.selectedFormat())?.descriptionKey ?? null,
+  );
 
   protected readonly loading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
