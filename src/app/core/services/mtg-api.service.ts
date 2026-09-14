@@ -506,8 +506,8 @@ export class MtgApiService implements CardApiService {
    * which doesn't apply to a Postgres query at all.
    */
   async getCardsByNames(names: string[], _lowPriority = false): Promise<Card[]> {
-    const rows = await this.queryScryfallCards('name', names);
-    return this.dedupeRowsByName(rows).map((row) => this.rowToCard(row));
+    const rows = await this.queryScryfallCardsByName(names);
+    return rows.map((row) => this.rowToCard(row));
   }
 
   async getPrints(name: string): Promise<Card[]> {
@@ -528,6 +528,32 @@ export class MtgApiService implements CardApiService {
       const { data, error } = await this.supabase.client.from('scryfall_cards').select('*').in(column, batch);
       if (error) {
         console.warn(`scryfall_cards ${column} batch failed, skipping ${batch.length} row(s):`, error);
+        continue;
+      }
+      rows.push(...((data ?? []) as ScryfallCardRow[]));
+    }
+    return rows;
+  }
+
+  /**
+   * Exact-name lookup, one row per name - unlike queryScryfallCards('name', ...),
+   * which used to feed a plain `.in('name', batch)` matching *every printing*
+   * of each name. A basic land alone (Plains: 900+ printings) blew straight
+   * past PostgREST's 1000-row response cap on its own, silently truncating
+   * whatever rarer names in the same batch sorted after it - live-confirmed
+   * on a real deck's card list, where the exact set of names lost this way
+   * changed from one call to the next. Calls the scryfall_cards_by_name SQL
+   * function (021_scryfall_cards_by_name_fn.sql), which does the "one row
+   * per name" reduction inside Postgres, so the result is bounded by the
+   * number of names requested rather than by their combined printing count.
+   */
+  private async queryScryfallCardsByName(names: string[]): Promise<ScryfallCardRow[]> {
+    const rows: ScryfallCardRow[] = [];
+    for (let i = 0; i < names.length; i += POSTGRES_BATCH_SIZE) {
+      const batch = names.slice(i, i + POSTGRES_BATCH_SIZE);
+      const { data, error } = await this.supabase.client.rpc('scryfall_cards_by_name', { names: batch });
+      if (error) {
+        console.warn(`scryfall_cards_by_name batch failed, skipping ${batch.length} name(s):`, error);
         continue;
       }
       rows.push(...((data ?? []) as ScryfallCardRow[]));
