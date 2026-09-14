@@ -298,8 +298,16 @@ export interface AverageDeckSplit {
  * MoxfieldService's per-hub aggregation) against the user's collection and
  * other decks - the shared detail-view logic behind both
  * CommanderRecommendationsDialog and FormatDeckRecommendationsDialog. Splits
- * every card three ways: free to use as-is, fully owned but committed to
- * another deck, or not owned in sufficient quantity at all.
+ * every card's *quantity* three ways - free to use as-is, committed to
+ * another deck, or not owned at all - which, for a partially-owned card
+ * (need 3, own 1), means the same card can land in more than one bucket at
+ * once (1 owned/assigned + 2 missing), not just one or the other. A binary
+ * per-card classification used to dump a partially-owned card entirely into
+ * "missing" - live-confirmed case: owning 1 of a needed 3 showed as 0 owned,
+ * 3 missing instead of the correct 1 owned, 2 missing, which also quietly
+ * undercounted the detail view's own owned/free totals (they're summed from
+ * these same buckets) below what the list view's badges already showed for
+ * the identical deck.
  */
 export function splitAverageDeckByAvailability(
   deckCards: AverageDeckCard[],
@@ -335,29 +343,36 @@ export function splitAverageDeckByAvailability(
     const ownedQty = oracleQty + (ownedByName.get(name.toLowerCase()) ?? 0);
     const substitute = findSubstitute(card, quantity, collectionEntries);
 
-    if (getCardOwnedStatus(quantity, ownedQty) !== 'owned') {
-      missing.push({ card, quantity, ownedQty, substitute });
-      continue;
-    }
-
-    // Fully owned overall - but is it actually *free*, or is some/all of it
-    // already committed to another deck? Oracle-based match catches any
-    // assigned printing of the same card; the exact card_id match
-    // additionally covers the (rare) case where a legacy row with no
-    // recorded oracle_id is the one that's assigned.
+    // Oracle-based match catches any assigned printing of the same card; the
+    // exact card_id match additionally covers the (rare) case where a
+    // legacy row with no recorded oracle_id is the one that's assigned.
     const assignedQty = getOwnedQuantity({ cardId: card.id, oracleId: card.oracleId }, assignedByCardId, assignedByOracle);
-    const available = Math.max(0, ownedQty - assignedQty);
-    if (available >= quantity) {
-      owned.push({ card, quantity, ownedQty, substitute });
-    } else {
+    const availableQty = Math.max(0, ownedQty - assignedQty);
+
+    // How many of the needed copies we actually have at all (never more than
+    // what's needed - extra owned copies beyond `quantity` aren't this
+    // card's business), how many of *those* are free vs already committed
+    // elsewhere, and how many more are needed on top of what's owned.
+    const coveredQty = Math.min(quantity, ownedQty);
+    const freeQty = Math.min(coveredQty, availableQty);
+    const assignedCoveredQty = coveredQty - freeQty;
+    const missingQty = quantity - coveredQty;
+
+    if (freeQty > 0) {
+      owned.push({ card, quantity: freeQty, ownedQty, substitute });
+    }
+    if (assignedCoveredQty > 0) {
       assignedElsewhere.push({
         card,
-        quantity,
+        quantity: assignedCoveredQty,
         ownedQty,
         substitute,
-        available,
+        available: availableQty,
         assignedElsewhere: getAssignedElsewhereDecks({ cardId: card.id, oracleId: card.oracleId }, allDecks, ''),
       });
+    }
+    if (missingQty > 0) {
+      missing.push({ card, quantity: missingQty, ownedQty, substitute });
     }
   }
 
@@ -367,6 +382,23 @@ export function splitAverageDeckByAvailability(
   unresolved.sort((a, b) => a.name.localeCompare(b.name));
 
   return { owned, assignedElsewhere, missing, unresolved };
+}
+
+/**
+ * Merges a card's quantities back into one row per card id, summing them -
+ * needed before inserting into deck_cards (unique on deck_id+card_id) since
+ * splitAverageDeckByAvailability's per-card split (see its own doc comment)
+ * can now legitimately put the *same* card into more than one bucket at
+ * once (e.g. 1 owned + 2 missing for a card needed 3x but owned 1x), which
+ * addDeck() flattens back into a single cards list before calling
+ * DeckService.addArchetypeDeck.
+ */
+export function mergeCardQuantities(entries: Array<{ card: Card; quantity: number }>): Array<{ cardId: string; quantity: number }> {
+  const byId = new Map<string, number>();
+  for (const { card, quantity } of entries) {
+    byId.set(card.id, (byId.get(card.id) ?? 0) + quantity);
+  }
+  return [...byId.entries()].map(([cardId, quantity]) => ({ cardId, quantity }));
 }
 
 /** A deck card the user owns under a *different* printing than the one the deck actually lists - e.g. the deck calls for Sol Ring (Fallout #285) but the collection only has Sol Ring (MSH #142). Null when the exact printing is already owned in sufficient quantity (nothing to substitute) or no oracle match exists at all. */

@@ -19,8 +19,8 @@ import {
   AverageDeckAssignedCardMatch,
   AverageDeckCardMatch,
   UnresolvedAverageDeckCard,
-  getMissingQuantity,
   getPreciseAverageDeckMatch,
+  mergeCardQuantities,
   splitAverageDeckByAvailability,
 } from '../deck-stats';
 import { DeckEntry, DeckService } from '../deck.service';
@@ -116,9 +116,11 @@ export class FormatDeckRecommendationsDialog {
   protected readonly assignedElsewhereQuantityTotal = computed(() =>
     this.assignedElsewhereCards().reduce((sum, c) => sum + c.quantity, 0),
   );
+  // missingCards' own quantity is already the shortfall (splitAverageDeckByAvailability
+  // computes it per card, not the card's full needed amount) - see its own doc comment.
   protected readonly missingQuantityTotal = computed(
     () =>
-      this.missingCards().reduce((sum, c) => sum + getMissingQuantity(c.quantity, c.ownedQty), 0) +
+      this.missingCards().reduce((sum, c) => sum + c.quantity, 0) +
       this.unresolvedCards().reduce((sum, c) => sum + c.quantity, 0),
   );
   private readonly totalQuantityNeeded = computed(
@@ -270,9 +272,7 @@ export class FormatDeckRecommendationsDialog {
     this.addingDeck.set(true);
     this.addDeckError.set(null);
     try {
-      const cards = [...this.ownedCards(), ...this.assignedElsewhereCards(), ...this.missingCards()].map(
-        ({ card, quantity }) => ({ cardId: card.id, quantity }),
-      );
+      const cards = mergeCardQuantities([...this.ownedCards(), ...this.assignedElsewhereCards(), ...this.missingCards()]);
       await this.deckService.addArchetypeDeck(rec.name, format, cards);
       this.deckAdded.set(true);
       this.added.emit();
@@ -295,11 +295,11 @@ export class FormatDeckRecommendationsDialog {
       const existing = await this.wishlistService.getCardIds();
       const inputs: UpsertWishlistInput[] = this.missingCards()
         .filter(({ card }) => !existing.has(card.id))
-        .map(({ card, quantity, ownedQty }) => ({
+        .map(({ card, quantity }) => ({
           cardId: card.id,
           priority: 2,
           notes: this.translate.instant('common.forDeck', { name: rec.name }),
-          quantity: getMissingQuantity(quantity, ownedQty),
+          quantity,
         }));
 
       if (inputs.length > 0) {
