@@ -1,24 +1,20 @@
 // Server-side proxy for Moxfield's unofficial deck-search JSON API
-// (api2.moxfield.com) - same shape/reasoning as edhrec-proxy: a bare
-// server-to-server request gets Cloudflare-blocked, so this attaches a real
-// browser's User-Agent/Accept/Referer/Origin, matching what a visit to
-// moxfield.com itself would send.
+// (api2.moxfield.com). Moxfield granted us a real, dedicated User-Agent
+// (conditional on: unsupported/undocumented use, data stays free, <=1
+// req/sec, and the UA string itself stays secret - see
+// ~/.claude/plans/crispy-gathering-wand.md). It's read from the
+// MOXFIELD_USER_AGENT Edge Function secret, never hardcoded/committed.
 //
 // Deploy: supabase functions deploy moxfield-proxy
-//
-// SPIKE NOTE: this endpoint and its response shape are reverse-engineered
-// (no official Moxfield API/docs exist) - see
-// ~/.claude/plans/crispy-gathering-wand.md. Only wired up far enough to
-// verify the real response shape live; MoxfieldService and everything
-// downstream of it comes next, once that's confirmed.
+// Set secret: supabase secrets set MOXFIELD_USER_AGENT="..."
 
 import { corsHeaders as sdkCorsHeaders } from 'npm:@supabase/supabase-js@2.112.4/cors';
 
 const MOXFIELD_BASE = 'https://api2.moxfield.com';
 const MOXFIELD_TIMEOUT_MS = 15000;
+const MOXFIELD_USER_AGENT = Deno.env.get('MOXFIELD_USER_AGENT');
 const MOXFIELD_FETCH_HEADERS = {
-  'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'User-Agent': MOXFIELD_USER_AGENT ?? '',
   Accept: 'application/json',
   Referer: 'https://www.moxfield.com/',
   Origin: 'https://www.moxfield.com',
@@ -58,6 +54,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (!MOXFIELD_USER_AGENT) {
+    return jsonResponse({ error: 'MOXFIELD_USER_AGENT secret ist nicht konfiguriert' }, 500);
   }
 
   try {
