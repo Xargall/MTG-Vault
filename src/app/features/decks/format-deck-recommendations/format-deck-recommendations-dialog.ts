@@ -19,10 +19,8 @@ import {
   AverageDeckAssignedCardMatch,
   AverageDeckCardMatch,
   UnresolvedAverageDeckCard,
-  buildAssignedElsewhereByNameMap,
-  buildPlainOwnedByNameMap,
-  getAverageDeckMatch,
   getMissingQuantity,
+  getPreciseAverageDeckMatch,
   splitAverageDeckByAvailability,
 } from '../deck-stats';
 import { DeckEntry, DeckService } from '../deck.service';
@@ -170,10 +168,6 @@ export class FormatDeckRecommendationsDialog {
       const collection = allCollection.filter((entry) => entry.card.game === 'mtg');
       this.collectionEntries.set(collection);
       this.allDecks.set(allDecks);
-      // Same bulk-scan reasoning as CommanderRecommendationsDialog.load() -
-      // plain name matching only, no oracle_id resolution per candidate.
-      const ownedByName = buildPlainOwnedByNameMap(collection);
-      const assignedElsewhereByName = buildAssignedElsewhereByNameMap(allDecks);
 
       this.scanPhase.set('listing');
       this.checked.set(0);
@@ -190,10 +184,13 @@ export class FormatDeckRecommendationsDialog {
         const batchResults = await Promise.all(
           batch.map(async (deck) => {
             const deckCards = await this.moxfield.getDeckCards(deck.publicId).catch(() => []);
-            const { matchedCount, totalCount, freeMatchedCount } = getAverageDeckMatch(
+            const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name)).catch(() => []);
+            const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
+            const { matchedCount, totalCount, freeMatchedCount } = getPreciseAverageDeckMatch(
               deckCards,
-              ownedByName,
-              assignedElsewhereByName,
+              cardsByName,
+              collection,
+              allDecks,
             );
             const matchPercent = totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0;
             const freeMatchPercent = totalCount > 0 ? Math.round((freeMatchedCount / totalCount) * 100) : 0;

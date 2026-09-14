@@ -200,21 +200,10 @@ export function getAssignedElsewhereDecks(
 
 // --- Average-decklist matching (Feature 3): resolving a computed
 // {name, quantity} decklist - EDHREC's own precomputed Commander average, or
-// MoxfieldService's client-side aggregation for 60-card formats - against
-// the user's collection and other decks. Name-keyed throughout (not
-// oracle_id), matching the bulk-scan performance reasoning below. ---
+// MoxfieldService's per-deck real decklist for 60-card formats - against the
+// user's collection and other decks. ---
 
-/** Every collection row counted by name, regardless of oracle_id - for a *bulk* scan across many candidate average-decklists at once (e.g. CommanderRecommendationsDialog.load()'s per-color-identity pass, or an analogous per-hub pass for 60-card formats), which deliberately does *not* resolve each card's oracle_id - doing that for hundreds of names across dozens of candidates at once used to hammer Scryfall and trigger 429s. See buildOwnedByNameMap below for the oracle-aware variant used once a single recommendation is actually opened. */
-export function buildPlainOwnedByNameMap(entries: CollectionEntry[]): Map<string, number> {
-  const owned = new Map<string, number>();
-  for (const { row, card } of entries) {
-    const key = card.name.toLowerCase();
-    owned.set(key, (owned.get(key) ?? 0) + row.quantity);
-  }
-  return owned;
-}
-
-/** Keyed by name, but only from rows with no recorded oracle_id - a row that has one is already covered by the oracle-keyed buildOwnedOracleMap above, so leaving it out here keeps the two maps disjoint and safely summable. Used once a single recommendation's detail view is open, which (unlike the bulk scan above) already resolves full Card objects (oracleId included). */
+/** Keyed by name, but only from rows with no recorded oracle_id - a row that has one is already covered by the oracle-keyed buildOwnedOracleMap above, so leaving it out here keeps the two maps disjoint and safely summable. */
 export function buildOwnedByNameMap(entries: CollectionEntry[]): Map<string, number> {
   const owned = new Map<string, number>();
   for (const { row, card } of entries) {
@@ -225,19 +214,6 @@ export function buildOwnedByNameMap(entries: CollectionEntry[]): Map<string, num
   return owned;
 }
 
-/** Name-keyed sum of every is_assigned deck_card quantity across ALL of the user's decks - the bulk-scan counterpart to buildAssignedElsewhereMaps above. No "current deck" to exclude here (none of them can be the not-yet-created recommended deck, same reasoning as that function's null-currentDeckId case), and kept name-keyed rather than oracle_id-keyed to match buildPlainOwnedByNameMap's own bulk-scan matching. */
-export function buildAssignedElsewhereByNameMap(allDecks: DeckEntry[]): Map<string, number> {
-  const assigned = new Map<string, number>();
-  for (const deckEntry of allDecks) {
-    for (const { row, card } of deckEntry.cards) {
-      if (!row.is_assigned) continue;
-      const key = card.name.toLowerCase();
-      assigned.set(key, (assigned.get(key) ?? 0) + row.quantity);
-    }
-  }
-  return assigned;
-}
-
 export interface AverageDeckMatch {
   /** Plain ownership match - includes copies already committed to other decks. */
   matchedCount: number;
@@ -246,22 +222,45 @@ export interface AverageDeckMatch {
   freeMatchedCount: number;
 }
 
-/** Bulk-scan match against a computed average decklist (see buildPlainOwnedByNameMap) - drives a recommendation list's dual free/total % badges before the user opens any single one. */
-export function getAverageDeckMatch(
+/**
+ * Oracle-precise match against a computed average decklist - the exact same
+ * per-card ownership/assignment math as splitAverageDeckByAvailability
+ * below, just summed into counts instead of built into display arrays. Used
+ * for a recommendation *list's* dual free/total % badges, same as
+ * splitAverageDeckByAvailability is for the detail view once a single one
+ * is opened - they used to run on two different algorithms (this one a
+ * cheap plain-name bulk scan, no oracle_id resolution, to avoid hundreds of
+ * per-candidate Scryfall calls). Now that card resolution goes through our
+ * own indexed/RPC-backed scryfall_cards table instead of hitting Scryfall
+ * directly, that cost concern is gone - and the two algorithms disagreeing
+ * (a list badge saying 8% free, its own detail view saying 0%) was exactly
+ * the kind of "the numbers don't add up" confusion reported live. Same
+ * formula everywhere now, so a list badge and its own detail view can never
+ * show different numbers for the same deck again.
+ */
+export function getPreciseAverageDeckMatch(
   deckCards: AverageDeckCard[],
-  ownedByName: Map<string, number>,
-  assignedElsewhereByName: Map<string, number>,
+  cardsByName: Map<string, Card>,
+  collectionEntries: CollectionEntry[],
+  allDecks: DeckEntry[],
 ): AverageDeckMatch {
+  const ownedByName = buildOwnedByNameMap(collectionEntries);
+  const ownedByOracle = buildOwnedOracleMap(collectionEntries);
+  const { byCardId: assignedByCardId, byOracleId: assignedByOracle } = buildAssignedElsewhereMaps(allDecks, null);
+
   let matched = 0;
   let freeMatched = 0;
   let total = 0;
   for (const { name, quantity } of deckCards) {
     total += quantity;
-    const key = name.toLowerCase();
-    const ownedQty = ownedByName.get(key) ?? 0;
+    const card = cardsByName.get(name.toLowerCase());
+    if (!card) continue; // unresolved - counts toward total above, contributes nothing else (see UnresolvedAverageDeckCard)
+
+    const oracleQty = card.oracleId ? (ownedByOracle.get(card.oracleId) ?? 0) : 0;
+    const ownedQty = oracleQty + (ownedByName.get(name.toLowerCase()) ?? 0);
     matched += Math.min(quantity, ownedQty);
 
-    const assignedQty = assignedElsewhereByName.get(key) ?? 0;
+    const assignedQty = getOwnedQuantity({ cardId: card.id, oracleId: card.oracleId }, assignedByCardId, assignedByOracle);
     const availableQty = Math.max(0, ownedQty - assignedQty);
     freeMatched += Math.min(quantity, availableQty);
   }

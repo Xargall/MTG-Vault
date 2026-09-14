@@ -19,10 +19,8 @@ import {
   AverageDeckAssignedCardMatch,
   AverageDeckCardMatch,
   UnresolvedAverageDeckCard,
-  buildAssignedElsewhereByNameMap,
-  buildPlainOwnedByNameMap,
-  getAverageDeckMatch,
   getMissingQuantity,
+  getPreciseAverageDeckMatch,
   splitAverageDeckByAvailability,
 } from '../deck-stats';
 import { DeckEntry, DeckService } from '../deck.service';
@@ -178,18 +176,6 @@ export class CommanderRecommendationsDialog {
       const collection = allCollection.filter((entry) => entry.card.game === 'mtg');
       this.collectionEntries.set(collection);
       this.allDecks.set(allDecks);
-      // Plain name matching for the bulk scan below (not oracle-aware) -
-      // resolving oracle_id for every card across every candidate's average
-      // decklist at once used to fire far too many Scryfall lookups
-      // concurrently and trigger 429s. The oracle-aware match still happens
-      // once the user actually opens a single commander - see
-      // selectRecommendation(), which already has full Card objects (and
-      // their oracleId) for free at that point.
-      const ownedByName = buildPlainOwnedByNameMap(collection);
-      // Free of any charge, network-wise - allDecks is already loaded above,
-      // and this stays name-keyed (see its own doc comment) so it lines up
-      // with ownedByName's name-only matching in the bulk scan below.
-      const assignedElsewhereByName = buildAssignedElsewhereByNameMap(allDecks);
 
       const ownedCommanders = dedupeByCardName(
         collection.filter(({ card }) => card.game === 'mtg' && isLegendaryCreature(card.typeLine)),
@@ -265,10 +251,13 @@ export class CommanderRecommendationsDialog {
         const batchResults = await Promise.all(
           batch.map(async (candidate) => {
             const deckCards = await this.edhrec.getAverageDeck(candidate.name).catch(() => []);
-            const { matchedCount, totalCount, freeMatchedCount } = getAverageDeckMatch(
+            const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name)).catch(() => []);
+            const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
+            const { matchedCount, totalCount, freeMatchedCount } = getPreciseAverageDeckMatch(
               deckCards,
-              ownedByName,
-              assignedElsewhereByName,
+              cardsByName,
+              collection,
+              allDecks,
             );
             const matchPercent = totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0;
             const freeMatchPercent = totalCount > 0 ? Math.round((freeMatchedCount / totalCount) * 100) : 0;
