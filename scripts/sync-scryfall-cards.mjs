@@ -104,6 +104,26 @@ async function upsertBatch(batch) {
   }
 }
 
+// A batch that fails outright used to fail the whole run (skippedBatches > 0
+// below) - confirmed live on a run where the actual cause was a transient
+// 504 from PostgREST, not bad data, and the exact same batch would very
+// likely have gone through a few seconds later. Retry before giving up.
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 2000;
+
+async function upsertBatchWithRetry(batch) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      await upsertBatch(batch);
+      return;
+    } catch (error) {
+      if (attempt === MAX_ATTEMPTS) throw error;
+      console.error(`Batch of ${batch.length} failed (attempt ${attempt}/${MAX_ATTEMPTS}), retrying:`, error.message);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+    }
+  }
+}
+
 async function main() {
   console.log('Fetching bulk-data listing...');
   const infoResponse = await fetch(BULK_DATA_ENDPOINT, { headers: { 'User-Agent': USER_AGENT } });
@@ -132,7 +152,7 @@ async function main() {
   const flush = async () => {
     if (batch.length === 0) return;
     try {
-      await upsertBatch(batch);
+      await upsertBatchWithRetry(batch);
       total += batch.length;
     } catch (error) {
       console.error(`Batch of ${batch.length} failed, skipping:`, error.message);
