@@ -18,6 +18,7 @@ import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.se
 import {
   AverageDeckAssignedCardMatch,
   AverageDeckCardMatch,
+  UnresolvedAverageDeckCard,
   buildAssignedElsewhereByNameMap,
   buildPlainOwnedByNameMap,
   getAverageDeckMatch,
@@ -97,6 +98,16 @@ export class FormatDeckRecommendationsDialog {
   protected readonly ownedCards = signal<AverageDeckCardMatch[]>([]);
   protected readonly assignedElsewhereCards = signal<AverageDeckAssignedCardMatch[]>([]);
   protected readonly missingCards = signal<AverageDeckCardMatch[]>([]);
+  // Deck cards whose name never resolved to a real Card - still counted
+  // below (see AverageDeckSplit's own doc comment), just with no tile to
+  // render, so the percentages/totals always add up to the deck's real size
+  // instead of quietly shrinking.
+  protected readonly unresolvedCards = signal<UnresolvedAverageDeckCard[]>([]);
+  protected readonly unresolvedCardsLabel = computed(() =>
+    this.unresolvedCards()
+      .map((c) => `${c.quantity}x ${c.name}`)
+      .join(', ') || null,
+  );
 
   protected readonly ownedQuantityTotal = computed(() =>
     [...this.ownedCards(), ...this.assignedElsewhereCards()].reduce((sum, c) => sum + c.quantity, 0),
@@ -107,11 +118,16 @@ export class FormatDeckRecommendationsDialog {
   protected readonly assignedElsewhereQuantityTotal = computed(() =>
     this.assignedElsewhereCards().reduce((sum, c) => sum + c.quantity, 0),
   );
-  protected readonly missingQuantityTotal = computed(() =>
-    this.missingCards().reduce((sum, c) => sum + getMissingQuantity(c.quantity, c.ownedQty), 0),
+  protected readonly missingQuantityTotal = computed(
+    () =>
+      this.missingCards().reduce((sum, c) => sum + getMissingQuantity(c.quantity, c.ownedQty), 0) +
+      this.unresolvedCards().reduce((sum, c) => sum + c.quantity, 0),
   );
   private readonly totalQuantityNeeded = computed(
-    () => this.ownedQuantityTotal() + this.missingCards().reduce((sum, c) => sum + c.quantity, 0),
+    () =>
+      this.ownedQuantityTotal() +
+      this.missingCards().reduce((sum, c) => sum + c.quantity, 0) +
+      this.unresolvedCards().reduce((sum, c) => sum + c.quantity, 0),
   );
 
   protected readonly detailMatchPercent = computed(() => {
@@ -213,6 +229,7 @@ export class FormatDeckRecommendationsDialog {
     this.ownedCards.set([]);
     this.assignedElsewhereCards.set([]);
     this.missingCards.set([]);
+    this.unresolvedCards.set([]);
 
     this.loadingDetail.set(true);
     try {
@@ -220,7 +237,7 @@ export class FormatDeckRecommendationsDialog {
       const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name));
       const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
 
-      const { owned, assignedElsewhere, missing } = splitAverageDeckByAvailability(
+      const { owned, assignedElsewhere, missing, unresolved } = splitAverageDeckByAvailability(
         deckCards,
         cardsByName,
         this.collectionEntries(),
@@ -229,6 +246,7 @@ export class FormatDeckRecommendationsDialog {
       this.ownedCards.set(owned);
       this.assignedElsewhereCards.set(assignedElsewhere);
       this.missingCards.set(missing);
+      this.unresolvedCards.set(unresolved);
     } catch (error) {
       this.detailError.set(
         error instanceof Error ? error.message : this.translate.instant('formatRecs.detailFailed'),

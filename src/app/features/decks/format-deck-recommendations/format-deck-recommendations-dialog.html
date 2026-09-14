@@ -91,13 +91,19 @@
             </div>
           }
 
-          @if (missingCards().length > 0) {
+          @if (missingCards().length > 0 || unresolvedCards().length > 0) {
             <h4>{{ 'commanderRecs.missingSection' | translate: { count: missingQuantityTotal() } }}</h4>
             <div class="results-grid">
               @for (entry of missingCards(); track entry.card.id) {
                 <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="missing" />
               }
             </div>
+
+            @if (unresolvedCardsLabel(); as label) {
+              <p class="unresolved-note">
+                {{ 'deckDetail.unresolvedCards' | translate: { count: unresolvedCards().length, names: label } }}
+              </p>
+            }
 
             <div class="wishlist-row">
               <span>{{ 'deckDetail.missingCards' | translate: { count: missingQuantityTotal() } }}</span>

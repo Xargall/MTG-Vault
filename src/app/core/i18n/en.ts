@@ -193,6 +193,7 @@ export const en: typeof de = {
   },
   deckDetail: {
     missingCards: '{{count}} cards still missing from your collection.',
+    unresolvedCards: "{{count}} card(s) couldn't be automatically matched (counted as missing, but shown without an image): {{names}}",
     onWishlist: 'On the wishlist ✓',
     wishlistButton: 'Add missing cards to wishlist',
     containedCards: 'Cards in this deck',

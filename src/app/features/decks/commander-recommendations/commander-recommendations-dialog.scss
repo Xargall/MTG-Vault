@@ -294,6 +294,13 @@
   padding-left: 10px;
 }
 
+.unresolved-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 .wishlist-row {
   display: flex;
   flex-wrap: wrap;

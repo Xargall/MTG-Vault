@@ -191,6 +191,8 @@ export const de = {
   },
   deckDetail: {
     missingCards: '{{count}} Karten fehlen noch in der Sammlung.',
+    unresolvedCards:
+      '{{count}} Karte(n) konnten nicht automatisch zugeordnet werden (zählen als fehlend, aber ohne Bild): {{names}}',
     onWishlist: 'Auf der Wunschliste ✓',
     wishlistButton: 'Fehlende Karten auf Wunschliste',
     containedCards: 'Enthaltene Karten',

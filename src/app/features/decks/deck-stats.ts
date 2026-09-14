@@ -281,10 +281,17 @@ export interface AverageDeckAssignedCardMatch extends AverageDeckCardMatch {
   assignedElsewhere: AssignedElsewhereEntry[];
 }
 
+/** A deck card whose name never resolved to a real Card via the card API (unusual punctuation, a double-faced card's face-only name, a spelling Moxfield/EDHREC stores differently than our own data, ...) - still counted toward totals/percentages (see AverageDeckSplit's callers), just with no Card to render a tile for. */
+export interface UnresolvedAverageDeckCard {
+  name: string;
+  quantity: number;
+}
+
 export interface AverageDeckSplit {
   owned: AverageDeckCardMatch[];
   assignedElsewhere: AverageDeckAssignedCardMatch[];
   missing: AverageDeckCardMatch[];
+  unresolved: UnresolvedAverageDeckCard[];
 }
 
 /**
@@ -311,10 +318,19 @@ export function splitAverageDeckByAvailability(
   const owned: AverageDeckCardMatch[] = [];
   const assignedElsewhere: AverageDeckAssignedCardMatch[] = [];
   const missing: AverageDeckCardMatch[] = [];
+  const unresolved: UnresolvedAverageDeckCard[] = [];
 
   for (const { name, quantity } of deckCards) {
     const card = cardsByName.get(name.toLowerCase());
-    if (!card) continue;
+    if (!card) {
+      // Silently dropping this card used to also drop it from every total/
+      // percentage below it - live-confirmed case: a real 60-card deck whose
+      // detail view came out to 43%/0% match on a ~49-card "total" instead
+      // of the correct 60, because ~11 cards' worth of quantity just
+      // vanished instead of counting as missing.
+      unresolved.push({ name, quantity });
+      continue;
+    }
 
     const oracleQty = card.oracleId ? (ownedByOracle.get(card.oracleId) ?? 0) : 0;
     const ownedQty = oracleQty + (ownedByName.get(name.toLowerCase()) ?? 0);
@@ -349,8 +365,9 @@ export function splitAverageDeckByAvailability(
   owned.sort((a, b) => a.card.name.localeCompare(b.card.name));
   assignedElsewhere.sort((a, b) => a.card.name.localeCompare(b.card.name));
   missing.sort((a, b) => a.card.name.localeCompare(b.card.name));
+  unresolved.sort((a, b) => a.name.localeCompare(b.name));
 
-  return { owned, assignedElsewhere, missing };
+  return { owned, assignedElsewhere, missing, unresolved };
 }
 
 /** A deck card the user owns under a *different* printing than the one the deck actually lists - e.g. the deck calls for Sol Ring (Fallout #285) but the collection only has Sol Ring (MSH #142). Null when the exact printing is already owned in sufficient quantity (nothing to substitute) or no oracle match exists at all. */
