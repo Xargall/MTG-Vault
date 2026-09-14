@@ -207,6 +207,7 @@ export const en: typeof de = {
     bindingDetailsTitle: 'Details',
     substituteNote: 'Replaces {{name}} ({{print}})',
     substituteOwnedNote: 'your copy: {{name}} from {{print}}',
+    substitutePrintTag: 'substitute printing',
     assignedElsewhereNote: 'Already assigned to "{{deckName}}"',
     availableNote: 'Available: {{available}} of {{needed}}',
     releaseButton: '🔓 Release',

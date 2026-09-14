@@ -206,6 +206,7 @@ export const de = {
     bindingDetailsTitle: 'Details',
     substituteNote: 'Ersetzt {{name}} ({{print}})',
     substituteOwnedNote: 'deine Version: {{name}} aus {{print}}',
+    substitutePrintTag: 'Ersatzdruck',
     assignedElsewhereNote: 'Bereits in „{{deckName}}" verplant',
     availableNote: 'Verfügbar: {{available}} von {{needed}}',
     releaseButton: '🔓 Freigeben',

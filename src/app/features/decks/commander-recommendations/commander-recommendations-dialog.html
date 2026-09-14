@@ -36,17 +36,11 @@
               @for (entry of ownedCards(); track entry.card.id) {
                 <div class="card-with-note">
                   <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
-                  @if (entry.substitute; as substitute) {
+                  @if (hasNotablePrintBreakdown(entry.printBreakdown)) {
                     <div class="binding-detail-notes">
-                      <span class="binding-detail-note">
-                        {{ 'deckDetail.substituteNote' | translate: { name: entry.card.name, print: printLabel(entry.card) } }}
-                      </span>
-                      <span class="binding-detail-subnote">
-                        {{
-                          'deckDetail.substituteOwnedNote'
-                            | translate: { name: substitute.card.name, print: printLabel(substitute.card) }
-                        }}
-                      </span>
+                      @for (print of entry.printBreakdown; track print.card.id) {
+                        <span class="binding-detail-note">{{ printBreakdownLabel(print) }}</span>
+                      }
                     </div>
                   }
                 </div>
@@ -61,16 +55,10 @@
                 <div class="card-with-note">
                   <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
                   <div class="binding-detail-notes">
-                    @if (entry.substitute; as substitute) {
-                      <span class="binding-detail-note">
-                        {{ 'deckDetail.substituteNote' | translate: { name: entry.card.name, print: printLabel(entry.card) } }}
-                      </span>
-                      <span class="binding-detail-subnote">
-                        {{
-                          'deckDetail.substituteOwnedNote'
-                            | translate: { name: substitute.card.name, print: printLabel(substitute.card) }
-                        }}
-                      </span>
+                    @if (hasNotablePrintBreakdown(entry.printBreakdown)) {
+                      @for (print of entry.printBreakdown; track print.card.id) {
+                        <span class="binding-detail-note">{{ printBreakdownLabel(print) }}</span>
+                      }
                     }
 
                     @for (assigned of entry.assignedElsewhere; track assigned.deckId) {

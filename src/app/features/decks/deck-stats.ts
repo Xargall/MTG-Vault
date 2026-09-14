@@ -267,11 +267,19 @@ export function getPreciseAverageDeckMatch(
   return { matchedCount: matched, totalCount: total, freeMatchedCount: freeMatched };
 }
 
+/** One printing's contribution to a deck card's shown quantity - the exact printing the deck lists, or a substitute (same card, different print) the user owns instead. */
+export interface PrintQuantity {
+  card: Card;
+  quantity: number;
+  isExactPrint: boolean;
+}
+
 export interface AverageDeckCardMatch {
   card: Card;
   quantity: number;
   ownedQty: number;
-  substitute: CollectionEntry | null;
+  /** Which specific printing(s) the shown `quantity` is actually made up of, exact print first - see getPrintBreakdown. Answers "are these N copies all the exact printing, all a substitute, or a mix" instead of a single "here's *a* substitute you have" note that didn't say how many of the total it covered. Reflects total ownership (capped at what's relevant to this card), not a *per-bucket* breakdown - a specific physical copy being "the one" committed elsewhere vs free isn't something the data model tracks (assignment is oracle/card-id aggregate, not per print), so the same breakdown is attached wherever this card appears (owned and/or assignedElsewhere) rather than inventing a false per-bucket split. */
+  printBreakdown: PrintQuantity[];
 }
 
 /** A "free" card, further split out of AverageDeckCardMatch's owned bucket - fully owned, but some/all copies are already `is_assigned` to one of the user's *other* decks. Display-only: unlike DeckDetailDialog, a recommendation preview offers no "Freigeben" action - releasing a commitment still happens from the deck it's actually assigned to. */
@@ -341,7 +349,6 @@ export function splitAverageDeckByAvailability(
 
     const oracleQty = card.oracleId ? (ownedByOracle.get(card.oracleId) ?? 0) : 0;
     const ownedQty = oracleQty + (ownedByName.get(name.toLowerCase()) ?? 0);
-    const substitute = findSubstitute(card, quantity, collectionEntries);
 
     // Oracle-based match catches any assigned printing of the same card; the
     // exact card_id match additionally covers the (rare) case where a
@@ -358,21 +365,28 @@ export function splitAverageDeckByAvailability(
     const assignedCoveredQty = coveredQty - freeQty;
     const missingQty = quantity - coveredQty;
 
+    // Which printing(s) make up coveredQty, exact print first - see
+    // getPrintBreakdown's own doc comment for why this is shared across
+    // owned/assignedElsewhere rather than split per bucket. Missing doesn't
+    // get one: missingQty is, by construction, copies of *any* printing the
+    // user doesn't have - there's no print to name for those.
+    const printBreakdown = coveredQty > 0 ? getPrintBreakdown(card, collectionEntries, coveredQty) : [];
+
     if (freeQty > 0) {
-      owned.push({ card, quantity: freeQty, ownedQty, substitute });
+      owned.push({ card, quantity: freeQty, ownedQty, printBreakdown });
     }
     if (assignedCoveredQty > 0) {
       assignedElsewhere.push({
         card,
         quantity: assignedCoveredQty,
         ownedQty,
-        substitute,
+        printBreakdown,
         available: availableQty,
         assignedElsewhere: getAssignedElsewhereDecks({ cardId: card.id, oracleId: card.oracleId }, allDecks, ''),
       });
     }
     if (missingQty > 0) {
-      missing.push({ card, quantity: missingQty, ownedQty, substitute });
+      missing.push({ card, quantity: missingQty, ownedQty, printBreakdown: [] });
     }
   }
 
@@ -399,6 +413,52 @@ export function mergeCardQuantities(entries: Array<{ card: Card; quantity: numbe
     byId.set(card.id, (byId.get(card.id) ?? 0) + quantity);
   }
   return [...byId.entries()].map(([cardId, quantity]) => ({ cardId, quantity }));
+}
+
+/**
+ * Breaks a card's ownership down by specific printing - the exact printing
+ * the deck lists, plus any other printing owned under the same oracle_id
+ * (a "substitute"), sorted exact-first then by quantity. Stops once `cap`
+ * copies are accounted for (see splitAverageDeckByAvailability, which caps
+ * at coveredQty - extra owned copies beyond what this card actually needs
+ * aren't this breakdown's business). Replaces the old findSubstitute below
+ * (still used by DeckDetailDialog's own, differently-shaped binding-detail
+ * view) for the two recommendation dialogs - that one only ever named *one*
+ * substitute printing and never said how many of the shown quantity it
+ * actually covered, live-confirmed as confusing once a card could show a
+ * double-digit quantity potentially spread across several printings.
+ */
+export function getPrintBreakdown(
+  deckCard: { id: string; oracleId: string | null },
+  collectionEntries: CollectionEntry[],
+  cap: number,
+): PrintQuantity[] {
+  const byPrint = new Map<string, { card: Card; quantity: number }>();
+  for (const entry of collectionEntries) {
+    const isExactPrint = entry.card.id === deckCard.id;
+    const isSamePrintFamily = deckCard.oracleId !== null && entry.row.oracle_id === deckCard.oracleId;
+    if (!isExactPrint && !isSamePrintFamily) continue;
+    const existing = byPrint.get(entry.card.id);
+    if (existing) existing.quantity += entry.row.quantity;
+    else byPrint.set(entry.card.id, { card: entry.card, quantity: entry.row.quantity });
+  }
+
+  const sorted = [...byPrint.values()].sort((a, b) => {
+    const aExact = a.card.id === deckCard.id ? 1 : 0;
+    const bExact = b.card.id === deckCard.id ? 1 : 0;
+    return bExact - aExact || b.quantity - a.quantity;
+  });
+
+  const result: PrintQuantity[] = [];
+  let remaining = cap;
+  for (const print of sorted) {
+    if (remaining <= 0) break;
+    const take = Math.min(print.quantity, remaining);
+    if (take <= 0) continue;
+    result.push({ card: print.card, quantity: take, isExactPrint: print.card.id === deckCard.id });
+    remaining -= take;
+  }
+  return result;
 }
 
 /** A deck card the user owns under a *different* printing than the one the deck actually lists - e.g. the deck calls for Sol Ring (Fallout #285) but the collection only has Sol Ring (MSH #142). Null when the exact printing is already owned in sufficient quantity (nothing to substitute) or no oracle match exists at all. */

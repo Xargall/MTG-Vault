@@ -18,6 +18,7 @@ import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.se
 import {
   AverageDeckAssignedCardMatch,
   AverageDeckCardMatch,
+  PrintQuantity,
   UnresolvedAverageDeckCard,
   getPreciseAverageDeckMatch,
   mergeCardQuantities,
@@ -332,6 +333,16 @@ export class CommanderRecommendationsDialog {
   /** "MSH #142" style short print label for the substitute callout - same as DeckDetailDialog.printLabel. */
   protected printLabel(card: Card): string {
     return card.game === 'mtg' ? `${card.setCode.toUpperCase()} #${card.collectorNumber}` : card.name;
+  }
+
+  /** Whether a card's printBreakdown is worth rendering at all - a single, exact-print entry means "all of it is the exact printing", the unremarkable default case with nothing to say. */
+  protected hasNotablePrintBreakdown(breakdown: PrintQuantity[]): boolean {
+    return breakdown.length > 1 || (breakdown.length === 1 && !breakdown[0].isExactPrint);
+  }
+
+  protected printBreakdownLabel(print: PrintQuantity): string {
+    const label = `${print.quantity}x ${this.printLabel(print.card)}`;
+    return print.isExactPrint ? label : `${label} (${this.translate.instant('deckDetail.substitutePrintTag')})`;
   }
 
   async addDeck() {
