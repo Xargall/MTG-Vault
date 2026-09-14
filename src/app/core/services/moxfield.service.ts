@@ -21,6 +21,42 @@ const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
 // together.
 const MOXFIELD_MIN_DELAY_MS = 1000;
 
+// Archetype hub rankings and their computed average decklists barely move
+// day to day, and every scan burns real budget against the 1 req/sec limit
+// above - persisted in localStorage for 24h (same pattern/TTL as
+// EdhrecService's commander-lists/salt caches) so re-opening the dialog, or
+// just reloading the page, doesn't repeat the same ~150-request scan.
+const MOXFIELD_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const HUBS_CACHE_KEY = 'mtg-vault-moxfield-hubs';
+const AVERAGE_DECKS_CACHE_KEY = 'mtg-vault-moxfield-average-decks';
+
+interface MoxfieldCacheEntry<T> {
+  data: Record<string, T>;
+  timestamp: number;
+}
+
+function readMoxfieldCache<T>(key: string): Record<string, T> {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return {};
+    const { data, timestamp } = JSON.parse(raw) as MoxfieldCacheEntry<T>;
+    if (Date.now() - timestamp >= MOXFIELD_CACHE_TTL_MS) return {};
+    return data;
+  } catch {
+    return {};
+  }
+}
+
+function writeMoxfieldCache<T>(key: string, data: Record<string, T>): void {
+  try {
+    const entry: MoxfieldCacheEntry<T> = { data, timestamp: Date.now() };
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch {
+    // Storage full/unavailable (private browsing) - not fatal, just means
+    // the next session fetches fresh instead of from cache.
+  }
+}
+
 // Moxfield's own format slugs, exactly as they appear in a real deck's
 // "format" field (confirmed live: "modern") - not guessed, but the other
 // five follow the same obvious pattern and haven't all been individually
@@ -119,19 +155,33 @@ export class MoxfieldService {
 
   private readonly hubsCache = new Map<string, Promise<MoxfieldHub[]>>();
   private readonly averageDeckCache = new Map<string, Promise<AverageDeckCard[]>>();
+  // Lazily read once per app load, then kept in sync as scans resolve -
+  // avoids re-parsing localStorage on every candidate hub/format lookup.
+  private hubsDiskCache: Record<string, MoxfieldHub[]> | null = null;
+  private averageDeckDiskCache: Record<string, AverageDeckCard[]> | null = null;
 
   /**
    * Live-verified candidate hubs for one format, sorted by how many decks
-   * carry that tag - cached per format for 24h (in-memory only, unlike
-   * EdhrecService's identity lists, since this doesn't need to survive a
-   * reload the way a 32-fixed-identity scan does).
+   * carry that tag - cached both in-memory and in localStorage for 24h (see
+   * HUBS_CACHE_KEY), since this barely changes day to day and a full scan
+   * costs one request per candidate hub name.
    */
   getArchetypeHubs(format: string): Promise<MoxfieldHub[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
+    this.hubsDiskCache ??= readMoxfieldCache<MoxfieldHub[]>(HUBS_CACHE_KEY);
+    const fromDisk = this.hubsDiskCache[format];
+    if (fromDisk) return Promise.resolve(fromDisk);
+
     let cached = this.hubsCache.get(format);
     if (!cached) {
-      cached = this.loadArchetypeHubs(format);
+      cached = this.loadArchetypeHubs(format).then((hubs) => {
+        if (hubs.length > 0 && this.hubsDiskCache) {
+          this.hubsDiskCache[format] = hubs;
+          writeMoxfieldCache(HUBS_CACHE_KEY, this.hubsDiskCache);
+        }
+        return hubs;
+      });
       this.hubsCache.set(format, cached);
     }
     return cached;
@@ -159,15 +209,28 @@ export class MoxfieldService {
    * shape as EdhrecService.getAverageDeck, so it plugs into the exact same
    * matching code in deck-stats.ts (splitAverageDeckByAvailability,
    * getAverageDeckMatch) without either of them knowing which source it
-   * came from.
+   * came from. Cached both in-memory and in localStorage for 24h (see
+   * AVERAGE_DECKS_CACHE_KEY) - by far the most expensive call here (1 search
+   * + up to SAMPLE_DECK_COUNT full deck fetches), and the one most worth
+   * saving a repeat of.
    */
   getAverageDeck(format: string, hubName: string): Promise<AverageDeckCard[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
     const key = `${format}:${hubName}`;
+    this.averageDeckDiskCache ??= readMoxfieldCache<AverageDeckCard[]>(AVERAGE_DECKS_CACHE_KEY);
+    const fromDisk = this.averageDeckDiskCache[key];
+    if (fromDisk) return Promise.resolve(fromDisk);
+
     let cached = this.averageDeckCache.get(key);
     if (!cached) {
-      cached = this.loadAverageDeck(format, hubName);
+      cached = this.loadAverageDeck(format, hubName).then((deckCards) => {
+        if (deckCards.length > 0 && this.averageDeckDiskCache) {
+          this.averageDeckDiskCache[key] = deckCards;
+          writeMoxfieldCache(AVERAGE_DECKS_CACHE_KEY, this.averageDeckDiskCache);
+        }
+        return deckCards;
+      });
       this.averageDeckCache.set(key, cached);
     }
     return cached;
