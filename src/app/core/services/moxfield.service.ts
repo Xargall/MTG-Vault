@@ -14,21 +14,20 @@ const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
 
 // Moxfield's own stated condition for handing out a user-agent at all: at
 // most 1 request/second, or the IP gets firewalled and the user-agent
-// revoked - unlike Scryfall's 10/sec, this leaves no margin for the
-// existing HUB_PROBE_BATCH_SIZE/DECK_FETCH_BATCH_SIZE concurrent batches
-// below to fire at once, so every actual network call funnels through this
-// one queue (see invoke()) regardless of how many the caller kicks off
+// revoked - unlike Scryfall's 10/sec, this leaves no margin for callers to
+// fire several deck fetches concurrently, so every actual network call
+// funnels through this one queue (see invoke()) regardless of how many the
+// caller (see FormatDeckRecommendationsDialog's own batching) kicks off
 // together.
 const MOXFIELD_MIN_DELAY_MS = 1000;
 
-// Archetype hub rankings and their computed average decklists barely move
-// day to day, and every scan burns real budget against the 1 req/sec limit
-// above - persisted in localStorage for 24h (same pattern/TTL as
-// EdhrecService's commander-lists/salt caches) so re-opening the dialog, or
-// just reloading the page, doesn't repeat the same ~150-request scan.
+// A format's top-liked decks barely change day to day, and every full list
+// burns real budget against the 1 req/sec limit above - persisted in
+// localStorage for 24h (same pattern/TTL as EdhrecService's commander-lists/
+// salt caches) so re-opening the dialog, or just reloading the page, doesn't
+// repeat the same ~25-request fetch.
 const MOXFIELD_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const HUBS_CACHE_KEY = 'mtg-vault-moxfield-hubs';
-const AVERAGE_DECKS_CACHE_KEY = 'mtg-vault-moxfield-average-decks';
+const TOP_DECKS_CACHE_KEY = 'mtg-vault-moxfield-top-decks';
 
 interface MoxfieldCacheEntry<T> {
   data: Record<string, T>;
@@ -70,55 +69,19 @@ export const MOXFIELD_FORMATS: readonly { slug: string; labelKey: string }[] = [
   { slug: 'pauper', labelKey: 'formatRecs.formatPauper' },
 ];
 
-// Moxfield has no endpoint that lists valid hub (archetype tag) names - this
-// is a hand-picked, deliberately generic starter set that shows up
-// throughout constructed Magic, live-verified per format in
-// getArchetypeHubs (see MIN_HUB_DECK_COUNT) rather than trusted blindly, so
-// a name that doesn't apply to a given format (e.g. "Tron" in Standard)
-// simply never surfaces as an empty bucket.
-const CANDIDATE_HUB_NAMES = [
-  'Aggro',
-  'Control',
-  'Midrange',
-  'Combo',
-  'Tempo',
-  'Tokens',
-  'Reanimator',
-  'Affinity',
-  'Burn',
-  'Tron',
-  'Ramp',
-  'Artifacts',
-  'Storm',
-  'Lifegain',
-  'Mill',
-  'Sacrifice',
-  'Spellslinger',
-  'Stax',
-] as const;
+// How many of a format's most-liked decks to offer as recommendations.
+const TOP_DECK_COUNT = 24;
 
-const MIN_HUB_DECK_COUNT = 15;
-const HUB_PROBE_BATCH_SIZE = 6;
-// How many of a hub's top (most-liked) decks get aggregated into its
-// "average deck" - kept modest since, unlike EDHREC, Moxfield's search
-// doesn't return card lists inline: each sampled deck costs its own extra
-// full-deck fetch (see loadAverageDeck), and this same call also drives the
-// hub list's own dual free/total % badges (see FormatDeckRecommendationsDialog),
-// so it runs once per candidate hub, not just once per opened detail view.
-const SAMPLE_DECK_COUNT = 8;
-const DECK_FETCH_BATCH_SIZE = 4;
-// A card must appear in at least half the sampled decks to make the average
-// decklist - keeps one-off tech/sideboard choices out of what's presented as
-// "the" build, same spirit as EDHREC's own inclusion-rate cutoff.
-const MIN_INCLUSION_RATE = 0.5;
-
-export interface MoxfieldHub {
+export interface MoxfieldTopDeck {
+  publicId: string;
   name: string;
-  deckCount: number;
+  likeCount: number;
 }
 
 interface MoxfieldSearchItem {
   publicId: string;
+  name: string;
+  likeCount: number;
 }
 
 interface MoxfieldSearchResponse {
@@ -139,12 +102,15 @@ interface MoxfieldDeckResponse {
  * Client for the `moxfield-proxy` Supabase Edge Function - Moxfield's own
  * unofficial deck-search/deck-detail JSON API (api2.moxfield.com), used for
  * 60-card-format ("Standard"/"Modern"/...) deck recommendations the way
- * EdhrecService covers Commander. Unlike EDHREC, Moxfield has no
- * precomputed "average deck" per archetype - getAverageDeck below builds
- * one client-side by sampling the most-liked decks tagged with a given hub
- * (Moxfield's own community-assigned archetype tag) and averaging their
- * card counts. See ~/.claude/plans/crispy-gathering-wand.md for the full
- * design/research behind this.
+ * EdhrecService covers Commander. EDHREC ties its recommendations to a
+ * single unambiguous identity (the commander) and serves one precomputed
+ * average build for it; a 60-card format has no equivalent singular
+ * identity, so this instead surfaces the format's actual most-liked
+ * individual community decks, each exactly as its author built it (real
+ * names like "Temur Garden", real full decklists) - not a computed blend
+ * across many decks under a hand-picked strategy label. See
+ * ~/.claude/plans/crispy-gathering-wand.md for the full design/research
+ * behind this.
  */
 @Injectable({ providedIn: 'root' })
 export class MoxfieldService {
@@ -153,135 +119,89 @@ export class MoxfieldService {
   private readonly queue = new RequestQueue(MOXFIELD_MIN_DELAY_MS);
   private rateLimitedUntil = 0;
 
-  private readonly hubsCache = new Map<string, Promise<MoxfieldHub[]>>();
-  private readonly averageDeckCache = new Map<string, Promise<AverageDeckCard[]>>();
-  // Lazily read once per app load, then kept in sync as scans resolve -
-  // avoids re-parsing localStorage on every candidate hub/format lookup.
-  private hubsDiskCache: Record<string, MoxfieldHub[]> | null = null;
-  private averageDeckDiskCache: Record<string, AverageDeckCard[]> | null = null;
+  private readonly topDecksCache = new Map<string, Promise<MoxfieldTopDeck[]>>();
+  private readonly deckCardsCache = new Map<string, Promise<AverageDeckCard[]>>();
+  // Lazily read once per app load, then kept in sync as fetches resolve -
+  // avoids re-parsing localStorage on every format/deck lookup.
+  private topDecksDiskCache: Record<string, MoxfieldTopDeck[]> | null = null;
+  private deckCardsDiskCache: Record<string, AverageDeckCard[]> | null = null;
 
   /**
-   * Live-verified candidate hubs for one format, sorted by how many decks
-   * carry that tag - cached both in-memory and in localStorage for 24h (see
-   * HUBS_CACHE_KEY), since this barely changes day to day and a full scan
-   * costs one request per candidate hub name.
+   * The format's most-liked decks (name/likeCount only, not their card
+   * lists yet - see getDeckCards) - cached both in-memory and in
+   * localStorage for 24h (see TOP_DECKS_CACHE_KEY).
    */
-  getArchetypeHubs(format: string): Promise<MoxfieldHub[]> {
+  getTopDecks(format: string): Promise<MoxfieldTopDeck[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
-    this.hubsDiskCache ??= readMoxfieldCache<MoxfieldHub[]>(HUBS_CACHE_KEY);
-    const fromDisk = this.hubsDiskCache[format];
+    this.topDecksDiskCache ??= readMoxfieldCache<MoxfieldTopDeck[]>(TOP_DECKS_CACHE_KEY);
+    const fromDisk = this.topDecksDiskCache[format];
     if (fromDisk) return Promise.resolve(fromDisk);
 
-    let cached = this.hubsCache.get(format);
+    let cached = this.topDecksCache.get(format);
     if (!cached) {
-      cached = this.loadArchetypeHubs(format).then((hubs) => {
-        if (hubs.length > 0 && this.hubsDiskCache) {
-          this.hubsDiskCache[format] = hubs;
-          writeMoxfieldCache(HUBS_CACHE_KEY, this.hubsDiskCache);
+      cached = this.loadTopDecks(format).then((decks) => {
+        if (decks.length > 0 && this.topDecksDiskCache) {
+          this.topDecksDiskCache[format] = decks;
+          writeMoxfieldCache(TOP_DECKS_CACHE_KEY, this.topDecksDiskCache);
         }
-        return hubs;
+        return decks;
       });
-      this.hubsCache.set(format, cached);
+      this.topDecksCache.set(format, cached);
     }
     return cached;
   }
 
-  private async loadArchetypeHubs(format: string): Promise<MoxfieldHub[]> {
-    const hubs: MoxfieldHub[] = [];
-    for (let i = 0; i < CANDIDATE_HUB_NAMES.length; i += HUB_PROBE_BATCH_SIZE) {
-      const batch = CANDIDATE_HUB_NAMES.slice(i, i + HUB_PROBE_BATCH_SIZE);
-      const batchResults = await Promise.all(
-        batch.map(async (name) => {
-          // pageSize 1 - only the result count matters here, not the decks
-          // themselves.
-          const response = await this.search({ fmt: format, hubName: name, pageSize: 1 }).catch(() => null);
-          return { name, deckCount: response?.totalResults ?? 0 };
-        }),
-      );
-      hubs.push(...batchResults.filter((hub) => hub.deckCount >= MIN_HUB_DECK_COUNT));
-    }
-    return hubs.sort((a, b) => b.deckCount - a.deckCount);
+  private async loadTopDecks(format: string): Promise<MoxfieldTopDeck[]> {
+    const response = await this.search({ fmt: format, sort: 'mostLiked', pageSize: TOP_DECK_COUNT }).catch(
+      () => null,
+    );
+    return (response?.data ?? []).map((item) => ({
+      publicId: item.publicId,
+      name: item.name,
+      likeCount: item.likeCount,
+    }));
   }
 
   /**
-   * A computed "average deck" for one format+hub - same {name, quantity}
-   * shape as EdhrecService.getAverageDeck, so it plugs into the exact same
-   * matching code in deck-stats.ts (splitAverageDeckByAvailability,
+   * One deck's real, complete mainboard - same {name, quantity} shape as
+   * EdhrecService.getAverageDeck, so it plugs into the exact same matching
+   * code in deck-stats.ts (splitAverageDeckByAvailability,
    * getAverageDeckMatch) without either of them knowing which source it
    * came from. Cached both in-memory and in localStorage for 24h (see
-   * AVERAGE_DECKS_CACHE_KEY) - by far the most expensive call here (1 search
-   * + up to SAMPLE_DECK_COUNT full deck fetches), and the one most worth
-   * saving a repeat of.
+   * TOP_DECKS_CACHE_KEY's sibling below), keyed by the deck's own publicId
+   * (globally unique on Moxfield, so no format prefix needed).
    */
-  getAverageDeck(format: string, hubName: string): Promise<AverageDeckCard[]> {
+  getDeckCards(publicId: string): Promise<AverageDeckCard[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
-    const key = `${format}:${hubName}`;
-    this.averageDeckDiskCache ??= readMoxfieldCache<AverageDeckCard[]>(AVERAGE_DECKS_CACHE_KEY);
-    const fromDisk = this.averageDeckDiskCache[key];
+    this.deckCardsDiskCache ??= readMoxfieldCache<AverageDeckCard[]>(`${TOP_DECKS_CACHE_KEY}-cards`);
+    const fromDisk = this.deckCardsDiskCache[publicId];
     if (fromDisk) return Promise.resolve(fromDisk);
 
-    let cached = this.averageDeckCache.get(key);
+    let cached = this.deckCardsCache.get(publicId);
     if (!cached) {
-      cached = this.loadAverageDeck(format, hubName).then((deckCards) => {
-        if (deckCards.length > 0 && this.averageDeckDiskCache) {
-          this.averageDeckDiskCache[key] = deckCards;
-          writeMoxfieldCache(AVERAGE_DECKS_CACHE_KEY, this.averageDeckDiskCache);
+      cached = this.loadDeckCards(publicId).then((cards) => {
+        if (cards.length > 0 && this.deckCardsDiskCache) {
+          this.deckCardsDiskCache[publicId] = cards;
+          writeMoxfieldCache(`${TOP_DECKS_CACHE_KEY}-cards`, this.deckCardsDiskCache);
         }
-        return deckCards;
+        return cards;
       });
-      this.averageDeckCache.set(key, cached);
+      this.deckCardsCache.set(publicId, cached);
     }
     return cached;
   }
 
-  private async loadAverageDeck(format: string, hubName: string): Promise<AverageDeckCard[]> {
-    const searchResult = await this.search({
-      fmt: format,
-      hubName,
-      sort: 'mostLiked',
-      pageSize: SAMPLE_DECK_COUNT,
-    }).catch(() => null);
-    const deckIds = searchResult?.data.map((item) => item.publicId) ?? [];
-    if (deckIds.length === 0) return [];
-
-    const decks: MoxfieldDeckResponse[] = [];
-    for (let i = 0; i < deckIds.length; i += DECK_FETCH_BATCH_SIZE) {
-      const batch = deckIds.slice(i, i + DECK_FETCH_BATCH_SIZE);
-      const batchResults = await Promise.all(batch.map((id) => this.fetchDeck(id).catch(() => null)));
-      decks.push(...batchResults.filter((deck): deck is MoxfieldDeckResponse => deck !== null));
-    }
-    if (decks.length === 0) return [];
-
-    // How many of the sampled decks include this card at all, and the
-    // summed quantity across all of them - both needed to decide inclusion
-    // (MIN_INCLUSION_RATE) and the averaged count.
-    const deckCounts = new Map<string, number>();
-    const totalQuantities = new Map<string, number>();
-    for (const deck of decks) {
-      const mainboard = deck.boards?.['mainboard']?.cards;
-      if (!mainboard) continue;
-      for (const entry of Object.values(mainboard)) {
-        const name = entry.card.name;
-        deckCounts.set(name, (deckCounts.get(name) ?? 0) + 1);
-        totalQuantities.set(name, (totalQuantities.get(name) ?? 0) + entry.quantity);
-      }
-    }
-
-    const minDeckCount = Math.ceil(decks.length * MIN_INCLUSION_RATE);
-    const result: AverageDeckCard[] = [];
-    for (const [name, deckCount] of deckCounts) {
-      if (deckCount < minDeckCount) continue;
-      const quantity = Math.max(1, Math.round((totalQuantities.get(name) ?? 0) / decks.length));
-      result.push({ name, quantity });
-    }
-    return result;
+  private async loadDeckCards(publicId: string): Promise<AverageDeckCard[]> {
+    const deck = await this.fetchDeck(publicId).catch(() => null);
+    const mainboard = deck?.boards?.['mainboard']?.cards;
+    if (!mainboard) return [];
+    return Object.values(mainboard).map((entry) => ({ name: entry.card.name, quantity: entry.quantity }));
   }
 
   private search(params: {
     fmt: string;
-    hubName?: string;
     sort?: 'mostLiked' | 'mostViewed' | 'recent';
     pageSize: number;
   }): Promise<MoxfieldSearchResponse> {
@@ -292,11 +212,10 @@ export class MoxfieldService {
     return this.invoke<MoxfieldDeckResponse>({ mode: 'deck', deckId });
   }
 
-  // Every caller (loadArchetypeHubs/loadAverageDeck) kicks off its own
-  // Promise.all batch of several of these at once - the queue is what
-  // actually turns that into a strictly serialized, ≥1s-apart stream of
-  // real network calls, so those batch sizes stay about local concurrency
-  // of bookkeeping, not actual request pacing.
+  // getManyDeckCards kicks off its own Promise.all batch of several of
+  // these at once - the queue is what actually turns that into a strictly
+  // serialized, ≥1s-apart stream of real network calls, so that batch size
+  // stays about local concurrency of bookkeeping, not actual request pacing.
   private async invoke<T>(body: Record<string, unknown>): Promise<T> {
     const { data, error } = await this.queue.add(() =>
       this.supabase.client.functions.invoke<T>('moxfield-proxy', { body }),

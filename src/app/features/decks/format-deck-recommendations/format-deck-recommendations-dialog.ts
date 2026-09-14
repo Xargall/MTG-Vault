@@ -9,7 +9,7 @@ import {
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../../core/models/card.model';
-import { MoxfieldHub, MoxfieldService, MOXFIELD_FORMATS } from '../../../core/services/moxfield.service';
+import { MoxfieldTopDeck, MoxfieldService, MOXFIELD_FORMATS } from '../../../core/services/moxfield.service';
 import { MtgApiService } from '../../../core/services/mtg-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
@@ -27,10 +27,14 @@ import {
 import { DeckEntry, DeckService } from '../deck.service';
 
 const BATCH_SIZE = 5;
+// Defensive floor - a real Moxfield deck should always clear this, but
+// guards against a broken/partial import on Moxfield's own side (e.g. no
+// mainboard) surfacing as a technically-real but useless recommendation.
+const MIN_RECOMMENDATION_CARD_COUNT = 20;
 
-type ScanPhase = 'hubs' | 'matching';
+type ScanPhase = 'listing' | 'matching';
 
-interface HubRecommendation extends MoxfieldHub {
+interface DeckRecommendation extends MoxfieldTopDeck {
   matchPercent: number;
   matchedCount: number;
   totalCount: number;
@@ -67,10 +71,10 @@ export class FormatDeckRecommendationsDialog {
 
   protected readonly loading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
-  protected readonly scanPhase = signal<ScanPhase>('hubs');
+  protected readonly scanPhase = signal<ScanPhase>('listing');
   protected readonly checked = signal(0);
   protected readonly total = signal(0);
-  protected readonly recommendations = signal<HubRecommendation[]>([]);
+  protected readonly recommendations = signal<DeckRecommendation[]>([]);
   private readonly collectionEntries = signal<CollectionEntry[]>([]);
   private readonly allDecks = signal<DeckEntry[]>([]);
 
@@ -81,7 +85,7 @@ export class FormatDeckRecommendationsDialog {
   // Detail (single hub's computed average decklist) - shown once a
   // recommendation row is clicked, same toggle pattern as
   // CommanderRecommendationsDialog.
-  protected readonly selectedRecommendation = signal<HubRecommendation | null>(null);
+  protected readonly selectedRecommendation = signal<DeckRecommendation | null>(null);
   protected readonly loadingDetail = signal(false);
   protected readonly detailError = signal<string | null>(null);
   protected readonly ownedCards = signal<AverageDeckCardMatch[]>([]);
@@ -149,21 +153,21 @@ export class FormatDeckRecommendationsDialog {
       const ownedByName = buildPlainOwnedByNameMap(collection);
       const assignedElsewhereByName = buildAssignedElsewhereByNameMap(allDecks);
 
-      this.scanPhase.set('hubs');
+      this.scanPhase.set('listing');
       this.checked.set(0);
       this.total.set(0);
-      const hubs = await this.moxfield.getArchetypeHubs(format);
+      const topDecks = await this.moxfield.getTopDecks(format);
 
       this.scanPhase.set('matching');
       this.checked.set(0);
-      this.total.set(hubs.length);
+      this.total.set(topDecks.length);
 
-      const results: HubRecommendation[] = [];
-      for (let i = 0; i < hubs.length; i += BATCH_SIZE) {
-        const batch = hubs.slice(i, i + BATCH_SIZE);
+      const results: DeckRecommendation[] = [];
+      for (let i = 0; i < topDecks.length; i += BATCH_SIZE) {
+        const batch = topDecks.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.all(
-          batch.map(async (hub) => {
-            const deckCards = await this.moxfield.getAverageDeck(format, hub.name).catch(() => []);
+          batch.map(async (deck) => {
+            const deckCards = await this.moxfield.getDeckCards(deck.publicId).catch(() => []);
             const { matchedCount, totalCount, freeMatchedCount } = getAverageDeckMatch(
               deckCards,
               ownedByName,
@@ -171,10 +175,10 @@ export class FormatDeckRecommendationsDialog {
             );
             const matchPercent = totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0;
             const freeMatchPercent = totalCount > 0 ? Math.round((freeMatchedCount / totalCount) * 100) : 0;
-            return { ...hub, matchPercent, matchedCount, totalCount, freeMatchPercent, freeMatchedCount };
+            return { ...deck, matchPercent, matchedCount, totalCount, freeMatchPercent, freeMatchedCount };
           }),
         );
-        results.push(...batchResults.filter((result) => result.totalCount > 0));
+        results.push(...batchResults.filter((result) => result.totalCount >= MIN_RECOMMENDATION_CARD_COUNT));
         this.checked.update((value) => value + batch.length);
         // Same "buildable right now" sort as CommanderRecommendationsDialog.
         this.recommendations.set(
@@ -190,7 +194,7 @@ export class FormatDeckRecommendationsDialog {
     }
   }
 
-  async selectRecommendation(rec: HubRecommendation) {
+  async selectRecommendation(rec: DeckRecommendation) {
     const format = this.selectedFormat();
     if (!format) return;
 
@@ -206,7 +210,7 @@ export class FormatDeckRecommendationsDialog {
 
     this.loadingDetail.set(true);
     try {
-      const deckCards = await this.moxfield.getAverageDeck(format, rec.name);
+      const deckCards = await this.moxfield.getDeckCards(rec.publicId);
       const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name));
       const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
 

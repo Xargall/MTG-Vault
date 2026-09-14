@@ -141,7 +141,7 @@
       } @else {
         @if (loading()) {
           <p class="state-message">
-            @if (scanPhase() === 'hubs') {
+            @if (scanPhase() === 'listing') {
               {{ 'formatRecs.scanningHubs' | translate }}
             } @else {
               {{ 'formatRecs.checkingHubs' | translate: { progress: checked() + ' / ' + total() } }}
@@ -154,7 +154,7 @@
         }
 
         <ul class="recommendation-list">
-          @for (rec of recommendations(); track rec.name) {
+          @for (rec of recommendations(); track rec.publicId) {
             <li>
               <button type="button" class="recommendation-row" (click)="selectRecommendation(rec)">
                 <div class="commander-placeholder"></div>
