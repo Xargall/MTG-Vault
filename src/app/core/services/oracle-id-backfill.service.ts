@@ -2,15 +2,15 @@ import { Injectable, inject } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 
 import { GameService } from './game.service';
-import { MtgBulkDataService } from './mtg-bulk-data.service';
+import { MtgApiService } from './mtg-api.service';
 import { SupabaseService } from './supabase.service';
 import { ToastService } from './toast.service';
 
 const BATCH_SIZE = 50;
-// A short breather between batches - not a rate-limit concern (every
-// lookup here is local, see MtgBulkDataService.findById), just a courtesy
-// so a huge backlog on first run doesn't fire hundreds of Supabase writes
-// back-to-back in one tight loop.
+// A short breather between batches - not a rate-limit concern (every lookup
+// here is a single batched scryfall_cards query, see MtgApiService.
+// getCardsByIds), just a courtesy so a huge backlog on first run doesn't
+// fire hundreds of Supabase writes back-to-back in one tight loop.
 const BATCH_PAUSE_MS = 1000;
 
 interface LegacyRow {
@@ -23,9 +23,15 @@ interface LegacyRow {
  * oracle_id column existed (see 015_oracle_id_and_deck_binding.sql) -
  * fills them in a few at a time so deck-matching/substitution (see
  * deck-stats.ts) stops missing them, without the user having to re-scan or
- * re-add every card by hand. Resolves each row's oracle_id from the local
- * bulk-data cache (117k+ printings, already downloaded for the scanner) -
- * no Scryfall API call at all, so no rate limit to pace around. Kicked off
+ * re-add every card by hand. Resolves each row's oracle_id via
+ * MtgApiService.getCardsByIds (scryfall_cards, kept fully synced server-side
+ * by the daily sync workflow) - this used to go through MtgBulkDataService's
+ * local IndexedDB cache instead (~600MB, built for the offline scanner),
+ * which returns nothing for a card it hasn't downloaded/refreshed yet.
+ * Live-confirmed: a recently-released set's cards came back unresolved that
+ * way, and the cursor-paginated batching below (see runBatch's own comment)
+ * treats a miss as permanent for the rest of this pass - a legacy row whose
+ * only problem was cache staleness never got a second chance. Kicked off
  * once from App's constructor; entirely non-blocking, batch by batch until
  * nothing is left, then quiet until the next full page load.
  */
@@ -33,7 +39,7 @@ interface LegacyRow {
 export class OracleIdBackfillService {
   private readonly supabase = inject(SupabaseService);
   private readonly gameService = inject(GameService);
-  private readonly mtgBulkData = inject(MtgBulkDataService);
+  private readonly mtgApi = inject(MtgApiService);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
 
@@ -44,17 +50,12 @@ export class OracleIdBackfillService {
     if (this.started) return;
     this.started = true;
 
-    await Promise.all([this.supabase.ready, this.gameService.ready, this.mtgBulkData.ensureLoaded()]);
+    await Promise.all([this.supabase.ready, this.gameService.ready]);
     // Nothing to backfill for a signed-out visitor (RLS would just return
     // nothing anyway) - and oracle_id is a Scryfall/MTG-only concept (see
     // card.model.ts), so this is scoped to the MTG game id specifically,
     // never Yu-Gi-Oh/Pokémon rows (which would never resolve one).
     if (!this.supabase.session()) return;
-    // Without a warm local cache every lookup below would just return null -
-    // rather than burn through the whole backlog doing nothing, wait for a
-    // session where the cache actually loaded (see MtgBulkDataService;
-    // App's constructor already kicks its own load off independently).
-    if (!this.mtgBulkData.ready()) return;
 
     const mtgGameId = this.gameService.games().find((game) => game.slug === 'mtg')?.id;
     if (!mtgGameId) return;
@@ -65,7 +66,7 @@ export class OracleIdBackfillService {
   /**
    * Pages by `id` (keyset pagination) rather than repeatedly re-querying
    * `oracle_id IS NULL` from the top - a resolved row leaves that filtered
-   * set, but a row whose card_id isn't in the local bulk cache (e.g. a
+   * set, but a row whose card_id isn't in scryfall_cards (e.g. a
    * retired/removed print) never does. Without a cursor, once 50+ such
    * permanently-unresolvable rows exist, every batch re-fetches the exact
    * same stuck rows, resolves none of them, stays at a full BATCH_SIZE
@@ -110,18 +111,18 @@ export class OracleIdBackfillService {
       return;
     }
 
+    const resolved = await this.mtgApi.getCardsByIds(data.map((row) => row.card_id));
+    const oracleIdByCardId = new Map(resolved.map((card) => [card.id, card.oracleId]));
+
     await Promise.all(
       data.map(async (row) => {
         try {
-          // card_id is Scryfall's own print id (scryfall_id) for MTG rows -
-          // findById is a plain local IndexedDB lookup by that same key,
-          // no network call.
-          const card = await this.mtgBulkData.findById(row.card_id);
-          if (!card?.oracle_id) return;
+          const oracleId = oracleIdByCardId.get(row.card_id);
+          if (!oracleId) return;
 
           const { error: updateError } = await this.supabase.client
             .from('collection_cards')
-            .update({ oracle_id: card.oracle_id })
+            .update({ oracle_id: oracleId })
             .eq('id', row.id);
           if (!updateError) this.backfilledAny = true;
         } catch (e) {
