@@ -2,6 +2,24 @@
   <div class="dialog" (click)="$event.stopPropagation()">
     <header class="dialog-header">
       <h2>{{ 'formatRecs.title' | translate }}</h2>
+      <div class="source-toggle" role="group" aria-label="{{ 'formatRecs.sourceToggleLabel' | translate }}">
+        <button
+          type="button"
+          class="source-toggle-button"
+          [class.active]="source() === 'moxfield'"
+          (click)="selectSource('moxfield')"
+        >
+          {{ 'formatRecs.sourceMoxfield' | translate }}
+        </button>
+        <button
+          type="button"
+          class="source-toggle-button"
+          [class.active]="source() === 'mtgo'"
+          (click)="selectSource('mtgo')"
+        >
+          {{ 'formatRecs.sourceMtgo' | translate }}
+        </button>
+      </div>
       <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
     </header>
 
@@ -152,13 +170,14 @@
         }
 
         <ul class="recommendation-list">
-          @for (rec of recommendations(); track rec.publicId) {
+          @for (rec of recommendations(); track rec.id) {
             <li>
               <button type="button" class="recommendation-row" (click)="selectRecommendation(rec)">
                 <div class="commander-placeholder"></div>
 
                 <div class="recommendation-info">
                   <p class="commander-name">{{ rec.name }}</p>
+                  <p class="source-label">{{ rec.sourceLabel }}</p>
                   <p class="match-detail">
                     {{ 'commanderRecs.cardsCount' | translate: { matched: rec.matchedCount, total: rec.totalCount } }}
                   </p>

@@ -236,7 +236,7 @@ export const en: typeof de = {
   },
   formatRecs: {
     title: 'Format Deck Recommendations',
-    hint: "Pick a format - the most-liked real community decks get checked against your collection, including what's already planned in other decks.",
+    hint: "Pick a format - real decks (Moxfield: most-liked community decks, MTGO: recent tournament results) get checked against your collection, including what's already planned in other decks.",
     formatStandard: 'Standard',
     formatStandardDescription:
       'A rotating format using only the newest sets from roughly the last 2 years - cheap to get into, but the card pool keeps changing.',
@@ -253,6 +253,12 @@ export const en: typeof de = {
       "Almost no restrictions - even the infamous Power Nine are legal (mostly limited to 1 copy/restricted). The highest power level there is.",
     formatPauper: 'Pauper',
     formatPauperDescription: 'Only common-rarity cards are legal - cheap to build, with its own distinct metagame.',
+    sourceToggleLabel: 'Source',
+    sourceMoxfield: 'Moxfield',
+    sourceMtgo: 'MTGO',
+    likeCount: '{{count}} ❤',
+    mtgoFinalPlace: 'Place {{rank}}',
+    mtgoSwissPlace: 'Rank {{rank}} (Swiss)',
     backToFormats: '← Different format',
     backToList: '← Back to list',
     scanningHubs: 'Searching popular decks…',

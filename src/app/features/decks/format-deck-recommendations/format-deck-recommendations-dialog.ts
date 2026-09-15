@@ -8,8 +8,10 @@ import {
 } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { AverageDeckCard } from '../../../core/services/edhrec.service';
 import { Card } from '../../../core/models/card.model';
-import { MoxfieldTopDeck, MoxfieldService, MOXFIELD_FORMATS } from '../../../core/services/moxfield.service';
+import { MoxfieldService, MOXFIELD_FORMATS } from '../../../core/services/moxfield.service';
+import { MtgoService } from '../../../core/services/mtgo.service';
 import { MtgApiService } from '../../../core/services/mtg-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
@@ -27,14 +29,25 @@ import {
 import { DeckEntry, DeckService } from '../deck.service';
 
 const BATCH_SIZE = 5;
-// Defensive floor - a real Moxfield deck should always clear this, but
-// guards against a broken/partial import on Moxfield's own side (e.g. no
-// mainboard) surfacing as a technically-real but useless recommendation.
+// Defensive floor - a real deck from either source should always clear
+// this, but guards against a broken/partial entry (e.g. no mainboard)
+// surfacing as a technically-real but useless recommendation.
 const MIN_RECOMMENDATION_CARD_COUNT = 20;
 
 type ScanPhase = 'listing' | 'matching';
+export type FormatRecSource = 'moxfield' | 'mtgo';
 
-interface DeckRecommendation extends MoxfieldTopDeck {
+// Source-agnostic shape both MoxfieldTopDeck and MtgoTopDeck get mapped to -
+// "id" plugs into getDeckCards regardless of which service it came from,
+// "sourceLabel" is the one bit of source-specific context worth surfacing
+// (like count vs. event/placement).
+interface SourceTopDeck {
+  id: string;
+  name: string;
+  sourceLabel: string;
+}
+
+interface DeckRecommendation extends SourceTopDeck {
   matchPercent: number;
   matchedCount: number;
   totalCount: number;
@@ -57,6 +70,7 @@ export class FormatDeckRecommendationsDialog {
   private readonly collectionService = inject(CollectionService);
   private readonly mtgApi = inject(MtgApiService);
   private readonly moxfield = inject(MoxfieldService);
+  private readonly mtgo = inject(MtgoService);
   private readonly deckService = inject(DeckService);
   private readonly wishlistService = inject(WishlistService);
   private readonly translate = inject(TranslateService);
@@ -65,6 +79,7 @@ export class FormatDeckRecommendationsDialog {
   readonly added = output<void>();
 
   protected readonly formats = MOXFIELD_FORMATS;
+  protected readonly source = signal<FormatRecSource>('moxfield');
   // null = format picker shown; set once the user chooses one, cleared by
   // backToFormats().
   protected readonly selectedFormat = signal<string | null>(null);
@@ -159,6 +174,44 @@ export class FormatDeckRecommendationsDialog {
     this.errorMessage.set(null);
   }
 
+  protected selectSource(source: FormatRecSource) {
+    if (this.source() === source) return;
+    this.source.set(source);
+    this.selectedRecommendation.set(null);
+    const format = this.selectedFormat();
+    if (format) void this.load(format);
+  }
+
+  private async fetchTopDecks(format: string): Promise<SourceTopDeck[]> {
+    if (this.source() === 'mtgo') {
+      const decks = await this.mtgo.getTopDecks(format);
+      return decks.map((deck) => {
+        const placeLabel =
+          deck.rank == null
+            ? null
+            : this.translate.instant(
+                deck.rankType === 'final' ? 'formatRecs.mtgoFinalPlace' : 'formatRecs.mtgoSwissPlace',
+                { rank: deck.rank },
+              );
+        return {
+          id: deck.id,
+          name: deck.name,
+          sourceLabel: placeLabel ? `${deck.event} · ${placeLabel}` : deck.event,
+        };
+      });
+    }
+    const decks = await this.moxfield.getTopDecks(format);
+    return decks.map((deck) => ({
+      id: deck.publicId,
+      name: deck.name,
+      sourceLabel: this.translate.instant('formatRecs.likeCount', { count: deck.likeCount }),
+    }));
+  }
+
+  private fetchDeckCards(id: string): Promise<AverageDeckCard[]> {
+    return this.source() === 'mtgo' ? this.mtgo.getDeckCards(id) : this.moxfield.getDeckCards(id);
+  }
+
   private async load(format: string) {
     this.loading.set(true);
     this.errorMessage.set(null);
@@ -175,7 +228,7 @@ export class FormatDeckRecommendationsDialog {
       this.scanPhase.set('listing');
       this.checked.set(0);
       this.total.set(0);
-      const topDecks = await this.moxfield.getTopDecks(format);
+      const topDecks = await this.fetchTopDecks(format);
 
       this.scanPhase.set('matching');
       this.checked.set(0);
@@ -186,7 +239,7 @@ export class FormatDeckRecommendationsDialog {
         const batch = topDecks.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.all(
           batch.map(async (deck) => {
-            const deckCards = await this.moxfield.getDeckCards(deck.publicId).catch(() => []);
+            const deckCards = await this.fetchDeckCards(deck.id).catch(() => []);
             const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name)).catch(() => []);
             const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
             const { matchedCount, totalCount, freeMatchedCount } = getPreciseAverageDeckMatch(
@@ -233,7 +286,7 @@ export class FormatDeckRecommendationsDialog {
 
     this.loadingDetail.set(true);
     try {
-      const deckCards = await this.moxfield.getDeckCards(rec.publicId);
+      const deckCards = await this.fetchDeckCards(rec.id);
       const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name));
       const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
 

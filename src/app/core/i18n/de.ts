@@ -235,7 +235,7 @@ export const de = {
   },
   formatRecs: {
     title: 'Format-Deck-Empfehlungen',
-    hint: 'Wähle ein Format - die beliebtesten echten Community-Decks werden gegen deine Sammlung geprüft, inklusive was schon in anderen Decks verplant ist.',
+    hint: 'Wähle ein Format - echte Decks (Moxfield: beliebteste Community-Decks, MTGO: aktuelle Turnierergebnisse) werden gegen deine Sammlung geprüft, inklusive was schon in anderen Decks verplant ist.',
     formatStandard: 'Standard',
     formatStandardDescription:
       'Rotierendes Format mit nur den neuesten Sets der letzten ~2 Jahre - günstiger Einstieg, aber der Kartenpool ändert sich laufend.',
@@ -253,6 +253,12 @@ export const de = {
       'Kaum Einschränkungen - selbst die berüchtigten Power Nine sind erlaubt (meist nur 1 Exemplar/restricted). Das höchste Powerlevel überhaupt.',
     formatPauper: 'Pauper',
     formatPauperDescription: 'Nur Karten der Seltenheit "Common" sind erlaubt - günstig, mit eigenem, sehr eigenständigem Metagame.',
+    sourceToggleLabel: 'Quelle',
+    sourceMoxfield: 'Moxfield',
+    sourceMtgo: 'MTGO',
+    likeCount: '{{count}} ❤',
+    mtgoFinalPlace: '{{rank}}. Platz',
+    mtgoSwissPlace: 'Rang {{rank}} (Swiss)',
     backToFormats: '← Anderes Format',
     backToList: '← Zurück zur Liste',
     scanningHubs: 'Suche beliebte Decks…',
