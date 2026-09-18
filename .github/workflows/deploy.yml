@@ -16,6 +16,22 @@ jobs:
         with:
           node-version: 22
 
+      # src/environments/environment.ts is gitignored (see .gitignore) and
+      # only exists on developer machines - the build fails without it
+      # (confirmed live: esbuild "Could not resolve ... environment").
+      # Reconstructed here from repo secrets rather than committing it,
+      # keeping the same not-checked-in convention the local setup already
+      # uses (see src/environments/environment.example.ts).
+      - name: Write environment.ts
+        run: |
+          cat > src/environments/environment.ts <<EOF
+          export const environment = {
+            production: true,
+            supabaseUrl: '${{ secrets.SUPABASE_URL }}',
+            supabaseAnonKey: '${{ secrets.SUPABASE_ANON_KEY }}',
+          };
+          EOF
+
       - run: npm ci
       - run: npm run build
 
