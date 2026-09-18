@@ -1,9 +1,11 @@
 name: Deploy frontend
 
-# Manual-only for now, deliberately - see the dry-run note below. Once a
-# dry run has been reviewed and looks right, this gets a `push` trigger
-# and `dry-run` flips to `false` in a follow-up change.
+# Path/credentials verified via several manual dry runs first (see commit
+# history) - server-dir is "/" because the FTP account used here is itself
+# scoped to the tcg-vault directory, not the wider webspace.
 on:
+  push:
+    branches: [master]
   workflow_dispatch: {}
 
 jobs:
@@ -35,9 +37,6 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-      # dry-run: true only PRINTS what would be uploaded/deleted - it never
-      # touches the server. Flip to false only after that output has been
-      # reviewed and matches expectations.
       - uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -46,4 +45,3 @@ jobs:
           protocol: ftps
           local-dir: ./dist/MTG-Vault/browser/
           server-dir: /
-          dry-run: true
