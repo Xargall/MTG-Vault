@@ -69,6 +69,16 @@
               {{ category.label | translate }}
             </button>
           }
+          @if (hasSurplusCards()) {
+            <button
+              type="button"
+              class="filter-button filter-button--surplus"
+              [class.is-active]="showSurplusOnly()"
+              (click)="showSurplusOnly.set(!showSurplusOnly())"
+            >
+              {{ 'collection.surplusFilter' | translate }}
+            </button>
+          }
         </div>
       </section>
 
@@ -89,6 +99,9 @@
         @for (entry of visibleEntries(); track entry.row.id) {
           <button type="button" class="card-link" (click)="selectedEntry.set(entry)">
             <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" />
+            @if (getSurplus(entry); as surplus) {
+              <span class="surplus-badge">{{ 'collection.surplusBadge' | translate: { count: surplus } }}</span>
+            }
           </button>
         }
       </div>

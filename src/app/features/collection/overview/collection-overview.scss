@@ -115,6 +115,28 @@ h1 {
   }
 }
 
+.filter-button--surplus {
+  --filter-color: var(--color-danger);
+}
+
+.surplus-badge {
+  position: absolute;
+  bottom: 22px;
+  left: 6px;
+  right: 6px;
+  z-index: 1;
+  background: var(--color-danger);
+  color: var(--color-bg);
+  border-radius: var(--radius);
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .add-button,
 .scan-button {
   width: 34px;
@@ -167,6 +189,7 @@ h1 {
 }
 
 .card-link {
+  position: relative;
   display: block;
   width: 100%;
   background: transparent;

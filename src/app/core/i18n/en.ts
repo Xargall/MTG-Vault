@@ -110,6 +110,8 @@ export const en: typeof de = {
     emptyCollection: 'No cards in your collection yet. Add your first card!',
     noResults: 'No cards found.',
     oracleBackfillDone: 'Collection updated',
+    surplusFilter: '⚠ Surplus',
+    surplusBadge: '+{{count}} extra',
   },
   addCard: {
     title: 'Add Card',

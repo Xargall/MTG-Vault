@@ -108,6 +108,8 @@ export const de = {
     emptyCollection: 'Noch keine Karten in deiner Sammlung. Füge deine erste Karte hinzu!',
     noResults: 'Keine Karten gefunden.',
     oracleBackfillDone: 'Sammlung wurde aktualisiert',
+    surplusFilter: '⚠ Überschuss',
+    surplusBadge: '+{{count}} übrig',
   },
   addCard: {
     title: 'Karte hinzufügen',

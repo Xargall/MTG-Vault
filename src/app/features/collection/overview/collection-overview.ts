@@ -17,10 +17,12 @@ import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-ch
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AuthService } from '../../../core/services/auth.service';
 import { GameService } from '../../../core/services/game.service';
+import { DeckEntry, DeckService } from '../../decks/deck.service';
 import { AddCardDialog } from '../add-card/add-card-dialog';
 import { CardDetailDialog } from '../card-detail/card-detail-dialog';
 import { DemoScanBlockedDialog } from '../demo-scan-blocked-dialog/demo-scan-blocked-dialog';
 import { categoryKeyFor, getCategoriesForGame } from '../card-category-stats';
+import { getEntrySurplus, getSurplusMap } from '../card-surplus-stats';
 import { getManaCurve } from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
 
@@ -52,6 +54,7 @@ const RENDER_LIMIT_STEP = 60;
 })
 export class CollectionOverview {
   private readonly collectionService = inject(CollectionService);
+  private readonly deckService = inject(DeckService);
   private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
   private readonly destroyRef = inject(DestroyRef);
@@ -63,23 +66,36 @@ export class CollectionOverview {
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
   private readonly entries = signal<CollectionEntry[]>([]);
+  // Decks are an MTG-only concept (see CLAUDE.md) - always empty for other
+  // games, which is exactly right: with no decks to need anything, nothing
+  // should ever be flagged as surplus there either (see getSurplusMap).
+  private readonly allDecks = signal<DeckEntry[]>([]);
 
   protected readonly searchQuery = signal('');
   protected readonly selectedCategory = signal<string | null>(null);
+  protected readonly showSurplusOnly = signal(false);
   protected readonly showAddDialog = signal(false);
   protected readonly showDemoScanBlocked = signal(false);
   protected readonly selectedEntry = signal<CollectionEntry | null>(null);
 
   protected readonly hasAnyCards = computed(() => this.entries().length > 0);
 
+  /** Cards owned in more copies than every deck combined actually needs - see card-surplus-stats.ts. Exposed as a Map (card identity -> surplus count) rather than per-entry up front, since most entries have none and recomputing this per card on every access would be wasteful. */
+  protected readonly surplusMap = computed(() => getSurplusMap(this.entries(), this.allDecks()));
+  protected readonly hasSurplusCards = computed(() => this.surplusMap().size > 0);
+  protected readonly getSurplus = (entry: CollectionEntry) => getEntrySurplus(entry, this.surplusMap());
+
   protected readonly filteredEntries = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
     const category = this.selectedCategory();
+    const surplusOnly = this.showSurplusOnly();
+    const surplusMap = this.surplusMap();
 
     return this.entries().filter((entry) => {
       const matchesQuery = !query || entry.card.name.toLowerCase().includes(query);
       const matchesCategory = !category || categoryKeyFor(entry) === category;
-      return matchesQuery && matchesCategory;
+      const matchesSurplus = !surplusOnly || getEntrySurplus(entry, surplusMap) > 0;
+      return matchesQuery && matchesCategory && matchesSurplus;
     });
   });
 
@@ -112,6 +128,7 @@ export class CollectionOverview {
     effect(() => {
       this.searchQuery();
       this.selectedCategory();
+      this.showSurplusOnly();
       untracked(() => this.renderLimit.set(INITIAL_RENDER_LIMIT));
     });
 
@@ -160,7 +177,12 @@ export class CollectionOverview {
     this.loading.set(true);
     this.errorMessage.set(null);
     try {
-      this.entries.set(await this.collectionService.getCollectionWithCardData());
+      const [entries, allDecks] = await Promise.all([
+        this.collectionService.getCollectionWithCardData(),
+        this.deckService.getMyDecks(),
+      ]);
+      this.entries.set(entries);
+      this.allDecks.set(allDecks);
     } catch (error) {
       this.errorMessage.set(
         error instanceof Error ? error.message : this.translate.instant('collection.loadError'),
