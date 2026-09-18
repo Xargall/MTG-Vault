@@ -1,0 +1,33 @@
+name: Deploy frontend
+
+# Manual-only for now, deliberately - see the dry-run note below. Once a
+# dry run has been reviewed and looks right, this gets a `push` trigger
+# and `dry-run` flips to `false` in a follow-up change.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+      - run: npm run build
+
+      # dry-run: true only PRINTS what would be uploaded/deleted - it never
+      # touches the server. Flip to false only after that output has been
+      # reviewed and matches expectations.
+      - uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist/MTG-Vault/browser/
+          server-dir: /home/public_html/tcg-vault/
+          dry-run: true
