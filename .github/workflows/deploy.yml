@@ -45,5 +45,5 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist/MTG-Vault/browser/
-          server-dir: /home/public_html/tcg-vault/
+          server-dir: /public_html/tcg-vault/
           dry-run: true
