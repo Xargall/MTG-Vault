@@ -110,6 +110,7 @@ export const de = {
     oracleBackfillDone: 'Sammlung wurde aktualisiert',
     surplusFilter: '⚠ Überschuss',
     surplusBadge: '+{{count}} übrig',
+    surplusSearchPlaceholder: 'Karte oder Deck suchen…',
   },
   addCard: {
     title: 'Karte hinzufügen',

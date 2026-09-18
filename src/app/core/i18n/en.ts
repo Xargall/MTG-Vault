@@ -112,6 +112,7 @@ export const en: typeof de = {
     oracleBackfillDone: 'Collection updated',
     surplusFilter: '⚠ Surplus',
     surplusBadge: '+{{count}} extra',
+    surplusSearchPlaceholder: 'Search card or deck…',
   },
   addCard: {
     title: 'Add Card',

@@ -55,3 +55,24 @@ export function getSurplusMap(entries: CollectionEntry[], allDecks: DeckEntry[])
 export function getEntrySurplus(entry: CollectionEntry, surplusMap: Map<string, number>): number {
   return surplusMap.get(ownedIdentity(entry.row)) ?? 0;
 }
+
+/** Every deck that lists a card, per identity - unlike buildDeckNeedTotals this deliberately includes released (`is_assigned=false`) rows too, since the point here is "which decks should I go look at to clear this surplus", not the arithmetic. Feeds both the surplus badge's deck names and letting the collection search match a deck name directly - going deck by deck is a lot faster than eyeballing which of several same-named cards actually belongs where. */
+export function buildDeckNamesByCard(allDecks: DeckEntry[]): Map<string, string[]> {
+  const names = new Map<string, Set<string>>();
+  for (const deckEntry of allDecks) {
+    for (const { row, card } of deckEntry.cards) {
+      const key = cardIdentity({ card_id: row.card_id, oracle_id: card.oracleId });
+      const set = names.get(key);
+      if (set) set.add(deckEntry.deck.name);
+      else names.set(key, new Set([deckEntry.deck.name]));
+    }
+  }
+  const result = new Map<string, string[]>();
+  for (const [key, set] of names) result.set(key, [...set].sort());
+  return result;
+}
+
+/** Which decks (if any) list `entry`'s card - see buildDeckNamesByCard. */
+export function getEntryDeckNames(entry: CollectionEntry, deckNamesByCard: Map<string, string[]>): string[] {
+  return deckNamesByCard.get(ownedIdentity(entry.row)) ?? [];
+}

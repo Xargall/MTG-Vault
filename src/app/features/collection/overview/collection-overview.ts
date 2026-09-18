@@ -22,7 +22,7 @@ import { AddCardDialog } from '../add-card/add-card-dialog';
 import { CardDetailDialog } from '../card-detail/card-detail-dialog';
 import { DemoScanBlockedDialog } from '../demo-scan-blocked-dialog/demo-scan-blocked-dialog';
 import { categoryKeyFor, getCategoriesForGame } from '../card-category-stats';
-import { getEntrySurplus, getSurplusMap } from '../card-surplus-stats';
+import { buildDeckNamesByCard, getEntryDeckNames, getEntrySurplus, getSurplusMap } from '../card-surplus-stats';
 import { getManaCurve } from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
 
@@ -85,14 +85,27 @@ export class CollectionOverview {
   protected readonly hasSurplusCards = computed(() => this.surplusMap().size > 0);
   protected readonly getSurplus = (entry: CollectionEntry) => getEntrySurplus(entry, this.surplusMap());
 
+  /** Which deck(s) list a given card, for the surplus badge and the deck-name search below - going deck by deck to clear surplus is a lot faster than eyeballing which of several same-named cards actually belongs where. */
+  private readonly deckNamesByCard = computed(() => buildDeckNamesByCard(this.allDecks()));
+  protected readonly getDeckNames = (entry: CollectionEntry) => getEntryDeckNames(entry, this.deckNamesByCard());
+
   protected readonly filteredEntries = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
     const category = this.selectedCategory();
     const surplusOnly = this.showSurplusOnly();
     const surplusMap = this.surplusMap();
+    const deckNamesByCard = this.deckNamesByCard();
 
     return this.entries().filter((entry) => {
-      const matchesQuery = !query || entry.card.name.toLowerCase().includes(query);
+      // In surplus mode the search also matches a deck's name, not just the
+      // card's own name - e.g. typing "Boundless Elves" finds every
+      // surplus card that deck lists, regardless of what the cards
+      // themselves are called, so cleanup can go deck by deck instead of
+      // hunting through the whole surplus list by eye.
+      const matchesQuery =
+        !query ||
+        entry.card.name.toLowerCase().includes(query) ||
+        (surplusOnly && getEntryDeckNames(entry, deckNamesByCard).some((name) => name.toLowerCase().includes(query)));
       const matchesCategory = !category || categoryKeyFor(entry) === category;
       const matchesSurplus = !surplusOnly || getEntrySurplus(entry, surplusMap) > 0;
       return matchesQuery && matchesCategory && matchesSurplus;

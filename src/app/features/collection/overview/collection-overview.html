@@ -14,7 +14,7 @@
           <input
             type="text"
             class="search-input"
-            [placeholder]="'collection.searchPlaceholder' | translate"
+            [placeholder]="(showSurplusOnly() ? 'collection.surplusSearchPlaceholder' : 'collection.searchPlaceholder') | translate"
             [value]="searchQuery()"
             (input)="searchQuery.set($any($event.target).value)"
           />
@@ -100,7 +100,9 @@
           <button type="button" class="card-link" (click)="selectedEntry.set(entry)">
             <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" />
             @if (getSurplus(entry); as surplus) {
-              <span class="surplus-badge">{{ 'collection.surplusBadge' | translate: { count: surplus } }}</span>
+              <span class="surplus-badge" [title]="getDeckNames(entry).join(', ')">
+                {{ 'collection.surplusBadge' | translate: { count: surplus } }}
+              </span>
             }
           </button>
         }
