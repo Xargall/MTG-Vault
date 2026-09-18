@@ -80,6 +80,17 @@
             </button>
           }
         </div>
+
+        @if (showSurplusOnly()) {
+          <label class="hide-lands-toggle">
+            <input
+              type="checkbox"
+              [checked]="hideLands()"
+              (change)="hideLands.set($any($event.target).checked)"
+            />
+            {{ 'collection.hideLands' | translate }}
+          </label>
+        }
       </section>
 
       @if (hasAnyCards() && gameService.currentSlug() === 'mtg') {

@@ -1,3 +1,4 @@
+import { Card } from '../../core/models/card.model';
 import { DeckEntry } from '../decks/deck.service';
 import { CollectionCardRow, CollectionEntry } from './collection.service';
 
@@ -75,4 +76,9 @@ export function buildDeckNamesByCard(allDecks: DeckEntry[]): Map<string, string[
 /** Which decks (if any) list `entry`'s card - see buildDeckNamesByCard. */
 export function getEntryDeckNames(entry: CollectionEntry, deckNamesByCard: Map<string, string[]>): string[] {
   return deckNamesByCard.get(ownedIdentity(entry.row)) ?? [];
+}
+
+/** Whether a card is any kind of land, basic or not (MTG-only - always false for other games, which have no type_line concept). Lands routinely dominate the surplus view with large, uninteresting counts - decks pull them from a shared, fungible pile of basics far more freely than nonland cards, so a big "surplus" of Forests rarely means anything worth cleaning up the way a leftover promo duplicate does. Exposed so the surplus filter can offer hiding them separately. */
+export function isLandCard(card: Card): boolean {
+  return card.game === 'mtg' && card.typeLine.includes('Land');
 }

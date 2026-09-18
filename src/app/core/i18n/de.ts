@@ -111,6 +111,7 @@ export const de = {
     surplusFilter: '⚠ Überschuss',
     surplusBadge: '+{{count}} übrig',
     surplusSearchPlaceholder: 'Karte oder Deck suchen…',
+    hideLands: 'Länder ausblenden',
   },
   addCard: {
     title: 'Karte hinzufügen',

@@ -92,6 +92,16 @@ h1 {
   gap: var(--spacing-sm);
 }
 
+.hide-lands-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--spacing-sm);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
 .filter-button {
   --filter-color: var(--color-text-muted);
   background: transparent;

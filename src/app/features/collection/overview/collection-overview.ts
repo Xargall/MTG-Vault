@@ -22,7 +22,7 @@ import { AddCardDialog } from '../add-card/add-card-dialog';
 import { CardDetailDialog } from '../card-detail/card-detail-dialog';
 import { DemoScanBlockedDialog } from '../demo-scan-blocked-dialog/demo-scan-blocked-dialog';
 import { categoryKeyFor, getCategoriesForGame } from '../card-category-stats';
-import { buildDeckNamesByCard, getEntryDeckNames, getEntrySurplus, getSurplusMap } from '../card-surplus-stats';
+import { buildDeckNamesByCard, getEntryDeckNames, getEntrySurplus, getSurplusMap, isLandCard } from '../card-surplus-stats';
 import { getManaCurve } from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
 
@@ -74,6 +74,11 @@ export class CollectionOverview {
   protected readonly searchQuery = signal('');
   protected readonly selectedCategory = signal<string | null>(null);
   protected readonly showSurplusOnly = signal(false);
+  // Only meaningful (and only shown) alongside showSurplusOnly - lands
+  // dominate that view with large, uninteresting counts (see isLandCard's
+  // own doc comment), so it's an easy way to focus on the cards actually
+  // worth cleaning up.
+  protected readonly hideLands = signal(false);
   protected readonly showAddDialog = signal(false);
   protected readonly showDemoScanBlocked = signal(false);
   protected readonly selectedEntry = signal<CollectionEntry | null>(null);
@@ -93,6 +98,7 @@ export class CollectionOverview {
     const query = this.searchQuery().trim().toLowerCase();
     const category = this.selectedCategory();
     const surplusOnly = this.showSurplusOnly();
+    const hideLands = this.hideLands();
     const surplusMap = this.surplusMap();
     const deckNamesByCard = this.deckNamesByCard();
 
@@ -108,7 +114,8 @@ export class CollectionOverview {
         (surplusOnly && getEntryDeckNames(entry, deckNamesByCard).some((name) => name.toLowerCase().includes(query)));
       const matchesCategory = !category || categoryKeyFor(entry) === category;
       const matchesSurplus = !surplusOnly || getEntrySurplus(entry, surplusMap) > 0;
-      return matchesQuery && matchesCategory && matchesSurplus;
+      const matchesLandFilter = !(surplusOnly && hideLands) || !isLandCard(entry.card);
+      return matchesQuery && matchesCategory && matchesSurplus && matchesLandFilter;
     });
   });
 
@@ -142,6 +149,7 @@ export class CollectionOverview {
       this.searchQuery();
       this.selectedCategory();
       this.showSurplusOnly();
+      this.hideLands();
       untracked(() => this.renderLimit.set(INITIAL_RENDER_LIMIT));
     });
 

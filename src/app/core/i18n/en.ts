@@ -113,6 +113,7 @@ export const en: typeof de = {
     surplusFilter: '⚠ Surplus',
     surplusBadge: '+{{count}} extra',
     surplusSearchPlaceholder: 'Search card or deck…',
+    hideLands: 'Hide lands',
   },
   addCard: {
     title: 'Add Card',
