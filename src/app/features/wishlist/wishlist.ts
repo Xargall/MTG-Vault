@@ -59,7 +59,38 @@ export class Wishlist {
     this.loading.set(true);
     this.errorMessage.set(null);
     try {
-      this.entries.set(await this.wishlistService.getWishlist());
+      const [entries, ownedByCardId, ownedByOracle] = await Promise.all([
+        this.wishlistService.getWishlist(),
+        this.collectionService.getQuantitiesByCardId(),
+        this.collectionService.getQuantitiesByOracleId(),
+      ]);
+
+      // A wish can already be fully covered without the user ever touching
+      // this page - most commonly a deck import auto-granting the same card
+      // into the collection (see DeckService.grantMissingCards) after the
+      // wish for it was created. Left alone, a fulfilled entry just sits
+      // there looking "still needed" and clicking its own "In Sammlung
+      // übernehmen" button would add a redundant extra copy on top of what's
+      // already owned - live-confirmed as the exact way a deck ended up with
+      // more copies of a card than it needs. Pruned here, before the entry
+      // is ever rendered, rather than only checked at click-time, so a
+      // stale wish can't linger and mislead in the meantime either.
+      const stillWanted: WishlistEntry[] = [];
+      const fulfilledIds: string[] = [];
+      for (const entry of entries) {
+        const oracleQty = entry.card.oracleId ? (ownedByOracle.get(entry.card.oracleId) ?? 0) : 0;
+        const ownedQty = oracleQty + (ownedByCardId.get(entry.row.card_id) ?? 0);
+        if (ownedQty >= entry.row.quantity) {
+          fulfilledIds.push(entry.row.id);
+        } else {
+          stillWanted.push(entry);
+        }
+      }
+      if (fulfilledIds.length > 0) {
+        await Promise.all(fulfilledIds.map((id) => this.wishlistService.removeEntry(id)));
+      }
+
+      this.entries.set(stillWanted);
     } catch (error) {
       this.errorMessage.set(
         error instanceof Error ? error.message : this.translate.instant('wishlist.loadError'),
