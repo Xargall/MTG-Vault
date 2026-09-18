@@ -293,6 +293,14 @@
   color: var(--color-text-muted);
 }
 
+.remove-cards-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-basis: 100%;
+  cursor: pointer;
+}
+
 .delete-button {
   padding: 4px 12px;
   border-radius: var(--radius);

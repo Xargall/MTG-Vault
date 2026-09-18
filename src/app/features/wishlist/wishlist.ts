@@ -13,6 +13,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { GameService } from '../../core/services/game.service';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
+import { CollectionService } from '../collection/collection.service';
 import { AddWishlistDialog } from './add-wishlist-dialog/add-wishlist-dialog';
 import { getEntryPrice, getWishlistTotalValue } from './wishlist-stats';
 import { WishlistEntry, WishlistService } from './wishlist.service';
@@ -26,6 +27,7 @@ import { WishlistEntry, WishlistService } from './wishlist.service';
 })
 export class Wishlist {
   private readonly wishlistService = inject(WishlistService);
+  private readonly collectionService = inject(CollectionService);
   private readonly translate = inject(TranslateService);
   private readonly gameService = inject(GameService);
 
@@ -33,6 +35,13 @@ export class Wishlist {
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly entries = signal<WishlistEntry[]>([]);
   protected readonly showAddDialog = signal(false);
+  // Row ids currently being moved to the collection - disables that entry's
+  // button so a slow request can't be double-submitted by an impatient tap.
+  protected readonly movingToCollection = signal<Set<string>>(new Set());
+  // Separate from errorMessage (which replaces the whole list on a load
+  // failure) - a failed add-to-collection should just show inline while
+  // keeping the rest of the wishlist visible and usable.
+  protected readonly actionError = signal<string | null>(null);
 
   protected readonly hasEntries = computed(() => this.entries().length > 0);
   protected readonly totalValue = computed(() => getWishlistTotalValue(this.entries()));
@@ -87,6 +96,34 @@ export class Wishlist {
   async remove(entry: WishlistEntry) {
     await this.wishlistService.removeEntry(entry.row.id);
     this.entries.update((list) => list.filter((e) => e.row.id !== entry.row.id));
+  }
+
+  /** Moves a wishlist entry into the collection - adds the exact card/quantity it names, then drops it from the wishlist since it's no longer missing. Foil/condition aren't tracked on a wishlist entry, so it's added as a plain nonfoil NM stack; the user can still adjust that afterward from the collection. */
+  async addToCollection(entry: WishlistEntry) {
+    const rowId = entry.row.id;
+    this.movingToCollection.update((set) => new Set(set).add(rowId));
+    this.actionError.set(null);
+    try {
+      await this.collectionService.addCard({
+        cardId: entry.row.card_id,
+        quantity: entry.row.quantity,
+        foil: false,
+        condition: 'NM',
+        oracleId: entry.card.oracleId,
+      });
+      await this.wishlistService.removeEntry(rowId);
+      this.entries.update((list) => list.filter((e) => e.row.id !== rowId));
+    } catch (error) {
+      this.actionError.set(
+        error instanceof Error ? error.message : this.translate.instant('wishlist.addToCollectionFailed'),
+      );
+    } finally {
+      this.movingToCollection.update((set) => {
+        const next = new Set(set);
+        next.delete(rowId);
+        return next;
+      });
+    }
   }
 
   protected onAdded() {

@@ -177,6 +177,7 @@ export class DeckDetailDialog {
   });
 
   protected readonly confirmingDelete = signal(false);
+  protected readonly removeCardsOnDelete = signal(false);
   protected readonly deleting = signal(false);
   protected readonly deleteError = signal<string | null>(null);
 
@@ -276,7 +277,7 @@ export class DeckDetailDialog {
     this.deleting.set(true);
     this.deleteError.set(null);
     try {
-      await this.deckService.deleteDeck(this.entry().deck.id);
+      await this.deckService.deleteDeck(this.entry().deck.id, this.removeCardsOnDelete());
       this.deleted.emit();
       this.close.emit();
     } catch (error) {

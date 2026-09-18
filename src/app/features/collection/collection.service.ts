@@ -90,6 +90,7 @@ export class CollectionService {
       .filter((entry): entry is CollectionEntry => entry !== null);
   }
 
+  /** Keyed by exact card_id, but only from rows with no recorded oracle_id - a row that has one is already covered by getQuantitiesByOracleId below, so leaving it out here keeps the two maps disjoint (see deck-stats.ts's getOwnedQuantity, which sums both). Used to include every row regardless of oracle_id, so a card whose exact printing was already owned got counted twice - live-confirmed as wrong "available" counts feeding both grantMissingCards' grant amounts and deleteDeck's release amounts. */
   async getQuantitiesByCardId(): Promise<Map<string, number>> {
     await this.gameService.ready;
     const gameId = this.gameService.currentGameId();
@@ -99,6 +100,7 @@ export class CollectionService {
       .from('collection_cards')
       .select('card_id, quantity')
       .eq('game_id', gameId)
+      .is('oracle_id', null)
       .returns<Array<{ card_id: string; quantity: number }>>();
 
     if (error) throw error;

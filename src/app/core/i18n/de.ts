@@ -198,6 +198,7 @@ export const de = {
     containedCards: 'Enthaltene Karten',
     deleteLink: 'Deck entfernen',
     confirmDeleteText: 'Deck wirklich entfernen? Die Karten bleiben in deiner Sammlung.',
+    removeCardsOption: 'Enthaltene Karten auch aus der Sammlung entfernen',
     confirmDeleteButton: 'Ja, entfernen',
     cancel: 'Abbrechen',
     deleteFailed: 'Deck konnte nicht entfernt werden.',
@@ -281,6 +282,8 @@ export const de = {
     priorityHigh: 'Hoch',
     notesPlaceholder: 'Notiz…',
     removeAria: 'Entfernen',
+    addToCollection: 'In Sammlung übernehmen',
+    addToCollectionFailed: 'Karte konnte nicht in die Sammlung übernommen werden.',
   },
   scanner: {
     close: 'Schließen',

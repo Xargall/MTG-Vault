@@ -4,15 +4,17 @@ import { CardOwnedStatus } from '../../shared/cards/card-tile/card-tile';
 import { CollectionEntry } from '../collection/collection.service';
 import { DeckCardEntry, DeckEntry } from './deck.service';
 
+/** Keyed by exact card_id, but only from rows with no recorded oracle_id - a row that has one is already covered by buildOwnedOracleMap below, so leaving it out here keeps the two maps disjoint and safely summable (see getOwnedQuantity). A row *with* an oracle_id used to be counted in both maps at once - live-confirmed case: owning 3 copies of a deck's exact printing came out to "5 available" in the deck-detail dialog (3 counted here by card_id, plus the same 3 counted again by oracle_id, minus 1 claimed by another deck), which also fed wrong grant amounts on import and wrong match percentages everywhere else getOwnedQuantity is used. */
 export function buildOwnedMap(collectionEntries: CollectionEntry[]): Map<string, number> {
   const owned = new Map<string, number>();
   for (const { row } of collectionEntries) {
+    if (row.oracle_id) continue;
     owned.set(row.card_id, (owned.get(row.card_id) ?? 0) + row.quantity);
   }
   return owned;
 }
 
-/** Same idea as buildOwnedMap, keyed by oracle_id instead - so a different printing of the same card (any Mountain, any Sol Ring) counts too, not just an exact print match. Only rows with a recorded oracle_id contribute (see collection.service.ts's oracle_id backfill) - a legacy row without one simply isn't here, so callers combine this with buildOwnedMap's exact card_id match to still cover it. */
+/** Same idea as buildOwnedMap, keyed by oracle_id instead - so a different printing of the same card (any Mountain, any Sol Ring) counts too, not just an exact print match. Only rows with a recorded oracle_id contribute; those are the same rows buildOwnedMap now excludes, so the two maps are disjoint and a row is never counted twice. */
 export function buildOwnedOracleMap(collectionEntries: CollectionEntry[]): Map<string, number> {
   const owned = new Map<string, number>();
   for (const { row } of collectionEntries) {

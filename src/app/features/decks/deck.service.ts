@@ -273,26 +273,64 @@ export class DeckService {
   }
 
   /**
-   * Deleting a deck releases the collection copies that were granted for it
-   * on import, so a shared card (see grantMissingCards) becomes available
-   * for another deck again and a later re-import of the same deck doesn't
-   * find it "already owned" and skip granting its own copy back.
+   * Deletes a deck. By default its cards stay in the collection untouched -
+   * a deck is just a list, not a claim on physical cards the user might
+   * still want. When `removeCards` is set (the deck-detail dialog's opt-in
+   * checkbox), also takes each of the deck's cards back out of the
+   * collection - but never more than is actually *free*: a card also
+   * required by one of the user's other decks (is_assigned there) is left
+   * alone, the same "available" math grantMissingCards uses when adding a
+   * deck. Skipping this used to be a real data-loss bug - deleting one deck
+   * would blindly drain a shared card's collection stock by this deck's own
+   * needed quantity, silently starving every other deck that also listed
+   * it (e.g. a Sol Ring shared with an untouched precon), with no way to
+   * tell afterwards which deck "took" the missing copies.
    */
-  async deleteDeck(deckId: string): Promise<void> {
-    const { data: deckCards, error: cardsError } = await this.supabase.client
-      .from('deck_cards')
-      .select('card_id, quantity')
-      .eq('deck_id', deckId)
-      .returns<Array<{ card_id: string; quantity: number }>>();
-    if (cardsError) throw cardsError;
+  async deleteDeck(deckId: string, removeCards = false): Promise<void> {
+    let reductions: Array<{ cardId: string; quantity: number }> = [];
+    if (removeCards) {
+      const [{ data: deckCards, error: cardsError }, ownedByCardId, ownedByOracle, allDecks] = await Promise.all([
+        this.supabase.client
+          .from('deck_cards')
+          .select('card_id, quantity')
+          .eq('deck_id', deckId)
+          .returns<Array<{ card_id: string; quantity: number }>>(),
+        this.collectionService.getQuantitiesByCardId(),
+        this.collectionService.getQuantitiesByOracleId(),
+        this.getMyDecks(),
+      ]);
+      if (cardsError) throw cardsError;
+
+      const isMtg = this.gameService.currentSlug() === 'mtg';
+      const resolvedCards = isMtg
+        ? await this.gameService.cardApi().getCardsByIds((deckCards ?? []).map((row) => row.card_id))
+        : [];
+      const oracleIdByCardId = new Map(resolvedCards.map((card) => [card.id, card.oracleId]));
+      // This deck's own rows still exist at this point (not deleted yet) -
+      // excluding deckId keeps them from counting as "assigned elsewhere"
+      // against themselves.
+      const { byCardId: assignedByCardId, byOracleId: assignedByOracle } = buildAssignedElsewhereMaps(
+        allDecks,
+        deckId,
+      );
+
+      reductions = (deckCards ?? [])
+        .map((row) => {
+          const oracleId = oracleIdByCardId.get(row.card_id) ?? null;
+          const cardRef = { cardId: row.card_id, oracleId };
+          const owned = getOwnedQuantity(cardRef, ownedByCardId, ownedByOracle);
+          const assignedElsewhere = getOwnedQuantity(cardRef, assignedByCardId, assignedByOracle);
+          const freeToRemove = Math.max(0, owned - assignedElsewhere);
+          return { cardId: row.card_id, quantity: Math.min(row.quantity, freeToRemove) };
+        })
+        .filter((reduction) => reduction.quantity > 0);
+    }
 
     const { error } = await this.supabase.client.from('decks').delete().eq('id', deckId);
     if (error) throw error;
 
-    if (deckCards && deckCards.length > 0) {
-      await this.collectionService.reduceQuantities(
-        deckCards.map((row) => ({ cardId: row.card_id, quantity: row.quantity })),
-      );
+    if (reductions.length > 0) {
+      await this.collectionService.reduceQuantities(reductions);
     }
   }
 

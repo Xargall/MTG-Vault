@@ -199,6 +199,7 @@ export const en: typeof de = {
     containedCards: 'Cards in this deck',
     deleteLink: 'Remove deck',
     confirmDeleteText: 'Really remove this deck? The cards stay in your collection.',
+    removeCardsOption: 'Also remove this deck\'s cards from my collection',
     confirmDeleteButton: 'Yes, remove',
     cancel: 'Cancel',
     deleteFailed: 'Deck could not be removed.',
@@ -281,6 +282,8 @@ export const en: typeof de = {
     priorityHigh: 'High',
     notesPlaceholder: 'Note…',
     removeAria: 'Remove',
+    addToCollection: 'Add to collection',
+    addToCollectionFailed: 'Card could not be added to the collection.',
   },
   scanner: {
     close: 'Close',

@@ -156,6 +156,14 @@
         } @else {
           <div class="confirm-row">
             <span>{{ 'deckDetail.confirmDeleteText' | translate }}</span>
+            <label class="remove-cards-option">
+              <input
+                type="checkbox"
+                [checked]="removeCardsOnDelete()"
+                (change)="removeCardsOnDelete.set($any($event.target).checked)"
+              />
+              {{ 'deckDetail.removeCardsOption' | translate }}
+            </label>
             <button type="button" class="delete-button" [disabled]="deleting()" (click)="confirmDelete()">
               {{ 'deckDetail.confirmDeleteButton' | translate }}
             </button>

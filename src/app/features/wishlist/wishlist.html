@@ -22,6 +22,10 @@
       {{ 'wishlist.totalValue' | translate: { value: (totalValue() | number: '1.2-2') + ' €' } }}
     </p>
 
+    @if (actionError()) {
+      <p class="state-message error">{{ actionError() }}</p>
+    }
+
     <ul class="entry-grid">
       @for (entry of entries(); track entry.row.id) {
         <li class="entry-card">
@@ -35,6 +39,15 @@
           </button>
 
           <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" />
+
+          <button
+            type="button"
+            class="add-to-collection-button"
+            [disabled]="movingToCollection().has(entry.row.id)"
+            (click)="addToCollection(entry)"
+          >
+            {{ 'wishlist.addToCollection' | translate }}
+          </button>
 
           <p class="entry-price">{{ getEntryPrice(entry) | number: '1.2-2' }} €</p>
           @if (entry.card.game === 'mtg' && entry.card.cardmarketUrl; as url) {
