@@ -49,24 +49,52 @@ export type AddCardResult =
   | { rowId: string; merged: true; previousQuantity: number }
   | { rowId: string; merged: false };
 
+// Supabase's PostgREST caps an unbounded select at a project-configured max
+// row count (1000 by default) - a plain `.select(...)` on collection_cards
+// with no `.range()` silently truncated to that many rows instead of
+// erroring, so a collection past the cap (a real, live-confirmed case: an
+// account with 1485 total copies) had some cards simply missing from every
+// view built on it, with no error anywhere to explain why. Every unbounded
+// read of collection_cards below pages through with this helper instead.
+const COLLECTION_PAGE_SIZE = 1000;
+
 @Injectable({ providedIn: 'root' })
 export class CollectionService {
   private readonly supabase = inject(SupabaseService);
   private readonly gameService = inject(GameService);
+
+  /** Runs `query` repeatedly with an increasing `.range()` until a page comes back shorter than COLLECTION_PAGE_SIZE, concatenating every page - see COLLECTION_PAGE_SIZE's own doc comment for why a single unbounded select isn't safe here. `query` must apply every other filter itself; this only adds the range. */
+  private async fetchAllPages<T>(
+    query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  ): Promise<T[]> {
+    const all: T[] = [];
+    let from = 0;
+    for (;;) {
+      const { data, error } = await query(from, from + COLLECTION_PAGE_SIZE - 1);
+      if (error) throw error;
+      const page = data ?? [];
+      all.push(...page);
+      if (page.length < COLLECTION_PAGE_SIZE) break;
+      from += COLLECTION_PAGE_SIZE;
+    }
+    return all;
+  }
 
   async getCollectionWithCardData(): Promise<CollectionEntry[]> {
     await this.gameService.ready;
     const gameId = this.gameService.currentGameId();
     if (!gameId) return [];
 
-    const { data, error } = await this.supabase.client
-      .from('collection_cards')
-      .select('*')
-      .eq('game_id', gameId)
-      .returns<CollectionCardRow[]>();
+    const data = await this.fetchAllPages<CollectionCardRow>((from, to) =>
+      this.supabase.client
+        .from('collection_cards')
+        .select('*')
+        .eq('game_id', gameId)
+        .range(from, to)
+        .returns<CollectionCardRow[]>(),
+    );
 
-    if (error) throw error;
-    if (!data || data.length === 0) return [];
+    if (data.length === 0) return [];
 
     const cards = await this.gameService.cardApi().getCardsByIds(data.map((row) => row.card_id));
     const cardsById = new Map(cards.map((card) => [card.id, card]));
@@ -96,17 +124,18 @@ export class CollectionService {
     const gameId = this.gameService.currentGameId();
     if (!gameId) return new Map();
 
-    const { data, error } = await this.supabase.client
-      .from('collection_cards')
-      .select('card_id, quantity')
-      .eq('game_id', gameId)
-      .is('oracle_id', null)
-      .returns<Array<{ card_id: string; quantity: number }>>();
-
-    if (error) throw error;
+    const data = await this.fetchAllPages<{ card_id: string; quantity: number }>((from, to) =>
+      this.supabase.client
+        .from('collection_cards')
+        .select('card_id, quantity')
+        .eq('game_id', gameId)
+        .is('oracle_id', null)
+        .range(from, to)
+        .returns<Array<{ card_id: string; quantity: number }>>(),
+    );
 
     const totals = new Map<string, number>();
-    for (const row of data ?? []) {
+    for (const row of data) {
       totals.set(row.card_id, (totals.get(row.card_id) ?? 0) + row.quantity);
     }
     return totals;
@@ -118,17 +147,18 @@ export class CollectionService {
     const gameId = this.gameService.currentGameId();
     if (!gameId) return new Map();
 
-    const { data, error } = await this.supabase.client
-      .from('collection_cards')
-      .select('oracle_id, quantity')
-      .eq('game_id', gameId)
-      .not('oracle_id', 'is', null)
-      .returns<Array<{ oracle_id: string; quantity: number }>>();
-
-    if (error) throw error;
+    const data = await this.fetchAllPages<{ oracle_id: string; quantity: number }>((from, to) =>
+      this.supabase.client
+        .from('collection_cards')
+        .select('oracle_id, quantity')
+        .eq('game_id', gameId)
+        .not('oracle_id', 'is', null)
+        .range(from, to)
+        .returns<Array<{ oracle_id: string; quantity: number }>>(),
+    );
 
     const totals = new Map<string, number>();
-    for (const row of data ?? []) {
+    for (const row of data) {
       totals.set(row.oracle_id, (totals.get(row.oracle_id) ?? 0) + row.quantity);
     }
     return totals;
@@ -136,15 +166,16 @@ export class CollectionService {
 
   /** Card totals across every game at once (not scoped to the currently active game) - used by the game-selection screen to show "X Karten in Sammlung" per tile. */
   async getQuantityTotalsByGame(): Promise<Map<string, number>> {
-    const { data, error } = await this.supabase.client
-      .from('collection_cards')
-      .select('game_id, quantity')
-      .returns<Array<{ game_id: string; quantity: number }>>();
-
-    if (error) throw error;
+    const data = await this.fetchAllPages<{ game_id: string; quantity: number }>((from, to) =>
+      this.supabase.client
+        .from('collection_cards')
+        .select('game_id, quantity')
+        .range(from, to)
+        .returns<Array<{ game_id: string; quantity: number }>>(),
+    );
 
     const totals = new Map<string, number>();
-    for (const row of data ?? []) {
+    for (const row of data) {
       totals.set(row.game_id, (totals.get(row.game_id) ?? 0) + row.quantity);
     }
     return totals;

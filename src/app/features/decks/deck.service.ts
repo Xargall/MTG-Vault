@@ -41,6 +41,11 @@ export interface DeckEntry {
   cards: DeckCardEntry[];
 }
 
+// Same reasoning as CollectionService's COLLECTION_PAGE_SIZE - an unbounded
+// select on deck_cards is subject to PostgREST's default max-rows cap, and
+// several decks' worth of cards can realistically add up past it.
+const DECK_CARDS_PAGE_SIZE = 1000;
+
 @Injectable({ providedIn: 'root' })
 export class DeckService {
   private readonly supabase = inject(SupabaseService);
@@ -62,24 +67,26 @@ export class DeckService {
     if (decksError) throw decksError;
     if (!decks || decks.length === 0) return [];
 
-    const { data: deckCards, error: cardsError } = await this.supabase.client
-      .from('deck_cards')
-      .select('*')
-      .in(
-        'deck_id',
-        decks.map((deck) => deck.id),
-      )
-      .returns<DeckCardRow[]>();
+    const deckIds = decks.map((deck) => deck.id);
+    const deckCards: DeckCardRow[] = [];
+    for (let from = 0; ; from += DECK_CARDS_PAGE_SIZE) {
+      const { data, error: cardsError } = await this.supabase.client
+        .from('deck_cards')
+        .select('*')
+        .in('deck_id', deckIds)
+        .range(from, from + DECK_CARDS_PAGE_SIZE - 1)
+        .returns<DeckCardRow[]>();
+      if (cardsError) throw cardsError;
+      const page = data ?? [];
+      deckCards.push(...page);
+      if (page.length < DECK_CARDS_PAGE_SIZE) break;
+    }
 
-    if (cardsError) throw cardsError;
-
-    const cards = await this.gameService
-      .cardApi()
-      .getCardsByIds((deckCards ?? []).map((row) => row.card_id));
+    const cards = await this.gameService.cardApi().getCardsByIds(deckCards.map((row) => row.card_id));
     const cardsById = new Map(cards.map((card) => [card.id, card]));
 
     const cardsByDeck = new Map<string, DeckCardEntry[]>();
-    for (const row of deckCards ?? []) {
+    for (const row of deckCards) {
       const card = cardsById.get(row.card_id);
       if (!card) continue;
       const list = cardsByDeck.get(row.deck_id);
