@@ -70,7 +70,55 @@ const COLLECTOR_NUMBER_CHAR_WHITELIST = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/*-
 // "LOB-EN001" - set code, two-letter language, then a 2-4 digit number.
 const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]{2,6}-[A-Z]{2}\d{2,4}$/;
 
-/** Gemini's own crop for its collector-number guess - deliberately looser than CROP_STRATEGIES (a vision model reads a wider region fine) and left as unfiltered color, since Gemini isn't Tesseract's binarize-first pipeline. */
+/**
+ * Percentile-clipped linear contrast stretch (a "levels"/auto-contrast
+ * adjustment), applied in place to a crop's own pixel data. Unlike
+ * processNormalCropPixels/processFoilCropPixels below, this does NOT
+ * greyscale or binarize - it keeps full color, just remaps the crop's own
+ * (often compressed) luminance range to span the full 0-255 - so a Gemini
+ * vision call still gets a color image, but one where e.g. black print-code
+ * text on a dark blue card frame (near-identical luminance, easy to read for
+ * a human who sees the hue difference, hard for a compressed/downsampled
+ * photo) is pulled apart instead of crushed together. Clipping to the 1st/
+ * 99th percentile (rather than the crop's literal min/max) keeps a single
+ * stray bright/dark pixel from skewing the whole remap.
+ */
+function applyContrastStretch(data: Uint8ClampedArray): void {
+  const pixelCount = data.length / 4;
+  if (pixelCount === 0) return;
+
+  const histogram = new Uint32Array(256);
+  for (let i = 0; i < data.length; i += 4) {
+    const luminance = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+    histogram[luminance]++;
+  }
+
+  const clipCount = pixelCount * 0.01;
+  let low = 0;
+  let cumulative = 0;
+  for (; low < 255; low++) {
+    cumulative += histogram[low];
+    if (cumulative >= clipCount) break;
+  }
+  let high = 255;
+  cumulative = 0;
+  for (; high > 0; high--) {
+    cumulative += histogram[high];
+    if (cumulative >= clipCount) break;
+  }
+  // Crop is already near-flat (blank/solid) - stretching further would just
+  // amplify noise, not reveal text that isn't there.
+  if (high <= low) return;
+
+  const scale = 255 / (high - low);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = Math.max(0, Math.min(255, (data[i] - low) * scale));
+    data[i + 1] = Math.max(0, Math.min(255, (data[i + 1] - low) * scale));
+    data[i + 2] = Math.max(0, Math.min(255, (data[i + 2] - low) * scale));
+  }
+}
+
+/** Gemini's own crop for its collector-number guess - deliberately looser than CROP_STRATEGIES (a vision model reads a wider region fine). Contrast-stretched (see applyContrastStretch) but kept in color, since Gemini isn't Tesseract's binarize-first pipeline. */
 function cropCollectorArea(source: HTMLCanvasElement): HTMLCanvasElement {
   const crop = document.createElement('canvas');
   // 20%→25% / 60%→65%: overlay UI elements sitting low on the viewport can
@@ -82,7 +130,12 @@ function cropCollectorArea(source: HTMLCanvasElement): HTMLCanvasElement {
   crop.width = Math.floor(source.width * 0.65);
   crop.height = h;
   const ctx = crop.getContext('2d');
-  ctx?.drawImage(source, 0, y, crop.width, h, 0, 0, crop.width, h);
+  if (!ctx) return crop;
+
+  ctx.drawImage(source, 0, y, crop.width, h, 0, 0, crop.width, h);
+  const imageData = ctx.getImageData(0, 0, crop.width, h);
+  applyContrastStretch(imageData.data);
+  ctx.putImageData(imageData, 0, 0);
   return crop;
 }
 
@@ -176,6 +229,25 @@ function scoreCollectorNumberText(text: string): number {
   if (/\d{3,4}/.test(trimmed)) return 70;
   return 0;
 }
+
+// Yu-Gi-Oh's print code prints in the bottom corner - unlike MTG it isn't
+// consistently left-aligned (see the Gemini prompt's own "unten links oder
+// unten rechts" note), so both corners are tried; bottom-right first since
+// that's the more common modern placement.
+const YUGIOH_CROP_STRATEGIES: CropStrategy[] = [
+  { name: 'bottomRight', x: 0.5, y: 0.87, w: 0.47, h: 0.1 },
+  { name: 'bottomRightWider', x: 0.4, y: 0.83, w: 0.57, h: 0.14 },
+  { name: 'bottomLeft', x: 0.03, y: 0.87, w: 0.47, h: 0.1 },
+];
+
+/** How closely OCR'd text matches the "SETCODE-LANGNUM" print-code shape - a clean match (100, the exact same format identifyByPrintCode expects) accepts the crop outright; a loose one (70, right general shape but not exactly right - e.g. a misread digit count) still just moves on to the next crop strategy instead of risking a wrong exact lookup. */
+function scoreYugiohPrintCodeText(text: string): number {
+  const trimmed = text.trim().toUpperCase();
+  if (YUGIOH_PRINT_CODE_PATTERN.test(trimmed)) return 100;
+  if (/^[A-Z0-9]{2,6}-[A-Z0-9]{3,6}$/.test(trimmed)) return 70;
+  return 0;
+}
+
 // MTG's multi-field scoring is a per-frame best guess, not a certainty - a
 // sliding window over the last few frames confirms a result once the same
 // oracle_id wins enough of them, tolerating a single noisy/no-match frame
@@ -603,24 +675,15 @@ export class Scanner {
     // path otherwise.
     if (!this.tesseractFallbackActive()) return false;
 
-    // Yu-Gi-Oh and Pokémon: whole-frame OCR feeding the name-only lookup -
-    // neither has MTG's structured Scryfall set-code/collector-number
-    // fields to crop toward.
-    const canvas = this.captureFrame(videoEl);
-    if (!canvas) return false;
-
-    const ocrResult = await this.ocrService.recognizeText(canvas);
-    if (ocrResult.confidence < MIN_CONFIDENCE_FOR_SET_CODE) return false;
-
-    if (ocrResult.confidence >= MIN_CONFIDENCE_FOR_NAME) {
-      const byName = await this.tryIdentifyByName(ocrResult.lines);
-      if (byName) {
-        this.onMatch(byName);
-        return true;
-      }
+    // Yu-Gi-Oh has its own structured print-code corner too (see
+    // handleYugiohFrame) - tried before falling back to the same whole-frame
+    // name OCR Pokémon uses (it has no compact printed code to crop toward
+    // at all, just its printed name up top).
+    if (this.gameService.currentSlug() === 'yugioh') {
+      return this.handleYugiohFrame(videoEl);
     }
 
-    return false;
+    return this.tryWholeFrameNameOcr(videoEl);
   }
 
   /**
@@ -638,6 +701,47 @@ export class Scanner {
 
     this.onMatch({ card: confirmed.card, confidence: 1 }, confirmed);
     return true;
+  }
+
+  /**
+   * Yu-Gi-Oh's own crop-based Tesseract pass for the print-code corner
+   * (mirrors handleMtgFrame/tryTesseractPath - see tryYugiohTesseractPath).
+   * A clean read is run through the same sliding-window consistency check
+   * MTG uses (confirmMtgCard - already game-agnostic in implementation
+   * despite the name, keyed only by card.id) before being trusted, since a
+   * misread print code could coincidentally exact-match a wrong real card.
+   * Falls back to the whole-frame name-OCR pass (previously the *only*
+   * Yu-Gi-Oh Tesseract path) when the structural read doesn't score well
+   * enough this frame.
+   */
+  private async handleYugiohFrame(videoEl: HTMLVideoElement): Promise<boolean> {
+    const result = await this.tryYugiohTesseractPath(videoEl);
+    const confirmed = this.confirmMtgCard(result);
+    if (confirmed) {
+      this.onMatch({ card: confirmed.card, confidence: 1 }, confirmed);
+      return true;
+    }
+
+    return this.tryWholeFrameNameOcr(videoEl);
+  }
+
+  /** Whole-frame OCR feeding the name-only lookup - Pokémon's only detection path (no compact printed code to crop toward), and Yu-Gi-Oh's fallback when its own structured print-code crop (see tryYugiohTesseractPath) didn't score well enough this frame. */
+  private async tryWholeFrameNameOcr(videoEl: HTMLVideoElement): Promise<boolean> {
+    const canvas = this.captureFrame(videoEl);
+    if (!canvas) return false;
+
+    const ocrResult = await this.ocrService.recognizeText(canvas);
+    if (ocrResult.confidence < MIN_CONFIDENCE_FOR_SET_CODE) return false;
+
+    if (ocrResult.confidence >= MIN_CONFIDENCE_FOR_NAME) {
+      const byName = await this.tryIdentifyByName(ocrResult.lines);
+      if (byName) {
+        this.onMatch(byName);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -847,6 +951,53 @@ export class Scanner {
     }
 
     return result;
+  }
+
+  /**
+   * Crop-based print-code scan for Yu-Gi-Oh (mirrors tryTesseractPath):
+   * tries each of YUGIOH_CROP_STRATEGIES's corner windows, reuses the same
+   * foil-aware adaptive preprocessing MTG's pass uses (modern Yu-Gi-Oh foil/
+   * holo rarities are exactly the case that pipeline's foil-vs-normal branch
+   * was built for) and the same char whitelist (digits, letters, hyphen all
+   * already included), and stops at the first strategy whose result scores
+   * well enough (see scoreYugiohPrintCodeText). That text is resolved via
+   * the now locally-cached identifyByPrintCode - no name fallback, since
+   * this crop is tight enough to never contain the card name anyway.
+   */
+  private async tryYugiohTesseractPath(
+    videoEl: HTMLVideoElement,
+  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null> {
+    for (const strategy of YUGIOH_CROP_STRATEGIES) {
+      const cropCanvas = this.cropToStrategy(videoEl, strategy);
+      if (!cropCanvas) continue;
+
+      const ctx = cropCanvas.getContext('2d');
+      if (!ctx) continue;
+
+      const imageData = ctx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
+      const stats = analyzeImageCharacteristics(imageData.data);
+      if (isFoilImage(stats)) {
+        processFoilCropPixels(imageData.data);
+      } else {
+        processNormalCropPixels(imageData.data);
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      const ocrResult = await this.ocrService.recognizeText(cropCanvas, {
+        pageSegMode: PSM.SINGLE_LINE,
+        charWhitelist: COLLECTOR_NUMBER_CHAR_WHITELIST,
+      });
+      const code = ocrResult.text.trim().toUpperCase();
+      if (scoreYugiohPrintCodeText(code) < MIN_SCORE_TO_ACCEPT) continue;
+
+      // Same reasoning as tryTesseractPath's own badge update - only claim
+      // it once something was actually found.
+      this.ocrEngine.set('tesseract');
+      const card = await this.yugiohApi.identifyByPrintCode(code);
+      if (card) return { card, finish: 'nonfoil', cardCategory: 'normal' };
+    }
+
+    return null;
   }
 
   private pushFrameHistory(entry: { id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null) {
