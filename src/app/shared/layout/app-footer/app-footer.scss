@@ -3,7 +3,7 @@
   justify-content: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-md) var(--spacing-lg);
-  background: linear-gradient(0deg, #2a0f0b 0%, #3c1712 100%);
+  background: linear-gradient(0deg, var(--footer-grad-top) 0%, var(--color-surface-alt) 100%);
   border-top: 2px solid var(--color-accent);
   color: var(--color-text-muted);
   font-size: 0.8rem;

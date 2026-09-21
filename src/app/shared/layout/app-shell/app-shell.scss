@@ -14,9 +14,9 @@
   // a fine diagonal grain (like tooling lines pressed into leather), over a
   // richer, more saturated version of the original flat two-tone gradient.
   background:
-    radial-gradient(ellipse 140% 100% at 50% -40%, rgba(232, 205, 122, 0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 140% 100% at 50% -40%, var(--header-highlight) 0%, transparent 60%),
     repeating-linear-gradient(115deg, rgba(0, 0, 0, 0.05) 0px, rgba(0, 0, 0, 0.05) 1px, transparent 1px, transparent 5px),
-    linear-gradient(180deg, #6b2a1e 0%, #3c1712 100%);
+    linear-gradient(180deg, var(--header-grad-top) 0%, var(--header-grad-bottom) 100%);
   // A gilt double-edge (like a book's gold-tooled edge) instead of a single
   // flat rule, plus a real cast shadow so the header reads as a mounted
   // plaque sitting above the page rather than a flat color band.
@@ -86,13 +86,21 @@
 .shell-title {
   font-family: var(--font-heading);
   font-weight: 700;
-  font-size: 1.2rem;
-  letter-spacing: 1px;
+  // Was 1.2rem, then 2rem - still read as a minor label next to the nav/
+  // controls rather than the app's own name. This is the one thing every
+  // page should recognize at a glance.
+  font-size: 2.75rem;
+  letter-spacing: 1.5px;
   // Engraved gold-foil effect: a metallic gradient clipped to the text plus
   // a dark drop-shadow beneath it (the shadow still renders even though the
   // fill itself is transparent) so the wordmark reads as struck/embossed
   // metal rather than flat colored type.
-  background: linear-gradient(180deg, #f6e2a8 0%, #c9a24a 45%, #8a6a2c 100%);
+  background: linear-gradient(
+    180deg,
+    var(--title-grad-start) 0%,
+    var(--color-accent) 45%,
+    var(--color-bronze) 100%
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

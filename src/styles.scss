@@ -1,26 +1,58 @@
 /* You can add global styles to this file, and also import other style files */
 
+// Shared turbulence-noise layer under every panel's surface texture -
+// desaturated so it stays a neutral fine grain regardless of theme color.
+// Only the layer(s) *underneath* it (the plank/weave pattern) change per
+// game. Held as a Sass variable, not a CSS custom property: --color-surface
+// below inlines it at build time so each theme's declaration is fully
+// self-contained. (A runtime var()-of-a-var() doesn't re-resolve per
+// descendant here - the browser substitutes nested custom properties once,
+// at the element that *declares* --color-surface, not at each element that
+// inherits and uses it - so a theme override deeper in the tree that only
+// swapped the nested variable never took effect. Baking the texture into
+// each theme's own --color-surface at compile time sidesteps that entirely.)
+$noise-layer: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.008 0.3' numOctaves='2' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix in='t' type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E")
+  0 0 / 240px 240px repeat;
+
+// Aged-wood grain (soft horizontal streaks) - MTG's parchment/leather look.
+$mtg-surface-texture: repeating-linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.07) 0px,
+    rgba(0, 0, 0, 0.02) 2px,
+    transparent 4px,
+    rgba(0, 0, 0, 0.05) 7px,
+    transparent 9px
+  ),
+  #{$noise-layer};
+
+// Crossed-diagonal weave (fabric/velvet), for a spellcaster's robe rather
+// than wood planking.
+$yugioh-surface-texture: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.07) 0px,
+    rgba(0, 0, 0, 0.07) 1px,
+    transparent 1px,
+    transparent 6px
+  ),
+  repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.025) 0px,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 6px
+  ),
+  #{$noise-layer};
+
 :root {
   --color-bg: #17110b;
-  // Aged-wood grain (soft horizontal streaks + fine turbulence noise) baked
-  // into --color-surface itself so every existing `background:
-  // var(--color-surface)` declaration - every card, panel and dialog -
-  // picks up the texture for free, distinct from the body's own seal
-  // pattern. --color-surface-solid holds the same base color with no
-  // texture, for the rare spot (a gradient color-stop) that needs a plain
-  // <color> rather than a full background-layer list.
+  // --color-surface-solid holds the same base color with no texture, for
+  // the rare spot (a gradient color-stop) that needs a plain <color> rather
+  // than a full background-layer list. --color-surface layers a material
+  // texture (see $mtg-surface-texture/$yugioh-surface-texture above) over
+  // it, picked up for free by every existing `background: var(--color-
+  // surface)` declaration - every card, panel and dialog.
   --color-surface-solid: #241a12;
-  --color-surface: repeating-linear-gradient(
-      180deg,
-      rgba(0, 0, 0, 0.07) 0px,
-      rgba(0, 0, 0, 0.02) 2px,
-      transparent 4px,
-      rgba(0, 0, 0, 0.05) 7px,
-      transparent 9px
-    ),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.008 0.3' numOctaves='2' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix in='t' type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E")
-      0 0 / 240px 240px repeat,
-    var(--color-surface-solid);
+  --color-surface: #{$mtg-surface-texture}, var(--color-surface-solid);
   --color-surface-alt: #3c1712;
   --color-border: #55231b;
   // Reserved for interactive boundaries (inputs, selects, buttons) that must
@@ -72,12 +104,54 @@
   // Same seal motif, fainter (0.06), for the page background itself.
   --pattern-seal-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(201,162,74,0.06)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E");
 
+  // Per-game accent tokens that don't fit the generic --color-* set above -
+  // the header plaque's gradient/highlight, the footer's gradient, and the
+  // wordmark's brightest gold-foil stop. Kept separate so a per-game theme
+  // block only has to override what actually differs, not redeclare the
+  // whole shared palette. Defaults here are the original MTG look.
+  --header-grad-top: #6b2a1e;
+  --header-grad-bottom: #3c1712;
+  --header-highlight: rgba(232, 205, 122, 0.16);
+  --footer-grad-top: #2a0f0b;
+  --title-grad-start: #f6e2a8;
+
   --font-body: 'EB Garamond', serif;
   --font-heading: 'Cinzel', serif;
   --radius: 6px;
   --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
+}
+
+// Per-game color theme. Applied via [data-game] on <body> (set from
+// AppShell's constructor effect, see app-shell.ts) so it re-skins the whole
+// app - not just the header - through the shared --color-* tokens above.
+// MTG has no block here since :root already carries its (original) look;
+// each further game gets its own block as its theme is designed.
+body[data-game='yugioh'] {
+  // Dark Magician: violet robe, teal/turquoise armor and gold trim.
+  --color-bg: #140b1f;
+  --color-surface-solid: #241640;
+  --color-surface: #{$yugioh-surface-texture}, var(--color-surface-solid);
+  --color-surface-alt: #3a1f5c;
+  --color-border: #4a2f70;
+  --color-border-strong: #9068c2;
+  --color-text: #ece3f5;
+  --color-text-muted: #c3aee0;
+  --color-accent: #35b8ae;
+  --color-accent-hover: #5fd9cd;
+  --color-danger: #e0687a;
+  --color-bronze: #b08d3e;
+
+  --header-grad-top: #5b2f96;
+  --header-grad-bottom: #241640;
+  --header-highlight: rgba(95, 217, 205, 0.18);
+  --footer-grad-top: #1a0f2e;
+  --title-grad-start: #dff7f2;
+
+  // Same seal motif as the default theme, recolored from gold to teal so the
+  // page background doesn't keep reading as MTG gilt under a violet theme.
+  --pattern-seal-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(95,217,205,0.07)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 * {

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -40,6 +40,15 @@ export class AppShell {
       !this.authService.isGuest() &&
       !this.authService.hasSeenGeminiOnboarding(),
   );
+
+  constructor() {
+    // Reflects the active game on <body> (not just this component's own
+    // template) so the global, var()-driven color theme in styles.scss can
+    // re-skin the whole app per game, not just the header.
+    effect(() => {
+      document.body.dataset['game'] = this.gameService.currentSlug();
+    });
+  }
 
   setLang(lang: 'de' | 'en') {
     setAppLanguage(this.translate, lang);
