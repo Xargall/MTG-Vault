@@ -1,0 +1,26 @@
+name: Sync ygoprodeck_cards
+
+# Runs scripts/sync-ygoprodeck-cards.mjs - the Yu-Gi-Oh equivalent of
+# sync-scryfall-cards.yml (see that workflow's comment for the underlying
+# reasoning: PostgREST reads of this project's own tables have held up more
+# reliably than calling the live card API from the browser on every read).
+
+on:
+  schedule:
+    # Daily at 03:00 UTC - offset from sync-scryfall-cards.yml's 02:00 UTC
+    # run, though each runs on its own GitHub Actions runner regardless.
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/sync-ygoprodeck-cards.mjs
+        env:
+          SUPABASE_URL: https://coxcqblefdlcmeumuglq.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
