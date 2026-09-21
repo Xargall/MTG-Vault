@@ -43,6 +43,12 @@ $yugioh-surface-texture: repeating-linear-gradient(
   ),
   #{$noise-layer};
 
+// A scatter of faint lightning-bolt outlines instead of a directional
+// grain/weave - electric rather than woven or planked, for Pikachu.
+$pokemon-surface-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpolygon points='30,4 14,30 24,30 18,52 42,22 28,22' fill='none' stroke='rgba(247,213,29,0.09)' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E")
+    0 0 / 56px 56px repeat,
+  #{$noise-layer};
+
 :root {
   --color-bg: #17110b;
   // --color-surface-solid holds the same base color with no texture, for
@@ -152,6 +158,31 @@ body[data-game='yugioh'] {
   // Same seal motif as the default theme, recolored from gold to teal so the
   // page background doesn't keep reading as MTG gilt under a violet theme.
   --pattern-seal-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(95,217,205,0.07)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+body[data-game='pokemon'] {
+  // Pikachu: electric yellow, cheek-red danger, dark storm-brown base.
+  --color-bg: #170f05;
+  --color-surface-solid: #2a1f0c;
+  --color-surface: #{$pokemon-surface-texture}, var(--color-surface-solid);
+  --color-surface-alt: #3d2e10;
+  --color-border: #4a3814;
+  --color-border-strong: #b08d2e;
+  --color-text: #f7edc9;
+  --color-text-muted: #d9c78a;
+  --color-accent: #f7d51d;
+  --color-accent-hover: #ffe873;
+  --color-danger: #e0483f;
+  --color-bronze: #a67c27;
+
+  --header-grad-top: #8a5a12;
+  --header-grad-bottom: #2a1f0c;
+  --header-highlight: rgba(247, 213, 29, 0.18);
+  --footer-grad-top: #120c03;
+  --title-grad-start: #fff6d1;
+
+  // Same seal motif again, recolored to electric yellow.
+  --pattern-seal-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(247,213,29,0.07)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 * {
