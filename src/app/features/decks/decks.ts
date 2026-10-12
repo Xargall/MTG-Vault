@@ -301,11 +301,14 @@ export class Decks {
       const indexed = this.activeIndex()?.getEntry(rec.deck.fileName);
       if (!indexed) throw new Error(this.translate.instant('browseDecks.detailFailed'));
 
-      await this.deckService.addPreconDeck(rec.deck.name, rec.deck.type, rec.deck.releaseDate, rec.deck.fileName, {
-        heroCardId: indexed.heroCardId,
-        cards: indexed.cards,
-        skippedCount: indexed.skippedCount,
-      });
+      // Same as BrowseDecksDialog: an entry with skipped cards may be stale.
+      const precon = this.gameService.precon();
+      const detail =
+        indexed.skippedCount > 0 && precon
+          ? await precon.getDeckDetail(rec.deck.fileName)
+          : { heroCardId: indexed.heroCardId, cards: indexed.cards, skippedCount: indexed.skippedCount };
+
+      await this.deckService.addPreconDeck(rec.deck.name, rec.deck.type, rec.deck.releaseDate, rec.deck.fileName, detail);
       await this.loadDecks();
     } catch (error) {
       this.recommendationError.set(

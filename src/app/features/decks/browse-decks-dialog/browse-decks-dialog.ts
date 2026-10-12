@@ -203,8 +203,10 @@ export class BrowseDecksDialog {
     this.wishlistAdded.set(false);
     this.wishlistError.set(null);
 
+    // An entry with skipped cards may just predate Scryfall knowing the
+    // set (see DeckCardIndexService.build) - fetch it live instead.
     const indexed = this.deckCardIndexActive().getEntry(deck.fileName);
-    if (indexed) {
+    if (indexed && indexed.skippedCount === 0) {
       const detail: PreconDetail = { heroCardId: indexed.heroCardId, cards: indexed.cards, skippedCount: indexed.skippedCount };
       this.detail.set(detail);
       void this.loadDetailCards(detail);

@@ -69,17 +69,29 @@ export class DeckCardIndexService {
       }
       this.indexedCount.set(this.entries.size);
 
+      // A completed cache is usable right away - the refresh pass below
+      // still runs, but only re-fetches the few entries that need it.
       const complete = await idbGet(db, STORE_META, 'complete');
-      if (complete) {
-        this.ready.set(true);
-        return;
-      }
+      if (complete) this.ready.set(true);
     }
 
+    // Not just "anything missing from the cache": a precon that MTGJSON
+    // lists from its decklist announcement on has no scryfallIds yet until
+    // Scryfall catches up, so it got cached with every card skipped - and
+    // the old "complete, never look again" shortcut froze it like that for
+    // good. Reported on Keen Engineering (FDC, listed before its release):
+    // adding it created a deck stuck at 0% completion. Newly
+    // released precons were never picked up after the first build either.
     const list = await this.mtgPrecon.getDeckList();
-    const targets = list.filter(
-      (deck) => INDEXED_TYPES.includes(deck.type) && !this.entries.has(deck.fileName),
-    );
+    const targets = list.filter((deck) => {
+      if (!INDEXED_TYPES.includes(deck.type)) return false;
+      const cached = this.entries.get(deck.fileName);
+      return !cached || cached.skippedCount > 0;
+    });
+    if (targets.length === 0) {
+      this.ready.set(true);
+      return;
+    }
     this.totalCount.set(this.entries.size + targets.length);
 
     for (let i = 0; i < targets.length; i += BATCH_SIZE) {

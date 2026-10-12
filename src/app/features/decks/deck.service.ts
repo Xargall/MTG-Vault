@@ -113,6 +113,10 @@ export class DeckService {
     if (!userId) throw new Error('Nicht eingeloggt.');
     const gameId = this.gameService.currentGameId();
     if (!gameId) throw new Error('Kein aktives Spiel.');
+    // Would otherwise create a deck with no cards, permanently stuck at 0%.
+    if (detail.cards.length === 0) {
+      throw new Error('Die Kartenliste dieses Decks ist noch nicht verfügbar - bitte später erneut versuchen.');
+    }
 
     const { data: deck, error: deckError } = await this.supabase.client
       .from('decks')
