@@ -96,6 +96,10 @@ export class FormatDeckRecommendationsDialog {
   protected readonly checked = signal(0);
   protected readonly total = signal(0);
   protected readonly recommendations = signal<DeckRecommendation[]>([]);
+  // Off by default - cards already committed to another of the user's decks
+  // don't count as available. See CommanderRecommendationsDialog's own copy
+  // of this signal for the same reasoning.
+  protected readonly includeAssignedElsewhere = signal(false);
   private readonly collectionEntries = signal<CollectionEntry[]>([]);
   private readonly allDecks = signal<DeckEntry[]>([]);
 
@@ -182,6 +186,13 @@ export class FormatDeckRecommendationsDialog {
     if (format) void this.load(format);
   }
 
+  /** Re-runs the match against every already-fetched top deck - unlike CommanderRecommendationsDialog, the candidate list itself (fetchTopDecks) doesn't depend on the collection, so only the matching step needs to be redone. Cheaper to just reload than to add a second path. */
+  protected toggleIncludeAssignedElsewhere() {
+    this.includeAssignedElsewhere.update((value) => !value);
+    const format = this.selectedFormat();
+    if (format) void this.load(format);
+  }
+
   private async fetchTopDecks(format: string): Promise<SourceTopDeck[]> {
     if (this.source() === 'mtgo') {
       const decks = await this.mtgo.getTopDecks(format);
@@ -246,7 +257,7 @@ export class FormatDeckRecommendationsDialog {
               deckCards,
               cardsByName,
               collection,
-              allDecks,
+              this.includeAssignedElsewhere() ? [] : allDecks,
             );
             const matchPercent = totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0;
             const freeMatchPercent = totalCount > 0 ? Math.round((freeMatchedCount / totalCount) * 100) : 0;
@@ -294,7 +305,7 @@ export class FormatDeckRecommendationsDialog {
         deckCards,
         cardsByName,
         this.collectionEntries(),
-        this.allDecks(),
+        this.includeAssignedElsewhere() ? [] : this.allDecks(),
       );
       this.ownedCards.set(owned);
       this.assignedElsewhereCards.set(assignedElsewhere);

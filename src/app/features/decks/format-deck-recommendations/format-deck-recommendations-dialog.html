@@ -46,11 +46,9 @@
           <p class="state-message error">{{ detailError() }}</p>
         } @else {
           <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="freeDetailMatchPercent()" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar-fill progress-bar-fill--total" [style.width.%]="detailMatchPercent()"></div>
             <div class="progress-bar-fill progress-bar-fill--free" [style.width.%]="freeDetailMatchPercent()"></div>
             <span class="progress-bar-label">
-              {{ 'commanderRecs.freeMatchBadge' | translate: { percent: freeDetailMatchPercent() } }} ·
-              {{ 'commanderRecs.totalMatchBadge' | translate: { percent: detailMatchPercent() } }}
+              {{ 'commanderRecs.freeMatchBadge' | translate: { percent: freeDetailMatchPercent() } }}
             </span>
           </div>
 
@@ -152,6 +150,15 @@
         <p class="format-description">{{ descriptionKey | translate }}</p>
       }
 
+      <label class="include-assigned-toggle">
+        <input
+          type="checkbox"
+          [checked]="includeAssignedElsewhere()"
+          (change)="toggleIncludeAssignedElsewhere()"
+        />
+        {{ 'deckMatch.includeAssignedToggle' | translate }}
+      </label>
+
       @if (errorMessage()) {
         <p class="state-message error">{{ errorMessage() }}</p>
       } @else {
@@ -179,16 +186,13 @@
                   <p class="commander-name">{{ rec.name }}</p>
                   <p class="source-label">{{ rec.sourceLabel }}</p>
                   <p class="match-detail">
-                    {{ 'commanderRecs.cardsCount' | translate: { matched: rec.matchedCount, total: rec.totalCount } }}
+                    {{ 'commanderRecs.cardsCount' | translate: { matched: rec.freeMatchedCount, total: rec.totalCount } }}
                   </p>
                 </div>
 
                 <div class="match-badges">
                   <span class="match-badge match-badge--free" [class.is-complete]="rec.freeMatchPercent === 100">
                     {{ 'commanderRecs.freeMatchBadge' | translate: { percent: rec.freeMatchPercent } }}
-                  </span>
-                  <span class="match-badge match-badge--total">
-                    {{ 'commanderRecs.totalMatchBadge' | translate: { percent: rec.matchPercent } }}
                   </span>
                 </div>
               </button>
