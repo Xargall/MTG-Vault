@@ -46,31 +46,6 @@
             </div>
           }
 
-          @if (assignedElsewhereCards().length > 0) {
-            <h4>{{ 'commanderRecs.plannedElsewhereSection' | translate: { count: assignedElsewhereQuantityTotal() } }}</h4>
-            <div class="results-grid">
-              @for (entry of assignedElsewhereCards(); track entry.card.id) {
-                <div class="card-with-note">
-                  <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
-                  <div class="binding-detail-notes">
-                    @if (hasNotablePrintBreakdown(entry.printBreakdown)) {
-                      @for (print of entry.printBreakdown; track print.card.id) {
-                        <span class="binding-detail-note">{{ printBreakdownLabel(print) }}</span>
-                      }
-                    }
-
-                    @for (assigned of entry.assignedElsewhere; track assigned.deckId) {
-                      <span class="binding-detail-note">
-                        {{ 'deckDetail.assignedElsewhereNote' | translate: { deckName: assigned.deckName } }}
-                        ({{ assigned.quantity }}x)
-                      </span>
-                    }
-                  </div>
-                </div>
-              }
-            </div>
-          }
-
           @if (missingCards().length > 0 || unresolvedCards().length > 0) {
             <h4>{{ 'commanderRecs.missingSection' | translate: { count: missingQuantityTotal() } }}</h4>
             <div class="results-grid">

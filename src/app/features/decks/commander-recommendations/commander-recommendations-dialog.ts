@@ -16,7 +16,6 @@ import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.dire
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
 import {
-  AverageDeckAssignedCardMatch,
   AverageDeckCardMatch,
   PrintQuantity,
   UnresolvedAverageDeckCard,
@@ -109,12 +108,13 @@ export class CommanderRecommendationsDialog {
   protected readonly selectedRecommendation = signal<CommanderRecommendation | null>(null);
   protected readonly loadingDetail = signal(false);
   protected readonly detailError = signal<string | null>(null);
-  // "Owned" is further split three ways: ownedCards are free to use as-is,
-  // assignedElsewhereCards are fully owned but committed to another deck
-  // (see CommanderAssignedCard), missingCards aren't owned in sufficient
-  // quantity at all regardless of assignment.
+  // ownedCards are free to use as-is; missingCards are everything else the
+  // deck needs - genuinely not owned, *and* (while includeAssignedElsewhere
+  // is off) copies that are owned but committed to another deck. A card
+  // locked elsewhere isn't any more buildable than one never owned at all,
+  // so it belongs with the "still need to get this" bucket, not its own
+  // half-owned category.
   protected readonly ownedCards = signal<AverageDeckCardMatch[]>([]);
-  protected readonly assignedElsewhereCards = signal<AverageDeckAssignedCardMatch[]>([]);
   protected readonly missingCards = signal<AverageDeckCardMatch[]>([]);
   // Deck cards whose name never resolved to a real Card - still counted
   // below (see AverageDeckSplit's own doc comment), just with no tile to
@@ -127,15 +127,8 @@ export class CommanderRecommendationsDialog {
       .join(', ') || null,
   );
 
-  /** Total copies, not distinct cards - a card needing 2 counts as 2 toward this. Plain ownership, same as before this feature - includes assignedElsewhereCards too (still "owned", just not free), unaffected by the free/assigned-elsewhere split below. Drives detailMatchPercent; the section headers below use their own, narrower totals. */
-  protected readonly ownedQuantityTotal = computed(() =>
-    [...this.ownedCards(), ...this.assignedElsewhereCards()].reduce((sum, c) => sum + c.quantity, 0),
-  );
   protected readonly freeQuantityTotal = computed(() =>
     this.ownedCards().reduce((sum, c) => sum + c.quantity, 0),
-  );
-  protected readonly assignedElsewhereQuantityTotal = computed(() =>
-    this.assignedElsewhereCards().reduce((sum, c) => sum + c.quantity, 0),
   );
   // missingCards' own quantity is already the shortfall (splitAverageDeckByAvailability
   // computes it per card, not the card's full needed amount) - see its own doc comment.
@@ -144,18 +137,9 @@ export class CommanderRecommendationsDialog {
       this.missingCards().reduce((sum, c) => sum + c.quantity, 0) +
       this.unresolvedCards().reduce((sum, c) => sum + c.quantity, 0),
   );
-  private readonly totalQuantityNeeded = computed(
-    () =>
-      this.ownedQuantityTotal() +
-      this.missingCards().reduce((sum, c) => sum + c.quantity, 0) +
-      this.unresolvedCards().reduce((sum, c) => sum + c.quantity, 0),
-  );
+  private readonly totalQuantityNeeded = computed(() => this.freeQuantityTotal() + this.missingQuantityTotal());
 
-  protected readonly detailMatchPercent = computed(() => {
-    const total = this.totalQuantityNeeded();
-    return total > 0 ? Math.round((this.ownedQuantityTotal() / total) * 100) : 0;
-  });
-  /** Same split as the list's dual badge (see load()) - what's actually buildable with free cards alone, vs. detailMatchPercent's plain ownership total. */
+  /** Same split as the list's badge (see load()) - what's actually buildable with free cards alone. */
   protected readonly freeDetailMatchPercent = computed(() => {
     const total = this.totalQuantityNeeded();
     return total > 0 ? Math.round((this.freeQuantityTotal() / total) * 100) : 0;
@@ -313,7 +297,6 @@ export class CommanderRecommendationsDialog {
     this.wishlistAdded.set(false);
     this.wishlistError.set(null);
     this.ownedCards.set([]);
-    this.assignedElsewhereCards.set([]);
     this.missingCards.set([]);
     this.unresolvedCards.set([]);
 
@@ -334,8 +317,13 @@ export class CommanderRecommendationsDialog {
         this.includeAssignedElsewhere() ? [] : this.allDecks(),
       );
       this.ownedCards.set(owned);
-      this.assignedElsewhereCards.set(assignedElsewhere);
-      this.missingCards.set(missing);
+      // Cards locked into another deck aren't buildable right now either -
+      // same bucket as genuinely missing ones, no printBreakdown (there's no
+      // free printing to name, same reasoning as a never-owned card).
+      this.missingCards.set([
+        ...missing,
+        ...assignedElsewhere.map(({ card, quantity, ownedQty }) => ({ card, quantity, ownedQty, printBreakdown: [] })),
+      ]);
       this.unresolvedCards.set(unresolved);
     } catch (error) {
       this.detailError.set(
@@ -372,7 +360,7 @@ export class CommanderRecommendationsDialog {
     this.addingDeck.set(true);
     this.addDeckError.set(null);
     try {
-      const cards = mergeCardQuantities([...this.ownedCards(), ...this.assignedElsewhereCards(), ...this.missingCards()]);
+      const cards = mergeCardQuantities([...this.ownedCards(), ...this.missingCards()]);
       await this.deckService.addEdhrecDeck(rec.name, cards);
       this.deckAdded.set(true);
       this.added.emit();
