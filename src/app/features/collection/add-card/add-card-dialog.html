@@ -9,7 +9,7 @@
       <input
         type="text"
         class="search-input"
-        [placeholder]="'addCard.searchPlaceholder' | translate"
+        [placeholder]="searchPlaceholderKey() | translate"
         [ngModel]="query()"
         (ngModelChange)="onQueryChange($event)"
         autofocus
@@ -24,8 +24,10 @@
       } @else {
         <div class="results-grid">
           @for (card of results(); track card.id) {
-            <button type="button" class="result-item" (click)="selectName(card)">
+            <button type="button" class="result-item" (click)="selectCard(card)">
               <app-card-tile [card]="card" />
+              <span class="print-meta">{{ card.setName }}<!--
+                --> @if (card.rarity) { · {{ card.rarity }} }</span>
             </button>
           }
         </div>
