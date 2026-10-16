@@ -63,11 +63,11 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item
 
 @Injectable({ providedIn: 'root' })
 export class PokemonApiService implements CardApiService {
-  async searchCards(query: string): Promise<Card[]> {
+  async searchCards(query: string, signal?: AbortSignal): Promise<Card[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
-    const brief = await this.fetchBrief(trimmed);
+    const brief = await this.fetchBrief(trimmed, signal);
     const capped = brief.slice(0, MAX_SEARCH_RESULTS);
     const raw = await mapWithConcurrency(capped, HYDRATE_CONCURRENCY, (entry) => this.fetchDetail(entry.id));
     return raw.filter((c): c is TcgdexRawCard => c !== null).map((c) => this.toCard(c));
@@ -114,8 +114,8 @@ export class PokemonApiService implements CardApiService {
     return { card: this.toCard(raw), confidence: best.confidence };
   }
 
-  private async fetchBrief(name: string): Promise<TcgdexBriefCard[]> {
-    const response = await fetch(`${API_BASE}/cards?name=${encodeURIComponent(name)}`);
+  private async fetchBrief(name: string, signal?: AbortSignal): Promise<TcgdexBriefCard[]> {
+    const response = await fetch(`${API_BASE}/cards?name=${encodeURIComponent(name)}`, { signal });
     if (!response.ok) {
       if (response.status === 404) return [];
       throw new Error(`TCGdex-Anfrage fehlgeschlagen (${response.status})`);

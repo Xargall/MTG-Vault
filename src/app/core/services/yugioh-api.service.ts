@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 
 import { Card, YugiohBanlistStatus, YugiohCard } from '../models/card.model';
+import { withSignal } from '../utils/abortable-query';
 import { cleanOcrText, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification } from './card-api.interface';
 import { SupabaseService } from './supabase.service';
@@ -93,24 +94,20 @@ export class YugiohApiService implements CardApiService {
    * equivalent. Falls back to the live API only when the local cache has
    * nothing at all (not yet synced, or a genuinely brand-new card).
    */
-  async searchCards(query: string): Promise<Card[]> {
+  async searchCards(query: string, signal?: AbortSignal): Promise<Card[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
     const escaped = trimmed.replace(/[%_]/g, '\\$&');
     const [prefixResult, containsResult] = await Promise.all([
-      this.supabase.client
-        .from('ygoprodeck_cards')
-        .select('*')
-        .ilike('name', `${escaped}%`)
-        .order('name')
-        .limit(SEARCH_ROW_LIMIT),
-      this.supabase.client
-        .from('ygoprodeck_cards')
-        .select('*')
-        .ilike('name', `%${escaped}%`)
-        .order('name')
-        .limit(SEARCH_ROW_LIMIT),
+      withSignal(
+        this.supabase.client.from('ygoprodeck_cards').select('*').ilike('name', `${escaped}%`).order('name').limit(SEARCH_ROW_LIMIT),
+        signal,
+      ),
+      withSignal(
+        this.supabase.client.from('ygoprodeck_cards').select('*').ilike('name', `%${escaped}%`).order('name').limit(SEARCH_ROW_LIMIT),
+        signal,
+      ),
     ]);
 
     const prefixRows = (prefixResult.data ?? []) as YgoprodeckCardRow[];
