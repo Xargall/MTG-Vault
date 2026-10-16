@@ -195,6 +195,9 @@ export const en: typeof de = {
     matchModeStrict: 'Strict',
     matchModeFlexible: 'Flexible',
   },
+  deckMatch: {
+    includeAssignedToggle: 'Include cards from other decks',
+  },
   deckDetail: {
     missingCards: '{{count}} cards still missing from your collection.',
     unresolvedCards: "{{count}} card(s) couldn't be automatically matched (counted as missing, but shown without an image): {{names}}",
@@ -228,7 +231,6 @@ export const en: typeof de = {
     noResults: 'No matching commanders found.',
     cardsCount: '{{matched}} / {{total}} cards',
     freeMatchBadge: '{{percent}}% free',
-    totalMatchBadge: '{{percent}}% total',
     missingTag: 'Commander missing from collection',
     loadFailed: 'Recommendations could not be loaded.',
     backToList: '← Back to list',
@@ -241,7 +243,7 @@ export const en: typeof de = {
   },
   formatRecs: {
     title: 'Format Deck Recommendations',
-    hint: "Pick a format - real decks (Moxfield: most-liked community decks, MTGO: recent tournament results) get checked against your collection, including what's already planned in other decks.",
+    hint: 'Pick a format - real decks (Moxfield: most-liked community decks, MTGO: recent tournament results) get checked against your freely available cards.',
     formatStandard: 'Standard',
     formatStandardDescription:
       'A rotating format using only the newest sets from roughly the last 2 years - cheap to get into, but the card pool keeps changing.',

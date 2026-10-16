@@ -193,6 +193,9 @@ export const de = {
     matchModeStrict: 'Strikt',
     matchModeFlexible: 'Flexibel',
   },
+  deckMatch: {
+    includeAssignedToggle: 'Karten aus anderen Decks einbeziehen',
+  },
   deckDetail: {
     missingCards: '{{count}} Karten fehlen noch in der Sammlung.',
     unresolvedCards:
@@ -227,7 +230,6 @@ export const de = {
     noResults: 'Keine passenden Commander gefunden.',
     cardsCount: '{{matched}} / {{total}} Karten',
     freeMatchBadge: '{{percent}}% frei',
-    totalMatchBadge: '{{percent}}% gesamt',
     missingTag: 'Commander fehlt in Sammlung',
     loadFailed: 'Empfehlungen konnten nicht geladen werden.',
     backToList: '← Zurück zur Liste',
@@ -240,7 +242,7 @@ export const de = {
   },
   formatRecs: {
     title: 'Format-Deck-Empfehlungen',
-    hint: 'Wähle ein Format - echte Decks (Moxfield: beliebteste Community-Decks, MTGO: aktuelle Turnierergebnisse) werden gegen deine Sammlung geprüft, inklusive was schon in anderen Decks verplant ist.',
+    hint: 'Wähle ein Format - echte Decks (Moxfield: beliebteste Community-Decks, MTGO: aktuelle Turnierergebnisse) werden gegen deine frei verfügbaren Karten geprüft.',
     formatStandard: 'Standard',
     formatStandardDescription:
       'Rotierendes Format mit nur den neuesten Sets der letzten ~2 Jahre - günstiger Einstieg, aber der Kartenpool ändert sich laufend.',
