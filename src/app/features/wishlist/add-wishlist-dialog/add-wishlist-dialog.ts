@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -25,6 +25,12 @@ export class AddWishlistDialog {
   readonly close = output<void>();
   readonly added = output<void>();
 
+  // Only MTG search supports typing a set code (see MtgApiService.searchCards)
+  // - Yu-Gi-Oh/Pokémon still search by name only, so the hint stays accurate per game.
+  protected readonly searchPlaceholderKey = computed(() =>
+    this.gameService.currentSlug() === 'mtg' ? 'addCard.searchPlaceholderMtg' : 'addCard.searchPlaceholder',
+  );
+
   protected readonly query = signal('');
   protected readonly results = signal<Card[]>([]);
   protected readonly searching = signal(false);
@@ -42,6 +48,14 @@ export class AddWishlistDialog {
   protected readonly submitError = signal<string | null>(null);
 
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
+  // Aborts the previous search's actual request (not just its result) when
+  // a newer one starts - see AddCardDialog's own copy of this for why a
+  // plain debounce-clear alone isn't enough.
+  private abortController: AbortController | null = null;
+  // Set when a search result was reached by typing an exact set code (see
+  // selectCard) - lets backToPrints() know to skip straight back to search
+  // instead of landing on an empty prints list that was never fetched.
+  private readonly directPrint = signal(false);
 
   onQueryChange(value: string) {
     this.query.set(value);
@@ -50,6 +64,7 @@ export class AddWishlistDialog {
 
     const trimmed = value.trim();
     if (!trimmed) {
+      this.abortController?.abort();
       this.results.set([]);
       this.searching.set(false);
       return;
@@ -60,13 +75,33 @@ export class AddWishlistDialog {
   }
 
   private async search(query: string) {
+    this.abortController?.abort();
+    const controller = new AbortController();
+    this.abortController = controller;
+
     this.searchError.set(null);
     try {
-      this.results.set(await this.gameService.cardApi().searchCards(query));
+      const results = await this.gameService.cardApi().searchCards(query, controller.signal);
+      if (controller.signal.aborted) return; // a newer search already took over
+      this.results.set(results);
     } catch (error) {
+      if (controller.signal.aborted) return;
       this.searchError.set(error instanceof Error ? error.message : this.translate.instant('addCard.searchFailed'));
     } finally {
-      this.searching.set(false);
+      if (!controller.signal.aborted) this.searching.set(false);
+    }
+  }
+
+  /** Same shortcut as AddCardDialog: typing an exact set code and clicking one of its cards already landed on one specific print, so this skips the "pick a print" step instead of making the user find that same printing again in its full reprint history. */
+  protected selectCard(card: Card) {
+    const trimmed = this.query().trim().toLowerCase();
+    if (card.game === 'mtg' && card.setCode.toLowerCase() === trimmed) {
+      this.directPrint.set(true);
+      this.selectedName.set(card.name);
+      this.selectPrint(card);
+    } else {
+      this.directPrint.set(false);
+      void this.selectName(card);
     }
   }
 
@@ -88,6 +123,8 @@ export class AddWishlistDialog {
   backToSearch() {
     this.selectedName.set(null);
     this.prints.set([]);
+    this.selectedCard.set(null);
+    this.directPrint.set(false);
   }
 
   selectPrint(card: Card) {
@@ -98,6 +135,10 @@ export class AddWishlistDialog {
   }
 
   backToPrints() {
+    if (this.directPrint()) {
+      this.backToSearch();
+      return;
+    }
     this.selectedCard.set(null);
   }
 
