@@ -18,7 +18,6 @@ import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.dire
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
 import {
-  AverageDeckAssignedCardMatch,
   AverageDeckCardMatch,
   PrintQuantity,
   UnresolvedAverageDeckCard,
@@ -113,8 +112,12 @@ export class FormatDeckRecommendationsDialog {
   protected readonly selectedRecommendation = signal<DeckRecommendation | null>(null);
   protected readonly loadingDetail = signal(false);
   protected readonly detailError = signal<string | null>(null);
+  // ownedCards are free to use as-is; missingCards are everything else the
+  // deck needs - genuinely not owned, *and* (while includeAssignedElsewhere
+  // is off) copies that are owned but committed to another deck. See
+  // CommanderRecommendationsDialog's own copy of this split for the same
+  // reasoning.
   protected readonly ownedCards = signal<AverageDeckCardMatch[]>([]);
-  protected readonly assignedElsewhereCards = signal<AverageDeckAssignedCardMatch[]>([]);
   protected readonly missingCards = signal<AverageDeckCardMatch[]>([]);
   // Deck cards whose name never resolved to a real Card - still counted
   // below (see AverageDeckSplit's own doc comment), just with no tile to
@@ -127,14 +130,8 @@ export class FormatDeckRecommendationsDialog {
       .join(', ') || null,
   );
 
-  protected readonly ownedQuantityTotal = computed(() =>
-    [...this.ownedCards(), ...this.assignedElsewhereCards()].reduce((sum, c) => sum + c.quantity, 0),
-  );
   protected readonly freeQuantityTotal = computed(() =>
     this.ownedCards().reduce((sum, c) => sum + c.quantity, 0),
-  );
-  protected readonly assignedElsewhereQuantityTotal = computed(() =>
-    this.assignedElsewhereCards().reduce((sum, c) => sum + c.quantity, 0),
   );
   // missingCards' own quantity is already the shortfall (splitAverageDeckByAvailability
   // computes it per card, not the card's full needed amount) - see its own doc comment.
@@ -143,17 +140,8 @@ export class FormatDeckRecommendationsDialog {
       this.missingCards().reduce((sum, c) => sum + c.quantity, 0) +
       this.unresolvedCards().reduce((sum, c) => sum + c.quantity, 0),
   );
-  private readonly totalQuantityNeeded = computed(
-    () =>
-      this.ownedQuantityTotal() +
-      this.missingCards().reduce((sum, c) => sum + c.quantity, 0) +
-      this.unresolvedCards().reduce((sum, c) => sum + c.quantity, 0),
-  );
+  private readonly totalQuantityNeeded = computed(() => this.freeQuantityTotal() + this.missingQuantityTotal());
 
-  protected readonly detailMatchPercent = computed(() => {
-    const total = this.totalQuantityNeeded();
-    return total > 0 ? Math.round((this.ownedQuantityTotal() / total) * 100) : 0;
-  });
   protected readonly freeDetailMatchPercent = computed(() => {
     const total = this.totalQuantityNeeded();
     return total > 0 ? Math.round((this.freeQuantityTotal() / total) * 100) : 0;
@@ -291,7 +279,6 @@ export class FormatDeckRecommendationsDialog {
     this.wishlistAdded.set(false);
     this.wishlistError.set(null);
     this.ownedCards.set([]);
-    this.assignedElsewhereCards.set([]);
     this.missingCards.set([]);
     this.unresolvedCards.set([]);
 
@@ -308,8 +295,13 @@ export class FormatDeckRecommendationsDialog {
         this.includeAssignedElsewhere() ? [] : this.allDecks(),
       );
       this.ownedCards.set(owned);
-      this.assignedElsewhereCards.set(assignedElsewhere);
-      this.missingCards.set(missing);
+      // Cards locked into another deck aren't buildable right now either -
+      // same bucket as genuinely missing ones, no printBreakdown (there's no
+      // free printing to name, same reasoning as a never-owned card).
+      this.missingCards.set([
+        ...missing,
+        ...assignedElsewhere.map(({ card, quantity, ownedQty }) => ({ card, quantity, ownedQty, printBreakdown: [] })),
+      ]);
       this.unresolvedCards.set(unresolved);
     } catch (error) {
       this.detailError.set(
@@ -347,7 +339,7 @@ export class FormatDeckRecommendationsDialog {
     this.addingDeck.set(true);
     this.addDeckError.set(null);
     try {
-      const cards = mergeCardQuantities([...this.ownedCards(), ...this.assignedElsewhereCards(), ...this.missingCards()]);
+      const cards = mergeCardQuantities([...this.ownedCards(), ...this.missingCards()]);
       await this.deckService.addArchetypeDeck(rec.name, format, cards);
       this.deckAdded.set(true);
       this.added.emit();
