@@ -116,6 +116,7 @@ export const de = {
   addCard: {
     title: 'Karte hinzufügen',
     searchPlaceholder: 'Kartenname suchen…',
+    searchPlaceholderMtg: 'Kartenname oder Set-Kürzel suchen (z. B. „EMN“)…',
     searching: 'Suche…',
     searchFailed: 'Suche fehlgeschlagen.',
     noCardsFound: 'Keine Karten gefunden.',

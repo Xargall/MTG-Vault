@@ -118,6 +118,7 @@ export const en: typeof de = {
   addCard: {
     title: 'Add Card',
     searchPlaceholder: 'Search card name…',
+    searchPlaceholderMtg: 'Search card name or set code (e.g. "EMN")…',
     searching: 'Searching…',
     searchFailed: 'Search failed.',
     noCardsFound: 'No cards found.',
