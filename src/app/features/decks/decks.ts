@@ -29,7 +29,6 @@ import {
   getAvailabilityMatch,
   getDeckCardCount,
   getDeckShowcase,
-  getPreconMatch,
 } from './deck-stats';
 import { DeckEntry, DeckService } from './deck.service';
 
@@ -168,6 +167,12 @@ export class Decks {
     this.activeIndex()?.indexedCount(); // re-run as the background index grows
 
     const owned = buildOwnedMap(this.collectionEntries());
+    const ownedByOracle = buildOwnedOracleMap(this.collectionEntries());
+    const allDecks = this.decks();
+    // null - none of these precons are added yet, so no "current deck" to
+    // exclude from the assigned-elsewhere tally (same reasoning as
+    // BrowseDecksDialog's own precon preview).
+    const { byCardId, byOracleId } = buildAssignedElsewhereMaps(allDecks, null);
     const trackedFileNames = new Set(
       this.decks()
         .map((entry) => entry.deck.mtgjson_file_name)
@@ -182,7 +187,12 @@ export class Decks {
       const indexed = this.activeIndex()?.getEntry(deck.fileName);
       if (!indexed || indexed.cards.length === 0) continue;
 
-      const matchPercent = getPreconMatch(indexed.cards, owned);
+      // Cards already committed to one of the user's own decks don't count
+      // toward "buildable right now" - a precon that's only a high match
+      // because half its cards are locked into another deck shouldn't
+      // outrank one that's actually free to build.
+      const required = indexed.cards.map((card) => ({ cardId: card.cardId, quantity: card.quantity }));
+      const matchPercent = getAvailabilityMatch(required, owned, ownedByOracle, byCardId, byOracleId, 'flexible').percent;
       if (matchPercent < RECOMMENDATION_THRESHOLD) continue;
 
       const missingCardIds = indexed.cards
