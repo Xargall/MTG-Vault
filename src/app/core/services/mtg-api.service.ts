@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { environment } from '../../../environments/environment';
 import { Card, MtgCard } from '../models/card.model';
+import { withSignal } from '../utils/abortable-query';
 import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
 import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
 import {
@@ -171,6 +172,16 @@ const POSTGRES_BATCH_SIZE = 200;
 // query still surfaces plenty of distinct card names after every printing
 // of the same few cards is collapsed down to one.
 const SEARCH_ROW_LIMIT = 200;
+// A plain set code (e.g. "emn") typed into the search box, with nothing
+// else - real MTG set codes run 2-6 alphanumeric characters with no spaces,
+// so this cheaply rules out an actual card name (always longer and/or
+// containing a space) before bothering with the extra query. Checked
+// against actual set_code rows below rather than a fixed-length regex alone -
+// a short card name could otherwise coincidentally match the shape.
+const SET_CODE_QUERY_PATTERN = /^[a-z0-9]{2,6}$/i;
+// Generous enough for any real set (even combined box-topper/number lists)
+// without a limit - this is "show me the whole set", not a ranked search.
+const SET_CARDS_LIMIT = 600;
 // Mobile networks hit Scryfall 504s (gateway timeout) far more often than
 // desktop - retried with exponential backoff (1s, 2s, 4s) rather than
 // surfacing the failure immediately. A thrown network error (offline blip,
@@ -287,30 +298,40 @@ export class MtgApiService implements CardApiService {
    * matches ("Sol" also matches "Agrus Kos, Eternal Soldier"), which can
    * bury the obvious card behind less relevant ones.
    */
-  async searchCards(query: string): Promise<Card[]> {
+  async searchCards(query: string, signal?: AbortSignal): Promise<Card[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
+    // A bare set code (e.g. "emn") browses that whole set instead of
+    // searching by name - falls through to the name search below if it
+    // doesn't actually match a real set (so a short card name typed alone
+    // still works as a normal search).
+    if (SET_CODE_QUERY_PATTERN.test(trimmed)) {
+      const setCards = await this.getCardsBySetCode(trimmed, signal);
+      if (setCards.length > 0) return setCards;
+    }
+
     const pattern = escapeRegExp(trimmed);
     const [prefixResult, wordResult] = await Promise.all([
-      this.supabase.client
-        .from('scryfall_cards')
-        .select('*')
-        .ilike('name', `${trimmed}%`)
-        .order('name')
-        .limit(SEARCH_ROW_LIMIT),
-      this.supabase.client
-        .from('scryfall_cards')
-        .select('*')
-        // PostgREST's case-insensitive regex operator is the keyword
-        // "imatch" (~*), not the raw symbol - passing "~*" as the operator
-        // string sends `name=~*.<value>` on the wire, which PostgREST
-        // rejects with a 400 ("unknown operator") for every query, silently
-        // breaking word-boundary search results (e.g. "Sol Ring") even
-        // though the prefix-match pass above still succeeds.
-        .filter('name', 'imatch', `\\y${pattern}`)
-        .order('name')
-        .limit(SEARCH_ROW_LIMIT),
+      withSignal(
+        this.supabase.client.from('scryfall_cards').select('*').ilike('name', `${trimmed}%`).order('name').limit(SEARCH_ROW_LIMIT),
+        signal,
+      ),
+      withSignal(
+        this.supabase.client
+          .from('scryfall_cards')
+          .select('*')
+          // PostgREST's case-insensitive regex operator is the keyword
+          // "imatch" (~*), not the raw symbol - passing "~*" as the operator
+          // string sends `name=~*.<value>` on the wire, which PostgREST
+          // rejects with a 400 ("unknown operator") for every query, silently
+          // breaking word-boundary search results (e.g. "Sol Ring") even
+          // though the prefix-match pass above still succeeds.
+          .filter('name', 'imatch', `\\y${pattern}`)
+          .order('name')
+          .limit(SEARCH_ROW_LIMIT),
+        signal,
+      ),
     ]);
     if (prefixResult.error) throw prefixResult.error;
     if (wordResult.error) throw wordResult.error;
@@ -318,6 +339,39 @@ export class MtgApiService implements CardApiService {
     const prefixRows = (prefixResult.data ?? []) as ScryfallCardRow[];
     const wordRows = (wordResult.data ?? []) as ScryfallCardRow[];
     return this.dedupeRowsByName([...prefixRows, ...wordRows]).map((row) => this.rowToCard(row));
+  }
+
+  /**
+   * Every card printed in one set (e.g. "emn" -> every Eldritch Moon card),
+   * for browsing/adding a whole set at once instead of searching by name.
+   * Returns [] for anything that isn't actually a known set_code (the
+   * caller falls back to a plain name search then) rather than throwing -
+   * typing a short, real card name that happens to look like a set code
+   * (shape-checked by SET_CODE_QUERY_PATTERN, not existence-checked) must
+   * still behave like a normal search.
+   */
+  private async getCardsBySetCode(code: string, signal?: AbortSignal): Promise<Card[]> {
+    const { data, error } = await withSignal(
+      this.supabase.client.from('scryfall_cards').select('*').eq('set_code', code.toLowerCase()).limit(SET_CARDS_LIMIT),
+      signal,
+    );
+    if (error) throw error;
+
+    const rows = (data ?? []) as ScryfallCardRow[];
+    // collector_number is text ("1", "10", "280a", "★7", ...) - sorting it
+    // as a plain string would put "10" before "2", scattering a set's own
+    // printed order. Parsing the leading digits and falling back to a plain
+    // string compare for anything after/without them (promos, foil-etched
+    // suffixes) keeps the common case in actual checklist order.
+    rows.sort((a, b) => {
+      const numA = parseInt(a.collector_number, 10);
+      const numB = parseInt(b.collector_number, 10);
+      if (Number.isNaN(numA) || Number.isNaN(numB) || numA !== numB) {
+        return (Number.isNaN(numA) ? Infinity : numA) - (Number.isNaN(numB) ? Infinity : numB);
+      }
+      return a.collector_number.localeCompare(b.collector_number);
+    });
+    return rows.map((row) => this.rowToCard(row));
   }
 
   async getCard(id: string): Promise<Card | null> {
