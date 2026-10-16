@@ -40,21 +40,6 @@ export function getOwnedQuantity(
   return oracleQty + (owned.get(card.cardId) ?? 0);
 }
 
-function matchPercent(required: RequiredCard[], owned: Map<string, number>, ownedByOracle?: Map<string, number>): number {
-  let needed = 0;
-  let matched = 0;
-  for (const item of required) {
-    needed += item.quantity;
-    matched += Math.min(item.quantity, getOwnedQuantity(item, owned, ownedByOracle));
-  }
-  return needed > 0 ? Math.round((matched / needed) * 100) : 0;
-}
-
-/** `ownedByOracle` is optional - callers with only cardId+quantity pairs (no resolved Card, e.g. the precon-recommendations list, which never fetches full cards for perf reasons) still get a correct card_id-only match; callers that already resolved full cards (browse-decks-dialog's preview) pass richer RequiredCard entries (with oracleId) plus this map to get the same any-printing matching. A "My Deck"'s own match badge uses getAvailabilityMatch instead (see decks.ts) - it accounts for cards already committed to other decks, which plain ownership here does not. */
-export function getPreconMatch(cards: RequiredCard[], owned: Map<string, number>, ownedByOracle?: Map<string, number>): number {
-  return matchPercent(cards, owned, ownedByOracle);
-}
-
 /** Shared by the precon preview (BrowseDecksDialog) and the commander preview (CommanderRecommendationsDialog) - same three-way split regardless of whether cards are keyed by id or by name. */
 export function getCardOwnedStatus(neededQty: number, ownedQty: number): CardOwnedStatus {
   if (ownedQty >= neededQty) return 'owned';
@@ -103,6 +88,17 @@ export function buildAssignedElsewhereMaps(
     }
   }
   return { byCardId, byOracleId };
+}
+
+/** Narrows a collection down to entries that still have at least one free (not `is_assigned` to another deck) copy - used to keep deck-recommendation candidate discovery (which colors/commanders are even worth considering) from being skewed by cards that are only "owned" on paper because they're locked into an existing deck. Aggregate (oracle/card-id level) availability, same as getCardAvailability - not a per-physical-row split, since assignment itself isn't tracked per print. */
+export function getFreelyOwnedEntries(entries: CollectionEntry[], allDecks: DeckEntry[]): CollectionEntry[] {
+  const owned = buildOwnedMap(entries);
+  const ownedByOracle = buildOwnedOracleMap(entries);
+  const { byCardId, byOracleId } = buildAssignedElsewhereMaps(allDecks, null);
+  return entries.filter(({ row, card }) => {
+    const availability = getCardAvailability({ cardId: row.card_id, oracleId: card.oracleId }, row.quantity, owned, ownedByOracle, byCardId, byOracleId);
+    return availability.available > 0;
+  });
 }
 
 export function getCardAvailability(
