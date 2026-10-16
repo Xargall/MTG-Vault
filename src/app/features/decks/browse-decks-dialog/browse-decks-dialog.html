@@ -64,28 +64,39 @@
             }
           </span>
 
-          <div class="match-mode-toggle" role="radiogroup" [attr.aria-label]="'browseDecks.matchModeLabel' | translate">
-            <button
-              type="button"
-              class="match-mode-option"
-              [class.is-selected]="matchMode() === 'strict'"
-              role="radio"
-              [attr.aria-checked]="matchMode() === 'strict'"
-              (click)="matchMode.set('strict')"
-            >
-              {{ 'browseDecks.matchModeStrict' | translate }}
-            </button>
-            <button
-              type="button"
-              class="match-mode-option"
-              [class.is-selected]="matchMode() === 'flexible'"
-              role="radio"
-              [attr.aria-checked]="matchMode() === 'flexible'"
-              (click)="matchMode.set('flexible')"
-            >
-              {{ 'browseDecks.matchModeFlexible' | translate }}
-            </button>
-          </div>
+          <label class="include-assigned-toggle">
+            <input
+              type="checkbox"
+              [checked]="includeAssignedElsewhere()"
+              (change)="includeAssignedElsewhere.set(!includeAssignedElsewhere())"
+            />
+            {{ 'deckMatch.includeAssignedToggle' | translate }}
+          </label>
+
+          @if (!includeAssignedElsewhere()) {
+            <div class="match-mode-toggle" role="radiogroup" [attr.aria-label]="'browseDecks.matchModeLabel' | translate">
+              <button
+                type="button"
+                class="match-mode-option"
+                [class.is-selected]="matchMode() === 'strict'"
+                role="radio"
+                [attr.aria-checked]="matchMode() === 'strict'"
+                (click)="matchMode.set('strict')"
+              >
+                {{ 'browseDecks.matchModeStrict' | translate }}
+              </button>
+              <button
+                type="button"
+                class="match-mode-option"
+                [class.is-selected]="matchMode() === 'flexible'"
+                role="radio"
+                [attr.aria-checked]="matchMode() === 'flexible'"
+                (click)="matchMode.set('flexible')"
+              >
+                {{ 'browseDecks.matchModeFlexible' | translate }}
+              </button>
+            </div>
+          }
           @if (d.skippedCount > 0) {
             <p class="state-message">
               {{

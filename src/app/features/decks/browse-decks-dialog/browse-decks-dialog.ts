@@ -94,8 +94,14 @@ export class BrowseDecksDialog {
   // 'flexible' (a partially-available card still earns half credit) is the
   // default; 'strict' only credits a fully-available card. Deliberately not
   // reset when switching between previewed decks - it's a standing search
-  // preference, not per-deck state.
+  // preference, not per-deck state. Only matters while includeAssignedElsewhere
+  // is off - once every card counts as available regardless of other decks,
+  // there's never a "partially available" case left for strict/flexible to
+  // disagree about.
   protected readonly matchMode = signal<MatchMode>('flexible');
+  // Off by default - cards already committed to another of the user's decks
+  // don't count as available. Same standing-preference reasoning as matchMode.
+  protected readonly includeAssignedElsewhere = signal(false);
 
   protected readonly availabilityMatch = computed(() => {
     const cards = this.detailCards();
@@ -108,7 +114,10 @@ export class BrowseDecksDialog {
     }));
     const owned = buildOwnedMap(this.collectionEntries());
     const ownedByOracle = buildOwnedOracleMap(this.collectionEntries());
-    const { byCardId, byOracleId } = buildAssignedElsewhereMaps(this.myDecks(), null);
+    const { byCardId, byOracleId } = buildAssignedElsewhereMaps(
+      this.includeAssignedElsewhere() ? [] : this.myDecks(),
+      null,
+    );
     return getAvailabilityMatch(required, owned, ownedByOracle, byCardId, byOracleId, this.matchMode());
   });
 

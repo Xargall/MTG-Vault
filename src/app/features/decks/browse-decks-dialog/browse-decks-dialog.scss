@@ -149,6 +149,15 @@
   }
 }
 
+.include-assigned-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
 .match-mode-toggle {
   display: inline-flex;
   align-self: flex-start;
