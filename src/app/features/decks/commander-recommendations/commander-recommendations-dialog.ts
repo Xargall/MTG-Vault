@@ -20,6 +20,7 @@ import {
   AverageDeckCardMatch,
   PrintQuantity,
   UnresolvedAverageDeckCard,
+  getFreelyOwnedEntries,
   getPreciseAverageDeckMatch,
   mergeCardQuantities,
   splitAverageDeckByAvailability,
@@ -87,6 +88,11 @@ export class CommanderRecommendationsDialog {
   protected readonly checked = signal(0);
   protected readonly total = signal(0);
   protected readonly recommendations = signal<CommanderRecommendation[]>([]);
+  // Off by default - cards already committed to another of the user's decks
+  // don't count as available. Toggling re-runs the whole scan (see load()):
+  // it changes which colors/commanders are even worth considering, not just
+  // the displayed percentage.
+  protected readonly includeAssignedElsewhere = signal(false);
   private readonly collectionEntries = signal<CollectionEntry[]>([]);
   // Every one of the user's decks - needed for the "already planned
   // elsewhere" split below (see buildAssignedElsewhereMaps). Fetched once
@@ -167,6 +173,12 @@ export class CommanderRecommendationsDialog {
     this.load();
   }
 
+  /** Re-runs the whole scan - the toggle changes which colors/commanders are considered at all (see discoveryPool in load()), not just the displayed percentage, so a cheap in-place re-sort isn't enough. */
+  protected toggleIncludeAssignedElsewhere() {
+    this.includeAssignedElsewhere.update((value) => !value);
+    void this.load();
+  }
+
   private async load() {
     this.loading.set(true);
     this.errorMessage.set(null);
@@ -180,8 +192,16 @@ export class CommanderRecommendationsDialog {
       this.collectionEntries.set(collection);
       this.allDecks.set(allDecks);
 
+      // Discovery runs against free cards only by default - a color or
+      // commander only owned via a card that's locked into another deck
+      // isn't actually buildable, so it shouldn't shape which candidates get
+      // considered in the first place (see includeAssignedElsewhere).
+      const discoveryPool = this.includeAssignedElsewhere()
+        ? collection
+        : getFreelyOwnedEntries(collection, allDecks);
+
       const ownedCommanders = dedupeByCardName(
-        collection.filter(({ card }) => card.game === 'mtg' && isLegendaryCreature(card.typeLine)),
+        discoveryPool.filter(({ card }) => card.game === 'mtg' && isLegendaryCreature(card.typeLine)),
       );
       const ownedCommanderNames = new Set(ownedCommanders.map((entry) => entry.card.name.toLowerCase()));
 
@@ -193,7 +213,7 @@ export class CommanderRecommendationsDialog {
       // size, and narrowed further to just the identities this collection's
       // own colors could actually cast (colorless always qualifies).
       const ownedColors = new Set(
-        collection.flatMap(({ card }) => (card.game === 'mtg' ? card.colorIdentity : [])),
+        discoveryPool.flatMap(({ card }) => (card.game === 'mtg' ? card.colorIdentity : [])),
       );
       const relevantIdentities = EDHREC_COLOR_IDENTITIES.filter((identity) =>
         identity.colors.every((color) => ownedColors.has(color)),
@@ -260,7 +280,7 @@ export class CommanderRecommendationsDialog {
               deckCards,
               cardsByName,
               collection,
-              allDecks,
+              this.includeAssignedElsewhere() ? [] : allDecks,
             );
             const matchPercent = totalCount > 0 ? Math.round((matchedCount / totalCount) * 100) : 0;
             const freeMatchPercent = totalCount > 0 ? Math.round((freeMatchedCount / totalCount) * 100) : 0;
@@ -311,7 +331,7 @@ export class CommanderRecommendationsDialog {
         deckCards,
         cardsByName,
         this.collectionEntries(),
-        this.allDecks(),
+        this.includeAssignedElsewhere() ? [] : this.allDecks(),
       );
       this.ownedCards.set(owned);
       this.assignedElsewhereCards.set(assignedElsewhere);

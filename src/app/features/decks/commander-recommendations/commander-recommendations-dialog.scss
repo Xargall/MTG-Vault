@@ -55,6 +55,15 @@
   color: var(--color-text-muted);
 }
 
+.include-assigned-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
 .state-message {
   color: var(--color-text-muted);
   margin: 0;
@@ -164,16 +173,6 @@
   }
 }
 
-// Free-of-other-deck-claims is the primary, decision-driving number - the
-// total (incl. already-planned-elsewhere) is secondary context, so it's
-// visually smaller/muted rather than matching weight with the free badge.
-.match-badge--total {
-  padding: 1px 8px;
-  font-size: 0.65rem;
-  font-weight: 500;
-  background: transparent;
-}
-
 .detail-view {
   display: flex;
   flex-direction: column;
@@ -223,19 +222,11 @@
   overflow: hidden;
 }
 
-// Two fills layered on top of each other (not side by side) - the total
-// (incl. already-planned-elsewhere) fill sits underneath, dimmer and always
-// at least as wide, so the free fill on top visually reads as "this much of
-// the total bar is actually usable right now".
 .progress-bar-fill {
   position: absolute;
   inset: 0;
   height: 100%;
   transition: width 0.3s ease;
-
-  &--total {
-    background: var(--color-border-strong);
-  }
 
   &--free {
     background: linear-gradient(180deg, var(--color-accent-hover) 0%, var(--color-accent) 100%);
