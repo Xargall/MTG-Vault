@@ -26,7 +26,8 @@ export interface MtgIdentificationResult {
 }
 
 export interface CardApiService {
-  searchCards(query: string): Promise<Card[]>;
+  /** `signal`, when given, lets a caller abort a stale search (e.g. the user kept typing) - without it, an in-flight request from an earlier keystroke can still resolve after a later one and overwrite its results. */
+  searchCards(query: string, signal?: AbortSignal): Promise<Card[]>;
   getCard(id: string): Promise<Card | null>;
   getCardsByIds(ids: string[]): Promise<Card[]>;
   getPrints(name: string): Promise<Card[]>;
