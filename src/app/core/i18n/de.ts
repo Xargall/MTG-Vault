@@ -234,7 +234,6 @@ export const de = {
     loadFailed: 'Empfehlungen konnten nicht geladen werden.',
     backToList: '← Zurück zur Liste',
     ownedSection: 'Frei verfügbar ({{count}})',
-    plannedElsewhereSection: 'In anderen Decks verplant ({{count}})',
     missingSection: 'Noch fehlend ({{count}})',
     detailFailed: 'Kartenliste konnte nicht geladen werden.',
     addDeckFailed: 'Deck konnte nicht hinzugefügt werden.',

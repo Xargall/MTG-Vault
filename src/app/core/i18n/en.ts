@@ -235,7 +235,6 @@ export const en: typeof de = {
     loadFailed: 'Recommendations could not be loaded.',
     backToList: '← Back to list',
     ownedSection: 'Free to use ({{count}})',
-    plannedElsewhereSection: 'Planned in other decks ({{count}})',
     missingSection: 'Still missing ({{count}})',
     detailFailed: 'Card list could not be loaded.',
     addDeckFailed: 'Deck could not be added.',
