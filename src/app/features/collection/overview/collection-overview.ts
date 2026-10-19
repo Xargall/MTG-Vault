@@ -16,6 +16,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AuthService } from '../../../core/services/auth.service';
+import { CardDisplayLanguageService } from '../../../core/services/card-display-language.service';
 import { GameService } from '../../../core/services/game.service';
 import { DeckEntry, DeckService } from '../../decks/deck.service';
 import { AddCardDialog } from '../add-card/add-card-dialog';
@@ -58,6 +59,7 @@ export class CollectionOverview {
   private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly cardDisplayLanguage = inject(CardDisplayLanguageService);
   protected readonly gameService = inject(GameService);
   protected readonly authService = inject(AuthService);
 
@@ -140,6 +142,11 @@ export class CollectionOverview {
 
     effect(() => {
       this.gameService.currentSlug();
+      // Re-fetches card data on a card-display-language switch too (see
+      // CardDisplayLanguageService/MtgApiService.translateCards) - the
+      // already-loaded entries' card.name/imageUrl wouldn't otherwise update
+      // until some unrelated reload happened to fire.
+      this.cardDisplayLanguage.current();
       untracked(() => this.load());
     });
 

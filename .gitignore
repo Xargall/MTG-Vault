@@ -47,6 +47,7 @@ supabase/.temp
 # Environment secrets
 /src/environments/environment.ts
 /src/environments/.supabase_token.env
+/src/environments/.supabase_service_role.env
 
 # Agent skills (installed via npx skills)
 /.agents

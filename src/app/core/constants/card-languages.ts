@@ -4,7 +4,10 @@
 // never a card-data lookup key: the local scryfall_cards mirror only carries
 // English-majority prints (see supabase/sql/016_scryfall_cards.sql), so
 // there's no real per-language Scryfall record to join against here.
-export const DEFAULT_CARD_LANGUAGE = 'en';
+// Most of this collection is bought/opened locally (German prints) - a
+// manually-added or auto-detected-nothing card defaults here rather than to
+// English, so the common case needs no manual correction.
+export const DEFAULT_CARD_LANGUAGE = 'de';
 
 export interface CardLanguageOption {
   /** Stored value (collection_cards.language) and the key this list is keyed by. */

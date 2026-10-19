@@ -1,38 +1,38 @@
 <div class="card-tile" [class.card-tile--missing]="status() === 'missing'" [class.card-tile--partial]="status() === 'partial'">
-  @if (quantity() !== null) {
-    <span class="quantity-badge">×{{ quantity() }}</span>
-  }
+  <div class="image-wrapper">
+    @if (quantity() !== null) {
+      <span class="quantity-badge">×{{ quantity() }}</span>
+    }
 
-  @if (language(); as lang) {
-    @if (lang !== 'en') {
+    @if (status(); as s) {
+      <span class="status-badge status-badge--{{ s }}" aria-hidden="true">
+        @if (s === 'owned') {
+          ✓
+        } @else if (s === 'partial') {
+          !
+        } @else {
+          ✕
+        }
+      </span>
+    }
+
+    @if (language(); as lang) {
       <span class="language-badge">{{ lang.toUpperCase() }}</span>
     }
-  }
 
-  @if (status(); as s) {
-    <span class="status-badge status-badge--{{ s }}" aria-hidden="true">
-      @if (s === 'owned') {
-        ✓
-      } @else if (s === 'partial') {
-        !
-      } @else {
-        ✕
-      }
-    </span>
-  }
-
-  @if (card().imageUrlSmall ?? card().imageUrl; as url) {
-    <img
-      class="card-image"
-      [class.skeleton-shimmer]="!imageLoaded()"
-      [src]="url"
-      [alt]="card().name"
-      loading="lazy"
-      (load)="imageLoaded.set(true)"
-    />
-  } @else {
-    <div class="card-placeholder">{{ card().name }}</div>
-  }
+    @if (card().imageUrlSmall ?? card().imageUrl; as url) {
+      <img
+        class="card-image"
+        [class.skeleton-shimmer]="!imageLoaded()"
+        [src]="url"
+        [alt]="card().name"
+        loading="lazy"
+        (load)="imageLoaded.set(true)"
+      />
+    } @else {
+      <div class="card-placeholder">{{ card().name }}</div>
+    }
+  </div>
 
   <p class="card-name">{{ card().name }}</p>
 </div>

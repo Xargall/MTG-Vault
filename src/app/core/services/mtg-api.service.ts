@@ -15,6 +15,7 @@ import {
 } from '../utils/set-code-parser';
 import { OcrLineLike, cleanOcrText, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification, MtgIdentificationResult, ScoredCandidate } from './card-api.interface';
+import { CardDisplayLanguageService } from './card-display-language.service';
 import { MtgBulkDataService } from './mtg-bulk-data.service';
 import { SupabaseService } from './supabase.service';
 
@@ -73,6 +74,13 @@ interface ScryfallCardRow {
   oracle_id: string;
   name: string;
   printed_name: string | null;
+  // Scryfall's own printed-language code (e.g. 'en', 'de', 'ja') - this row
+  // is one specific printing in one specific language; the same oracle_id
+  // has a separate row per language it was ever printed in (see
+  // 025_scryfall_cards_lang.sql). Backs the card-display language toggle
+  // (MtgApiService.translateCards) - unrelated to collection_cards.language,
+  // which tracks which language copy a user physically owns.
+  lang: string;
   image_url: string | null;
   set_code: string;
   set_name: string;
@@ -206,6 +214,7 @@ export class MtgApiService implements CardApiService {
   // (that service never depends back on this one).
   private readonly bulkData = inject(MtgBulkDataService);
   private readonly supabase = inject(SupabaseService);
+  private readonly displayLanguage = inject(CardDisplayLanguageService);
 
   // Every Scryfall call funnels through this queue (max 10 req/s, per
   // Scryfall's documented limit) and carries an identifying User-Agent -
@@ -310,13 +319,22 @@ export class MtgApiService implements CardApiService {
     // still works as a normal search).
     if (SET_CODE_QUERY_PATTERN.test(trimmed)) {
       const setCards = await this.getCardsBySetCode(trimmed, signal);
-      if (setCards.length > 0) return setCards;
+      if (setCards.length > 0) return this.translateCards(setCards);
     }
 
     const pattern = escapeRegExp(trimmed);
     const [prefixResult, wordResult] = await Promise.all([
       withSignal(
-        this.supabase.client.from('scryfall_cards').select('*').ilike('name', `${trimmed}%`).order('name').limit(SEARCH_ROW_LIMIT),
+        this.supabase.client
+          .from('scryfall_cards')
+          .select('*')
+          .ilike('name', `${trimmed}%`)
+          // One row per name per language (see 025_scryfall_cards_lang.sql) -
+          // without this, every non-English printing of the same card shows
+          // up as its own extra, visually-duplicate-looking search result.
+          .eq('lang', 'en')
+          .order('name')
+          .limit(SEARCH_ROW_LIMIT),
         signal,
       ),
       withSignal(
@@ -330,6 +348,7 @@ export class MtgApiService implements CardApiService {
           // breaking word-boundary search results (e.g. "Sol Ring") even
           // though the prefix-match pass above still succeeds.
           .filter('name', 'imatch', `\\y${pattern}`)
+          .eq('lang', 'en')
           .order('name')
           .limit(SEARCH_ROW_LIMIT),
         signal,
@@ -340,7 +359,8 @@ export class MtgApiService implements CardApiService {
 
     const prefixRows = (prefixResult.data ?? []) as ScryfallCardRow[];
     const wordRows = (wordResult.data ?? []) as ScryfallCardRow[];
-    return this.dedupeRowsByName([...prefixRows, ...wordRows]).map((row) => this.rowToCard(row));
+    const cards = this.dedupeRowsByName([...prefixRows, ...wordRows]).map((row) => this.rowToCard(row));
+    return this.translateCards(cards);
   }
 
   /**
@@ -354,7 +374,15 @@ export class MtgApiService implements CardApiService {
    */
   private async getCardsBySetCode(code: string, signal?: AbortSignal): Promise<Card[]> {
     const { data, error } = await withSignal(
-      this.supabase.client.from('scryfall_cards').select('*').eq('set_code', code.toLowerCase()).limit(SET_CARDS_LIMIT),
+      this.supabase.client
+        .from('scryfall_cards')
+        .select('*')
+        .eq('set_code', code.toLowerCase())
+        // One row per card per language (see 025_scryfall_cards_lang.sql) -
+        // without this, browsing a set lists every card once per language
+        // it was printed in.
+        .eq('lang', 'en')
+        .limit(SET_CARDS_LIMIT),
       signal,
     );
     if (error) throw error;
@@ -379,22 +407,52 @@ export class MtgApiService implements CardApiService {
   async getCard(id: string): Promise<Card | null> {
     const { data, error } = await this.supabase.client.from('scryfall_cards').select('*').eq('id', id).maybeSingle();
     if (error) throw error;
-    return data ? this.rowToCard(data as ScryfallCardRow) : null;
+    if (!data) return null;
+    const [card] = await this.translateCards([this.rowToCard(data as ScryfallCardRow)]);
+    return card;
   }
 
   /** Exact, language-independent lookup by set code + collector number (e.g. "iko"/"123"). Tries both the unpadded and zero-padded 4-digit form (see collectorNumberVariants) - Scryfall's own stored collector_number isn't consistently one or the other across sets. */
   async getCardBySetAndNumber(setCode: string, collectorNumber: string): Promise<Card | null> {
     for (const variant of this.collectorNumberVariants(collectorNumber)) {
-      const { data, error } = await this.supabase.client
-        .from('scryfall_cards')
-        .select('*')
-        .eq('set_code', setCode.toLowerCase())
-        .eq('collector_number', variant)
-        .maybeSingle();
-      if (error) throw error;
-      if (data) return this.rowToCard(data as ScryfallCardRow);
+      const row = await this.lookupScryfallCardRow(setCode.toLowerCase(), variant);
+      if (row) {
+        const [card] = await this.translateCards([this.rowToCard(row)]);
+        return card;
+      }
     }
     return null;
+  }
+
+  /**
+   * One row per set+number, preferring the English printing - under all_cards
+   * (see 025_scryfall_cards_lang.sql) every language a card was printed in is
+   * its own row sharing the same set_code+collector_number, so an unfiltered
+   * query here would return several rows instead of one. Falls back to
+   * whatever language IS available (`.limit(1)`, no particular order beyond
+   * that) for the rare card never printed in English at all - the same
+   * "default_cards" fallback this table used to get for free from Scryfall's
+   * own bulk file curation.
+   */
+  private async lookupScryfallCardRow(setCode: string, collectorNumber: string): Promise<ScryfallCardRow | null> {
+    const { data: englishRow, error: englishError } = await this.supabase.client
+      .from('scryfall_cards')
+      .select('*')
+      .eq('set_code', setCode)
+      .eq('collector_number', collectorNumber)
+      .eq('lang', 'en')
+      .maybeSingle();
+    if (englishError) throw englishError;
+    if (englishRow) return englishRow as ScryfallCardRow;
+
+    const { data: anyRows, error: anyError } = await this.supabase.client
+      .from('scryfall_cards')
+      .select('*')
+      .eq('set_code', setCode)
+      .eq('collector_number', collectorNumber)
+      .limit(1);
+    if (anyError) throw anyError;
+    return (anyRows?.[0] as ScryfallCardRow | undefined) ?? null;
   }
 
   private categoryForMatch(match: { isToken: boolean; isHelper: boolean }): CardCategory {
@@ -558,7 +616,7 @@ export class MtgApiService implements CardApiService {
   /** Queries scryfall_cards directly - this is the method that used to matter most for reliability (Collection/Dashboard/Wishlist/Decks all resolve through here) and PostgREST has held up reliably where scryfall-proxy didn't. A batch that errors is skipped, not fatal - every caller here already looks results up by id and quietly drops whatever it doesn't find (see e.g. collection.service.ts). */
   async getCardsByIds(ids: string[]): Promise<Card[]> {
     const rows = await this.queryScryfallCards('id', ids);
-    return rows.map((row) => this.rowToCard(row));
+    return this.translateCards(rows.map((row) => this.rowToCard(row)));
   }
 
   /**
@@ -569,7 +627,7 @@ export class MtgApiService implements CardApiService {
    */
   async getCardsByNames(names: string[], _lowPriority = false): Promise<Card[]> {
     const rows = await this.queryScryfallCardsByName(names);
-    return rows.map((row) => this.rowToCard(row));
+    return this.translateCards(rows.map((row) => this.rowToCard(row)));
   }
 
   async getPrints(name: string): Promise<Card[]> {
@@ -577,9 +635,14 @@ export class MtgApiService implements CardApiService {
       .from('scryfall_cards')
       .select('*')
       .eq('name', name)
+      // One row per printing per language (see 025_scryfall_cards_lang.sql) -
+      // without this, every printing shows up once per language it was ever
+      // printed in, instead of once per actual print to pick from.
+      .eq('lang', 'en')
       .order('released_at', { ascending: false });
     if (error) throw error;
-    return ((data ?? []) as ScryfallCardRow[]).map((row) => this.rowToCard(row));
+    const cards = ((data ?? []) as ScryfallCardRow[]).map((row) => this.rowToCard(row));
+    return this.translateCards(cards);
   }
 
   /** Shared batching for an `.in(column, [...])` PostgREST query (see POSTGRES_BATCH_SIZE) - a failed batch is logged and skipped rather than failing the whole call, same degrade-gracefully philosophy as everywhere else card lookups are batched in this file. */
@@ -917,6 +980,72 @@ export class MtgApiService implements CardApiService {
       setCode: row.set_code,
       collectorNumber: row.collector_number,
     };
+  }
+
+  /**
+   * Overrides `name`/`imageUrl`/`imageUrlSmall` on every given card with its
+   * same-oracle_id printing in the app's current display language (see
+   * CardDisplayLanguageService), when one exists - called at the end of
+   * every public method here that returns Card data for display (search,
+   * prints, collection lookups, deck-import), so no other file in the app
+   * needs to know this toggle exists at all. A no-op for English (the
+   * default) or when no card here has an oracle_id (Yu-Gi-Oh/Pokémon never
+   * reach this service in the first place, but guards defensively anyway).
+   *
+   * Deliberately leaves prices/rarity/set/collector-number/mana-cost/type-
+   * line untouched - those describe the specific (English/canonical)
+   * printing this Card otherwise still is, not a property of display
+   * language, and `collection_cards.language` (which printed-language copy a
+   * user owns) is a wholly separate concern from this purely visual swap.
+   */
+  private async translateCards(cards: Card[]): Promise<Card[]> {
+    const lang = this.displayLanguage.current();
+    if (lang === 'en') return cards;
+
+    const oracleIds = [...new Set(cards.map((card) => card.oracleId).filter((id): id is string => id !== null))];
+    if (oracleIds.length === 0) return cards;
+
+    const localized = await this.getLocalizedCardDataByOracleIds(oracleIds, lang);
+    if (localized.size === 0) return cards;
+
+    return cards.map((card) => {
+      const match = card.oracleId ? localized.get(card.oracleId) : undefined;
+      if (!match) return card;
+      return { ...card, name: match.name, imageUrl: match.imageUrl, imageUrlSmall: match.imageUrlSmall };
+    });
+  }
+
+  /** Batched by oracle_id+lang (see 025_scryfall_cards_lang.sql's composite index) - one query for the whole list rather than one per card, which matters for a collection-grid-sized call. `distinct on` picks any one matching-language printing per oracle_id (its name/art is the same across sets for a given card in practice), same "one row per card" reasoning as scryfall_cards_by_name. */
+  private async getLocalizedCardDataByOracleIds(
+    oracleIds: string[],
+    lang: string,
+  ): Promise<Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null }>> {
+    const result = new Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null }>();
+    for (let i = 0; i < oracleIds.length; i += POSTGRES_BATCH_SIZE) {
+      const batch = oracleIds.slice(i, i + POSTGRES_BATCH_SIZE);
+      const { data, error } = await this.supabase.client.rpc('scryfall_cards_localized', {
+        oracle_ids: batch,
+        target_lang: lang,
+      });
+      if (error) {
+        console.warn('scryfall_cards_localized batch failed, skipping:', error);
+        continue;
+      }
+      for (const row of (data ?? []) as Array<{
+        oracle_id: string;
+        printed_name: string | null;
+        name: string;
+        image_url: string | null;
+        image_url_small: string | null;
+      }>) {
+        result.set(row.oracle_id, {
+          name: row.printed_name ?? row.name,
+          imageUrl: row.image_url,
+          imageUrlSmall: row.image_url_small,
+        });
+      }
+    }
+    return result;
   }
 
   private async runSearch(scryfallQuery: string, params: string, queue?: ScryfallQueue): Promise<ScryfallRawCard[]> {

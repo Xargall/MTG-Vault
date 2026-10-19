@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 
+import { DEFAULT_CARD_LANGUAGE } from '../../core/constants/card-languages';
 import { Card } from '../../core/models/card.model';
 import { GameService } from '../../core/services/game.service';
 import { SupabaseService } from '../../core/services/supabase.service';
@@ -202,7 +203,7 @@ export class CollectionService {
     condition,
     finish = 'nonfoil',
     cardCategory = 'normal',
-    language = 'en',
+    language = DEFAULT_CARD_LANGUAGE,
     oracleId = null,
   }: AddCardInput): Promise<AddCardResult> {
     await this.gameService.ready;

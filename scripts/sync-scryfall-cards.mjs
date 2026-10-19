@@ -1,10 +1,17 @@
-// Downloads Scryfall's "default_cards" bulk file (every printing, ~120k+
-// records) and upserts it into the `scryfall_cards` Postgres table (see
-// supabase/sql/016_scryfall_cards.sql), which the Angular app then reads
-// via plain PostgREST instead of the scryfall-proxy Edge Function - a
-// live-debugging session found scryfall-proxy failing consistently on at
-// least one real network while PostgREST queries against this project's
-// own tables never did.
+// Downloads Scryfall's "all_cards" bulk file (every printing, every
+// language - markedly bigger than "default_cards", which is practically
+// English-only) and upserts it into the `scryfall_cards` Postgres table
+// (see supabase/sql/016_scryfall_cards.sql + 025_scryfall_cards_lang.sql),
+// which the Angular app then reads via plain PostgREST instead of the
+// scryfall-proxy Edge Function - a live-debugging session found
+// scryfall-proxy failing consistently on at least one real network while
+// PostgREST queries against this project's own tables never did.
+//
+// The extra languages back the card-display language toggle
+// (MtgApiService.translateCards) - every *identification* path (scanning,
+// exact set+number lookup) still resolves to the English/canonical print
+// on purpose (see getCardBySetAndNumber's lang='en'-first query), so
+// collection_cards.card_id itself is unaffected by this switch.
 //
 // Originally a Supabase Edge Function (sync-scryfall-cards) - moved here
 // after that hit Edge Functions' CPU-time limit processing this much data
@@ -63,6 +70,7 @@ function rowFromRawCard(raw) {
     oracle_id: oracleId,
     name: String(raw.name ?? ''),
     printed_name: raw.printed_name ?? null,
+    lang: String(raw.lang ?? 'en'),
     image_url: raw.image_uris?.normal ?? rawFaces?.[0]?.image_uris?.normal ?? null,
     image_url_small: raw.image_uris?.small ?? rawFaces?.[0]?.image_uris?.small ?? null,
     set_code: set,
@@ -129,11 +137,11 @@ async function main() {
   const infoResponse = await fetch(BULK_DATA_ENDPOINT, { headers: { 'User-Agent': USER_AGENT } });
   if (!infoResponse.ok) throw new Error(`bulk-data request failed (${infoResponse.status})`);
   const infoBody = await infoResponse.json();
-  const defaultCards = infoBody.data.find((entry) => entry.type === 'default_cards');
-  if (!defaultCards) throw new Error('"default_cards" not found in bulk-data listing');
+  const allCards = infoBody.data.find((entry) => entry.type === 'all_cards');
+  if (!allCards) throw new Error('"all_cards" not found in bulk-data listing');
 
-  console.log(`Downloading ${defaultCards.jsonl_download_uri} (${defaultCards.compressed_size} bytes compressed)...`);
-  const dataResponse = await fetch(defaultCards.jsonl_download_uri, { headers: { 'User-Agent': USER_AGENT } });
+  console.log(`Downloading ${allCards.jsonl_download_uri} (${allCards.compressed_size} bytes compressed)...`);
+  const dataResponse = await fetch(allCards.jsonl_download_uri, { headers: { 'User-Agent': USER_AGENT } });
   if (!dataResponse.ok || !dataResponse.body) throw new Error(`bulk file download failed (${dataResponse.status})`);
 
   const gunzip = zlib.createGunzip();

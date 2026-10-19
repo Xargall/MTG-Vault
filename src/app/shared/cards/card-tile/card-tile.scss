@@ -7,6 +7,13 @@
   position: relative;
 }
 
+// Containing block for the badges below - scoped to just the artwork, not
+// the card-name text underneath it, so "bottom" positioning (language-badge)
+// lands on the image's own bottom edge instead of the whole tile's.
+.image-wrapper {
+  position: relative;
+}
+
 .quantity-badge {
   position: absolute;
   top: 6px;
@@ -21,14 +28,13 @@
   font-weight: 600;
 }
 
-// Shares the status-badge's corner - in practice never shown together, since
-// `status` is only passed by deck-preview card tiles (no collection row,
-// so no language either) and `language` only by the collection grid (which
-// never passes `status`).
+// Mirrors quantity-badge's corner (same side, bottom instead of top) -
+// always shown (not just for non-default languages), since this is the
+// collector's own record of which printed-language copy they physically own.
 .language-badge {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  bottom: 6px;
+  right: 6px;
   z-index: 1;
   background: var(--color-bg);
   color: var(--color-text);

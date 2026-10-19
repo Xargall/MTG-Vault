@@ -40,14 +40,14 @@ const MTG_PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Mag
 Lies den Set-Code (3 Großbuchstaben), die Collector Number und das Sprachkürzel (2 Großbuchstaben) unten links dieser Karte.
 
 Formate die vorkommen können:
-- Normal neu:   "0082"        → Ausgabe: "MSH 82 EN"
-- Normal alt:   "082/350"     → Ausgabe: "MSH 82 EN"
-- Token neu:    "T 0003"      → Ausgabe: "MSH T3 EN"
-- Token alt:    "016/017 T"   → Ausgabe: "MSH T16 EN"
-- Token alt:    "017/017T"    → Ausgabe: "MSH T17 EN"
-- Halo neu:     "H 0020"      → Ausgabe: "MSH H20 EN"
-- Halo alt:     "020/020 H"   → Ausgabe: "MSH H20 EN"
-- Mit Rarität:  "U 0003"      → Ausgabe: "MSH 3 EN"   (siehe unten - U ist KEIN Flag!)
+- Normal neu:   "0082"        → Ausgabe: "MSH 82 DE"
+- Normal alt:   "082/350"     → Ausgabe: "MSH 82 DE"
+- Token neu:    "T 0003"      → Ausgabe: "MSH T3 DE"
+- Token alt:    "016/017 T"   → Ausgabe: "MSH T16 DE"
+- Token alt:    "017/017T"    → Ausgabe: "MSH T17 DE"
+- Halo neu:     "H 0020"      → Ausgabe: "MSH H20 DE"
+- Halo alt:     "020/020 H"   → Ausgabe: "MSH H20 DE"
+- Mit Rarität:  "U 0003"      → Ausgabe: "MSH 3 DE"   (siehe unten - U ist KEIN Flag!)
 
 Wichtig bei X/Y Format: IMMER nur X nehmen, nie Y!
 Das einzige echte Flag ist T (Token) oder H (Halo/Reminder-Karte) - steht vor oder nach der Nummer.
@@ -55,7 +55,8 @@ Ein einzelner Buchstabe C, U, R oder M direkt vor/nach der Nummer ist KEIN Flag,
 (Common/Uncommon/Rare/Mythic) - diesen Buchstaben komplett ignorieren, nicht mit T/H verwechseln.
 
 Das Sprachkürzel steht meist direkt neben Set-Code/Rarität/Collector Number, z.B. EN, DE, FR, IT, SP, PT,
-JP, KR, RU, CS, CT. Wenn es nicht klar lesbar ist, Set-Code und Nummer aber schon, schreibe "EN".
+JP, KR, RU, CS, CT. Wenn es nicht klar lesbar ist, Set-Code und Nummer aber schon, schreibe "DE" (die meisten
+Karten in dieser Sammlung sind deutsch).
 
 Antworte NUR in diesem Format:
 - Normale Karte: "MSH 82 DE"
