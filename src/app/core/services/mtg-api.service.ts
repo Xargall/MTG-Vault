@@ -1083,29 +1083,24 @@ export class MtgApiService implements CardApiService {
       const match = localized.get(`${card.oracleId}:${card.setCode}:${card.collectorNumber}`);
       if (!match) return card;
 
-      // A single set can print several distinct-art versions of the same
-      // card under different collector numbers (live-confirmed: Fallout's
-      // "Sol Ring" has separate Nuka-Cola-bottle and Bobblehead arts, both
-      // set_code "pip") - matching on set_code alone wasn't precise enough
-      // and could show the wrong art even within the right set. Only the
-      // exact same printing (set_code + collector_number, see
-      // same_printing, resolved in Postgres - scryfall_cards_localized) is
-      // safe to use for the image. The translated name itself is safe to
-      // use from any matching printing, since it's the same text
-      // regardless of which one.
-      return match.samePrinting
-        ? { ...card, name: match.name, imageUrl: match.imageUrl, imageUrlSmall: match.imageUrlSmall }
-        : { ...card, name: match.name };
+      // Only an exact same-printing match (set_code + collector_number,
+      // resolved in Postgres - scryfall_cards_localized) is ever returned -
+      // a card genuinely never printed in the target language (live-
+      // confirmed: several Fallout Commander-precon-exclusive cards have no
+      // German printing at all) stays fully untranslated by design, rather
+      // than "borrowing" a translated name from some other printing of the
+      // same oracle card while keeping the original art - that mixed
+      // DE-name/EN-art combination read as a bug even though it was
+      // arguably correct, so full consistency won out (explicit choice).
+      return { ...card, name: match.name, imageUrl: match.imageUrl, imageUrlSmall: match.imageUrlSmall };
     });
   }
 
-  /** Batched (see POSTGRES_BATCH_SIZE) and resolved entirely in Postgres (scryfall_cards_localized, backed by the (oracle_id, lang) index) - exactly one row per requested printing comes back, never every candidate reprint, which mattered a lot for a collection-grid-sized call (hundreds of printings). All batches fire at once (see queryScryfallCards's doc comment for why), not one after another. */
+  /** Batched (see POSTGRES_BATCH_SIZE) and resolved entirely in Postgres (scryfall_cards_localized, backed by the (oracle_id, lang) index) - exactly one row per requested printing comes back, and only for an exact set_code+collector_number match (anything else is simply absent from the result, left untranslated by the caller). All batches fire at once (see queryScryfallCards's doc comment for why), not one after another. */
   private async getLocalizedCardDataByPairs(
     pairs: Array<{ oracleId: string; setCode: string; collectorNumber: string }>,
     lang: string,
-  ): Promise<
-    Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null; samePrinting: boolean }>
-  > {
+  ): Promise<Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null }>> {
     const batches: Array<Array<{ oracleId: string; setCode: string; collectorNumber: string }>> = [];
     for (let i = 0; i < pairs.length; i += POSTGRES_BATCH_SIZE) {
       batches.push(pairs.slice(i, i + POSTGRES_BATCH_SIZE));
@@ -1124,10 +1119,7 @@ export class MtgApiService implements CardApiService {
       ),
     );
 
-    const result = new Map<
-      string,
-      { name: string; imageUrl: string | null; imageUrlSmall: string | null; samePrinting: boolean }
-    >();
+    const result = new Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null }>();
     for (const settled of results) {
       if (settled.status === 'rejected' || settled.value.error) {
         console.warn(
@@ -1144,14 +1136,12 @@ export class MtgApiService implements CardApiService {
         name: string | null;
         image_url: string | null;
         image_url_small: string | null;
-        same_printing: boolean;
       }>) {
         if (!row.name) continue;
         result.set(`${row.oracle_id}:${row.set_code}:${row.collector_number}`, {
           name: row.printed_name ?? row.name,
           imageUrl: row.image_url,
           imageUrlSmall: row.image_url_small,
-          samePrinting: row.same_printing,
         });
       }
     }
