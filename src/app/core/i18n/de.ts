@@ -219,6 +219,7 @@ export const de = {
     onWishlist: 'Auf der Wunschliste ✓',
     wishlistButton: 'Fehlende Karten auf Wunschliste',
     containedCards: 'Enthaltene Karten',
+    containedTokens: 'Enthaltene Token',
     deleteLink: 'Deck entfernen',
     confirmDeleteText: 'Deck wirklich entfernen? Die Karten bleiben in deiner Sammlung.',
     removeCardsOption: 'Enthaltene Karten auch aus der Sammlung entfernen',

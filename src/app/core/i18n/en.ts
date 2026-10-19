@@ -220,6 +220,7 @@ export const en: typeof de = {
     onWishlist: 'On the wishlist ✓',
     wishlistButton: 'Add missing cards to wishlist',
     containedCards: 'Cards in this deck',
+    containedTokens: 'Included tokens',
     deleteLink: 'Remove deck',
     confirmDeleteText: 'Really remove this deck? The cards stay in your collection.',
     removeCardsOption: 'Also remove this deck\'s cards from my collection',

@@ -51,10 +51,19 @@
 
       <h3>{{ 'deckDetail.containedCards' | translate }}</h3>
       <div class="results-grid">
-        @for (item of cardsWithStatus(); track item.entry.row.id) {
+        @for (item of mainCards(); track item.entry.row.id) {
           <app-card-tile [card]="item.entry.card" [quantity]="item.entry.row.quantity" [status]="item.status" />
         }
       </div>
+
+      @if (tokenCards().length > 0) {
+        <h3>{{ 'deckDetail.containedTokens' | translate }}</h3>
+        <div class="results-grid">
+          @for (item of tokenCards(); track item.entry.row.id) {
+            <app-card-tile [card]="item.entry.card" [quantity]="item.entry.row.quantity" [status]="item.status" />
+          }
+        </div>
+      }
 
       @if (cardBindingDetails().length > 0) {
         <h3>{{ 'deckDetail.bindingDetailsTitle' | translate }}</h3>

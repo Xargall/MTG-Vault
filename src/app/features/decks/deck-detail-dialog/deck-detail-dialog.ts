@@ -104,6 +104,23 @@ export class DeckDetailDialog {
     })),
   );
 
+  /**
+   * Splits the status-badged grid into the deck's actual decklist and any
+   * bonus tokens a precon box ships with (see the mtgjson tokens-parsing
+   * fix) - shown as its own section instead of mixed in alphabetically, so
+   * e.g. 10 Thopter tokens next to Sai, Master Thopterist don't read as a
+   * data error. Scryfall's own type_line reliably starts with "Token" for
+   * every token card object (confirmed live), so no extra data is needed -
+   * token-ness is MTG-only (see card.model.ts), same as everything else
+   * deck-detail is scoped to.
+   */
+  protected readonly mainCards = computed(() =>
+    this.cardsWithStatus().filter((item) => !(item.entry.card.game === 'mtg' && item.entry.card.typeLine.startsWith('Token'))),
+  );
+  protected readonly tokenCards = computed(() =>
+    this.cardsWithStatus().filter((item) => item.entry.card.game === 'mtg' && item.entry.card.typeLine.startsWith('Token')),
+  );
+
   /** The real, weighted "can I actually build this" match - a card that's owned but fully claimed by another deck doesn't count as free, matching the flexible (half-credit) scoring the deck-search toggle defaults to. See getAvailabilityMatch. */
   protected readonly availabilityMatch = computed(() => {
     const { byCardId, byOracleId } = this.assignedMaps();
