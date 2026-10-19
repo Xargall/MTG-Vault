@@ -15,6 +15,8 @@ export class CardTile {
   readonly quantity = input<number | null>(null);
   /** Collection-ownership indicator (deck previews only) - null renders no badge and no dimming, matching every other existing use of this tile. */
   readonly status = input<CardOwnedStatus | null>(null);
+  /** Owned-copy language code (see card-languages.ts), e.g. 'de' - null (no collection row context, e.g. search/print pickers) or the default ('en') both render no badge, so the badge only ever marks a copy owned in a non-English printing. */
+  readonly language = input<string | null>(null);
 
   protected readonly imageLoaded = signal(false);
 }

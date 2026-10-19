@@ -109,7 +109,7 @@
       <div class="card-grid">
         @for (entry of visibleEntries(); track entry.row.id) {
           <button type="button" class="card-link" (click)="selectedEntry.set(entry)">
-            <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" />
+            <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" [language]="entry.row.language" />
             @if (getSurplus(entry); as surplus) {
               <span class="surplus-badge" [title]="getDeckNames(entry).join(', ')">
                 {{ 'collection.surplusBadge' | translate: { count: surplus } }}

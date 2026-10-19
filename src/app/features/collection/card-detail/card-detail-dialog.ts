@@ -11,6 +11,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
 import { Card, MtgCard, PokemonCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
 import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
 import { ATTRIBUTE_CATEGORIES } from '../yugioh-collection-stats';
@@ -86,15 +87,18 @@ export class CardDetailDialog {
     }
   }
 
+  protected readonly languageOptions = CARD_LANGUAGE_OPTIONS;
   protected readonly editing = signal(false);
   protected readonly editQuantity = signal(1);
   protected readonly editFoil = signal(false);
+  protected readonly editLanguage = signal(DEFAULT_CARD_LANGUAGE);
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
 
   protected startEdit() {
     this.editQuantity.set(this.entry().row.quantity);
     this.editFoil.set(this.entry().row.foil);
+    this.editLanguage.set(this.entry().row.language);
     this.saveError.set(null);
     this.editing.set(true);
   }
@@ -117,6 +121,7 @@ export class CardDetailDialog {
       await this.collectionService.updateEntry(this.entry().row.id, {
         quantity,
         foil: this.entry().card.game === 'mtg' ? this.editFoil() : this.entry().row.foil,
+        language: this.editLanguage(),
       });
       this.editing.set(false);
       this.updated.emit();
@@ -136,6 +141,11 @@ export class CardDetailDialog {
   });
 
   protected readonly price = computed(() => getEntryPrice(this.entry(), 'eur'));
+
+  protected readonly languageLabelKey = computed(() => {
+    const code = this.entry().row.language;
+    return CARD_LANGUAGE_OPTIONS.find((option) => option.code === code)?.labelKey ?? null;
+  });
 
   protected asMtgCard(card: Card): MtgCard | null {
     return card.game === 'mtg' ? card : null;

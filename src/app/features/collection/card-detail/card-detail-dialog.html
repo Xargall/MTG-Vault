@@ -92,6 +92,9 @@
             }
           }
 
+          <dt>{{ 'cardDetail.language' | translate }}</dt>
+          <dd>{{ languageLabelKey() ? (languageLabelKey()! | translate) : ('common.unknown' | translate) }}</dd>
+
           <dt>{{ 'cardDetail.price' | translate }}</dt>
           <dd>{{ price() > 0 ? (price() | number: '1.2-2') + ' €' : ('common.unknown' | translate) }}</dd>
         </dl>
@@ -128,6 +131,17 @@
                   {{ 'cardDetail.foil' | translate }}
                 </label>
               }
+
+              <label for="edit-language">{{ 'cardDetail.language' | translate }}</label>
+              <select
+                id="edit-language"
+                [ngModel]="editLanguage()"
+                (ngModelChange)="editLanguage.set($event)"
+              >
+                @for (option of languageOptions; track option.code) {
+                  <option [value]="option.code">{{ option.labelKey | translate }}</option>
+                }
+              </select>
 
               <div class="edit-actions">
                 <button type="button" class="save-button" [disabled]="saving()" (click)="saveEdit()">

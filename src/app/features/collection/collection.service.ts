@@ -20,6 +20,11 @@ export interface CollectionCardRow {
   // parsed collector-number flags, not recomputed from the card afterward.
   card_category: string;
   condition: string;
+  // Printed language of this physical copy (see card-languages.ts) - purely
+  // collection metadata, unrelated to the app's own UI language. Part of the
+  // same-card/foil/finish dedup key (see 023_collection_language.sql), so a
+  // German and an English copy of the same card/foil/finish stack separately.
+  language: string;
   created_at: string;
   // Scryfall's oracle_id, mirrored from the card at add-time - null for rows
   // added before this column existed, and always null for Yu-Gi-Oh/Pokémon
@@ -40,6 +45,7 @@ export interface AddCardInput {
   condition: string;
   finish?: string;
   cardCategory?: string;
+  language?: string;
   oracleId?: string | null;
 }
 
@@ -196,6 +202,7 @@ export class CollectionService {
     condition,
     finish = 'nonfoil',
     cardCategory = 'normal',
+    language = 'en',
     oracleId = null,
   }: AddCardInput): Promise<AddCardResult> {
     await this.gameService.ready;
@@ -204,9 +211,9 @@ export class CollectionService {
     const gameId = this.gameService.currentGameId();
     if (!gameId) throw new Error('Kein aktives Spiel.');
 
-    // `finish` is part of the match, not just `foil` - a halo copy of a
-    // card must stack separately from a nonfoil copy of the same card_id,
-    // even though both have foil=false.
+    // `finish`/`language` are part of the match, not just `foil` - a halo or
+    // German copy of a card must stack separately from a nonfoil/English
+    // copy of the same card_id, even though both have foil=false.
     const { data: existing, error: selectError } = await this.supabase.client
       .from('collection_cards')
       .select('id, quantity, oracle_id')
@@ -214,6 +221,7 @@ export class CollectionService {
       .eq('card_id', cardId)
       .eq('foil', foil)
       .eq('finish', finish)
+      .eq('language', language)
       .maybeSingle<{ id: string; quantity: number; oracle_id: string | null }>();
 
     if (selectError) throw selectError;
@@ -240,6 +248,7 @@ export class CollectionService {
       condition,
       finish,
       card_category: cardCategory,
+      language,
       oracle_id: oracleId,
     };
     const { data, error } = await this.supabase.client
@@ -266,8 +275,8 @@ export class CollectionService {
     if (error) throw error;
   }
 
-  /** Manual correction of one collection row's own quantity/foil (see CardDetailDialog's edit form) - unlike addCards/reduceQuantities, sets these fields directly rather than incrementing/decrementing them. */
-  async updateEntry(rowId: string, changes: { quantity?: number; foil?: boolean }): Promise<void> {
+  /** Manual correction of one collection row's own quantity/foil/language (see CardDetailDialog's edit form) - unlike addCards/reduceQuantities, sets these fields directly rather than incrementing/decrementing them. */
+  async updateEntry(rowId: string, changes: { quantity?: number; foil?: boolean; language?: string }): Promise<void> {
     const { error } = await this.supabase.client.from('collection_cards').update(changes).eq('id', rowId);
     if (error) throw error;
   }

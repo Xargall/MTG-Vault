@@ -8,6 +8,7 @@ import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
 import {
   CollectorFinish,
   SetCodeMatch,
+  findPrintedLanguage,
   parseCollectorNumber,
   parseGeminiMtgResult,
   parseSetCode,
@@ -101,6 +102,7 @@ export interface CroppedIdentification {
   card: Card;
   finish: CollectorFinish;
   cardCategory: CardCategory;
+  language: string;
 }
 
 const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
@@ -433,6 +435,7 @@ export class MtgApiService implements CardApiService {
   private async resolveSetCodeMatch(match: SetCodeMatch): Promise<CroppedIdentification | null> {
     const finish = match.finish;
     const cardCategory = this.categoryForMatch(match);
+    const language = match.language;
 
     const setCodesToTry: Array<{ setCode: string; number: string }> = match.isToken
       ? [
@@ -449,7 +452,7 @@ export class MtgApiService implements CardApiService {
 
     for (const { setCode, number } of setCodesToTry) {
       const raw = await this.lookupBySetAndNumber(setCode, number);
-      if (raw) return { card: this.toCard(raw), finish, cardCategory };
+      if (raw) return { card: this.toCard(raw), finish, cardCategory, language };
     }
     return null;
   }
@@ -490,7 +493,12 @@ export class MtgApiService implements CardApiService {
     const candidates =
       bareMatch.isToken || bareMatch.isHelper ? allMatches.filter((card) => card.set.startsWith('t')) : allMatches;
     return candidates.length === 1
-      ? { card: this.toCard(candidates[0]), finish: bareMatch.finish, cardCategory: this.categoryForMatch(bareMatch) }
+      ? {
+          card: this.toCard(candidates[0]),
+          finish: bareMatch.finish,
+          cardCategory: this.categoryForMatch(bareMatch),
+          language: findPrintedLanguage(text),
+        }
       : null;
   }
 

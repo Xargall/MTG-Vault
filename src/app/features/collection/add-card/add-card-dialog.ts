@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, output, signal } 
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
 import { Card } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
@@ -27,6 +28,7 @@ export class AddCardDialog {
   readonly added = output<void>();
 
   protected readonly conditions = CONDITIONS;
+  protected readonly languageOptions = CARD_LANGUAGE_OPTIONS;
 
   // Only MTG search supports typing a set code (see MtgApiService.searchCards)
   // - Yu-Gi-Oh/Pokémon still search by name only, so the hint stays accurate per game.
@@ -48,6 +50,7 @@ export class AddCardDialog {
   protected readonly quantity = signal(1);
   protected readonly foil = signal(false);
   protected readonly condition = signal('NM');
+  protected readonly language = signal(DEFAULT_CARD_LANGUAGE);
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
 
@@ -139,6 +142,7 @@ export class AddCardDialog {
     this.quantity.set(1);
     this.foil.set(false);
     this.condition.set('NM');
+    this.language.set(DEFAULT_CARD_LANGUAGE);
     this.submitError.set(null);
   }
 
@@ -162,6 +166,7 @@ export class AddCardDialog {
         quantity: this.quantity(),
         foil: this.foil(),
         condition: this.condition(),
+        language: this.language(),
         oracleId: card.oracleId,
       });
       this.added.emit();

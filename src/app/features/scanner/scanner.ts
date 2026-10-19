@@ -13,6 +13,7 @@ import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { PSM } from 'tesseract.js';
 
+import { DEFAULT_CARD_LANGUAGE, PRINTED_LANGUAGE_CODES } from '../../core/constants/card-languages';
 import { Card } from '../../core/models/card.model';
 import { CardIdentification, MtgIdentificationResult, ScoredCandidate } from '../../core/services/card-api.interface';
 import { AddCardResult, CollectionService } from '../collection/collection.service';
@@ -69,6 +70,13 @@ const COLLECTOR_NUMBER_CHAR_WHITELIST = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/*-
 // Yu-Gi-Oh print code as it appears on the card, e.g. "SDAZ-DE001" or
 // "LOB-EN001" - set code, two-letter language, then a 2-4 digit number.
 const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]{2,6}-[A-Z]{2}\d{2,4}$/;
+const YUGIOH_PRINT_CODE_LANGUAGE_PATTERN = /-([A-Z]{2})\d/;
+
+/** Extracts the language segment already embedded in a Yu-Gi-Oh print code (e.g. "SDAZ-DE001" -> 'de') - unlike MTG, no separate OCR read is needed, it's part of the same code the card is identified by. Falls back to the default (English) for an unrecognized segment rather than failing the whole identification over it. */
+function extractYugiohLanguage(printCode: string): string {
+  const token = YUGIOH_PRINT_CODE_LANGUAGE_PATTERN.exec(printCode)?.[1];
+  return (token && PRINTED_LANGUAGE_CODES[token]) || DEFAULT_CARD_LANGUAGE;
+}
 
 /**
  * Percentile-clipped linear contrast stretch (a "levels"/auto-contrast
@@ -376,7 +384,7 @@ export class Scanner {
   // with no result at all) - see getConsistentResult(). Carries the parsed
   // finish/category alongside each card, so confirming a match doesn't lose
   // that signal across the sliding window (see confirmMtgCard).
-  private frameHistory: Array<{ id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null> =
+  private frameHistory: Array<{ id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null> =
     [];
   private rateLimitedUntil = 0;
 
@@ -417,6 +425,11 @@ export class Scanner {
   // since only MTG's collector-number corner carries a token/halo flag to read.
   protected readonly detectedFinish = signal<CollectorFinish>('nonfoil');
   protected readonly detectedCardCategory = signal<CardCategory>('normal');
+  // Same lifecycle as detectedFinish/detectedCardCategory above - the
+  // printed-language abbreviation read off the same crop (MTG) or embedded
+  // in the same print code (Yu-Gi-Oh), defaulting to English for every
+  // other path (picker selection, Pokémon, which has no such code to read).
+  protected readonly detectedLanguage = signal(DEFAULT_CARD_LANGUAGE);
   protected readonly candidateChoices = signal<ScoredCandidate[] | null>(null);
   // Which heading/copy the picker shows - 'medium' (5 options, fairly
   // confident guess) vs 'low' (10 options, weak signal). Derived from how
@@ -842,7 +855,7 @@ export class Scanner {
 
   private async tryGeminiPath(
     videoEl: HTMLVideoElement,
-  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null> {
+  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null> {
     try {
       const rawFrame = this.captureRawFrame(videoEl);
       if (!rawFrame) return null;
@@ -879,12 +892,12 @@ export class Scanner {
         const code = text.toUpperCase().trim();
         if (!YUGIOH_PRINT_CODE_PATTERN.test(code)) return null;
         const card = await this.yugiohApi.identifyByPrintCode(code);
-        return card ? { card, finish: 'nonfoil', cardCategory: 'normal' } : null;
+        return card ? { card, finish: 'nonfoil', cardCategory: 'normal', language: extractYugiohLanguage(code) } : null;
       }
 
       if (game === 'pokemon') {
         const card = (await this.gameService.cardApi().identifyCard(text))?.card ?? null;
-        return card ? { card, finish: 'nonfoil', cardCategory: 'normal' } : null;
+        return card ? { card, finish: 'nonfoil', cardCategory: 'normal', language: DEFAULT_CARD_LANGUAGE } : null;
       }
 
       return await this.mtgApi.identifyByGeminiResult(text);
@@ -915,8 +928,8 @@ export class Scanner {
    */
   private async tryTesseractPath(
     videoEl: HTMLVideoElement,
-  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null> {
-    let result: { card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null = null;
+  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null> {
+    let result: { card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null = null;
 
     for (const strategy of CROP_STRATEGIES) {
       const cropCanvas = this.cropToStrategy(videoEl, strategy);
@@ -966,7 +979,7 @@ export class Scanner {
    */
   private async tryYugiohTesseractPath(
     videoEl: HTMLVideoElement,
-  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null> {
+  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null> {
     for (const strategy of YUGIOH_CROP_STRATEGIES) {
       const cropCanvas = this.cropToStrategy(videoEl, strategy);
       if (!cropCanvas) continue;
@@ -994,26 +1007,26 @@ export class Scanner {
       // it once something was actually found.
       this.ocrEngine.set('tesseract');
       const card = await this.yugiohApi.identifyByPrintCode(code);
-      if (card) return { card, finish: 'nonfoil', cardCategory: 'normal' };
+      if (card) return { card, finish: 'nonfoil', cardCategory: 'normal', language: extractYugiohLanguage(code) };
     }
 
     return null;
   }
 
-  private pushFrameHistory(entry: { id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null) {
+  private pushFrameHistory(entry: { id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null) {
     this.frameHistory.push(entry);
     if (this.frameHistory.length > FRAME_HISTORY_SIZE) this.frameHistory.shift();
   }
 
   /** Sliding-window consistency check: within the last FRAME_HISTORY_SIZE frames, the same card must appear at least CONSISTENT_MATCHES_REQUIRED times - tolerates a single noisy/no-match frame in between two real hits instead of a strict streak. */
   private confirmMtgCard(
-    result: { card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null,
-  ): { card: Card; finish: CollectorFinish; cardCategory: CardCategory } | null {
+    result: { card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null,
+  ): { card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null {
     this.pushFrameHistory(result ? { id: result.card.id, ...result } : null);
     if (!result) return null;
 
     const entries = this.frameHistory.filter(
-      (entry): entry is { id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory } =>
+      (entry): entry is { id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } =>
         entry !== null,
     );
 
@@ -1113,7 +1126,10 @@ export class Scanner {
     return this.captureCanvas;
   }
 
-  private onMatch(result: CardIdentification, meta?: { finish: CollectorFinish; cardCategory: CardCategory }) {
+  private onMatch(
+    result: CardIdentification,
+    meta?: { finish: CollectorFinish; cardCategory: CardCategory; language: string },
+  ) {
     // Guards against a race between the two concurrent auto-detection paths
     // (MTG's per-tick Tesseract crop and the gate-triggered Gemini call) -
     // whichever resolves first wins; the other lands here after the panel
@@ -1125,6 +1141,7 @@ export class Scanner {
     this.detectedCard.set(result.card);
     this.detectedFinish.set(meta?.finish ?? 'nonfoil');
     this.detectedCardCategory.set(meta?.cardCategory ?? 'normal');
+    this.detectedLanguage.set(meta?.language ?? DEFAULT_CARD_LANGUAGE);
     this.status.set('matched');
     if (navigator.vibrate) navigator.vibrate(200);
 
@@ -1213,6 +1230,7 @@ export class Scanner {
         condition: 'NM',
         finish: this.detectedFinish(),
         cardCategory: this.detectedCardCategory(),
+        language: this.detectedLanguage(),
         oracleId: card.oracleId,
       });
       this.lastAdded.set({ card, result });
@@ -1245,6 +1263,7 @@ export class Scanner {
     this.detectedCard.set(null);
     this.detectedFinish.set('nonfoil');
     this.detectedCardCategory.set('normal');
+    this.detectedLanguage.set(DEFAULT_CARD_LANGUAGE);
     this.candidateChoices.set(null);
     this.status.set('scanning');
     this.scheduleNextCapture();

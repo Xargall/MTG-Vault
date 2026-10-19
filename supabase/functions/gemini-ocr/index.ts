@@ -37,27 +37,30 @@ const GEMINI_TIMEOUT_MS = 25000;
 // untouched.
 const MTG_PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Magic: The Gathering Karte mit der Set-Code/Sammelnummer-Zeile.
 
-Lies NUR den Set-Code (3 Großbuchstaben) und die Collector Number unten links dieser Karte.
+Lies den Set-Code (3 Großbuchstaben), die Collector Number und das Sprachkürzel (2 Großbuchstaben) unten links dieser Karte.
 
 Formate die vorkommen können:
-- Normal neu:   "0082"        → Ausgabe: "MSH 82"
-- Normal alt:   "082/350"     → Ausgabe: "MSH 82"
-- Token neu:    "T 0003"      → Ausgabe: "MSH T3"
-- Token alt:    "016/017 T"   → Ausgabe: "MSH T16"
-- Token alt:    "017/017T"    → Ausgabe: "MSH T17"
-- Halo neu:     "H 0020"      → Ausgabe: "MSH H20"
-- Halo alt:     "020/020 H"   → Ausgabe: "MSH H20"
-- Mit Rarität:  "U 0003"      → Ausgabe: "MSH 3"   (siehe unten - U ist KEIN Flag!)
+- Normal neu:   "0082"        → Ausgabe: "MSH 82 EN"
+- Normal alt:   "082/350"     → Ausgabe: "MSH 82 EN"
+- Token neu:    "T 0003"      → Ausgabe: "MSH T3 EN"
+- Token alt:    "016/017 T"   → Ausgabe: "MSH T16 EN"
+- Token alt:    "017/017T"    → Ausgabe: "MSH T17 EN"
+- Halo neu:     "H 0020"      → Ausgabe: "MSH H20 EN"
+- Halo alt:     "020/020 H"   → Ausgabe: "MSH H20 EN"
+- Mit Rarität:  "U 0003"      → Ausgabe: "MSH 3 EN"   (siehe unten - U ist KEIN Flag!)
 
 Wichtig bei X/Y Format: IMMER nur X nehmen, nie Y!
 Das einzige echte Flag ist T (Token) oder H (Halo/Reminder-Karte) - steht vor oder nach der Nummer.
 Ein einzelner Buchstabe C, U, R oder M direkt vor/nach der Nummer ist KEIN Flag, sondern die Raritätsangabe
 (Common/Uncommon/Rare/Mythic) - diesen Buchstaben komplett ignorieren, nicht mit T/H verwechseln.
 
+Das Sprachkürzel steht meist direkt neben Set-Code/Rarität/Collector Number, z.B. EN, DE, FR, IT, SP, PT,
+JP, KR, RU, CS, CT. Wenn es nicht klar lesbar ist, Set-Code und Nummer aber schon, schreibe "EN".
+
 Antworte NUR in diesem Format:
-- Normale Karte: "MSH 82"
-- Token-Karte:   "MSH T3"
-- Halo-Karte:    "MSH H20"
+- Normale Karte: "MSH 82 DE"
+- Token-Karte:   "MSH T3 DE"
+- Halo-Karte:    "MSH H20 DE"
 
 WICHTIG: Wenn das Bild leer, unscharf, zu dunkel ist oder du keine tatsächlich lesbaren Zeichen erkennst,
 antworte IMMER mit "UNKNOWN". Errate NIEMALS einen plausibel aussehenden Set-Code oder eine Nummer nur weil

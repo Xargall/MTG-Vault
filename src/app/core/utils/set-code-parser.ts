@@ -1,3 +1,5 @@
+import { DEFAULT_CARD_LANGUAGE, PRINTED_LANGUAGE_CODES } from '../constants/card-languages';
+
 export type CollectorFinish = 'nonfoil' | 'halo';
 
 export interface SetCodeMatch {
@@ -11,6 +13,8 @@ export interface SetCodeMatch {
   // finish variant of the plain print at all. See resolveSetCodeMatch.
   isHelper: boolean;
   finish: CollectorFinish;
+  /** Stored language code (see card-languages.ts) read off the same crop/line the set code came from - defaults to English when no recognizable language abbreviation is present. */
+  language: string;
 }
 
 export interface CollectorNumberMatch {
@@ -137,6 +141,30 @@ const IGNORED_SET_TOKENS = [
   'EEN', 'ADI', 'SBE', 'PRE', 'EEE', 'NSA', 'NSS', 'SRE', 'LRE', 'TAA',
 ];
 
+// Bare 2-letter language abbreviation, e.g. "DE" in "MSH · DE U 0329" - the
+// same short info-strip text the set code/collector number are read from
+// (see parseSetCode), so a plain flat token search is safe here: a crop this
+// tight never contains an unrelated word that happens to also be a valid
+// printed-language code.
+const LANGUAGE_CODE_TOKEN_PATTERN = /\b([A-Z]{2})\b/g;
+
+/**
+ * Scans OCR'd text for a known printed-language abbreviation (see
+ * PRINTED_LANGUAGE_CODES) and maps it to the stored language code. Falls
+ * back to the default (English) when nothing recognizable is found - most
+ * owned cards are English anyway, and it's manually correctable per copy
+ * afterward (see the add-card/card-detail dialogs).
+ */
+export function findPrintedLanguage(text: string): string {
+  const tokens = text.toUpperCase().match(LANGUAGE_CODE_TOKEN_PATTERN);
+  if (!tokens) return DEFAULT_CARD_LANGUAGE;
+  for (const token of tokens) {
+    const mapped = PRINTED_LANGUAGE_CODES[token];
+    if (mapped) return mapped;
+  }
+  return DEFAULT_CARD_LANGUAGE;
+}
+
 // Gemini's own MTG prompt (see gemini-ocr's MTG_PROMPT) asks it to normalize
 // every printed format itself - "0082", "082/350", "T 0003", "016/017 T",
 // "017/017T", "H 0020", "020/020 H" all become exactly one of "MSH 82" /
@@ -146,7 +174,10 @@ const IGNORED_SET_TOKENS = [
 // parseCollectorNumber here would actually be wrong, since their new-format
 // pattern requires a zero-padded 4-digit number (matching what's printed on
 // the card), which Gemini's unpadded "82"/"T3"/"H20" answer never is.
-const GEMINI_MTG_RESULT_PATTERN = /^([A-Z]{2,4})\s+([TH]?)(\d{1,4})$/;
+// Trailing language token is optional - an older/cached edge-function
+// deploy, or a genuinely unreadable language abbreviation Gemini still
+// chose to answer "EN" for (see gemini-ocr's MTG_PROMPT), both still parse.
+const GEMINI_MTG_RESULT_PATTERN = /^([A-Z]{2,4})\s+([TH]?)(\d{1,4})(?:\s+([A-Z]{2,3}))?$/;
 
 /**
  * Parses Gemini's normalized MTG answer into the same shape parseSetCode
@@ -158,13 +189,14 @@ export function parseGeminiMtgResult(text: string): SetCodeMatch | null {
   const match = GEMINI_MTG_RESULT_PATTERN.exec(text.trim().toUpperCase());
   if (!match) return null;
 
-  const [, setCode, flag, digits] = match;
+  const [, setCode, flag, digits, languageToken] = match;
   return {
     setCode: setCode.toLowerCase(),
     collectorNumber: String(parseInt(digits, 10)),
     isToken: flag === 'T',
     isHelper: flag === 'H',
     finish: 'nonfoil',
+    language: (languageToken && PRINTED_LANGUAGE_CODES[languageToken]) || DEFAULT_CARD_LANGUAGE,
   };
 }
 
@@ -218,6 +250,7 @@ export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string>
   // positional signal observed in practice.
   const lastLine = lines[lines.length - 1];
   const secondLastLine = lines.length >= 2 ? lines[lines.length - 2] : null;
+  const language = findPrintedLanguage(rawText);
 
   const setCodeFromLastLine = lastLine ? lastLine.match(SET_CODE_TOKEN_PATTERN)?.find(isValidToken) : undefined;
   if (setCodeFromLastLine) {
@@ -233,6 +266,7 @@ export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string>
         isToken: collectorMatch.isToken,
         isHelper: collectorMatch.isHelper,
         finish: collectorMatch.finish,
+        language,
       };
     }
   }
@@ -270,5 +304,6 @@ export function parseSetCode(rawText: string, validSetCodes: ReadonlySet<string>
     isToken: collectorMatch.isToken,
     isHelper: collectorMatch.isHelper,
     finish: collectorMatch.finish,
+    language,
   };
 }

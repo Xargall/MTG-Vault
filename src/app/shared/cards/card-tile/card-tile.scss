@@ -21,6 +21,25 @@
   font-weight: 600;
 }
 
+// Shares the status-badge's corner - in practice never shown together, since
+// `status` is only passed by deck-preview card tiles (no collection row,
+// so no language either) and `language` only by the collection grid (which
+// never passes `status`).
+.language-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .status-badge {
   position: absolute;
   top: 6px;

@@ -92,6 +92,17 @@
               }
             </select>
 
+            <label for="language">{{ 'addCard.language' | translate }}</label>
+            <select
+              id="language"
+              [ngModel]="language()"
+              (ngModelChange)="language.set($event)"
+            >
+              @for (option of languageOptions; track option.code) {
+                <option [value]="option.code">{{ option.labelKey | translate }}</option>
+              }
+            </select>
+
             @if (submitError()) {
               <p class="state-message error">{{ submitError() }}</p>
             }
