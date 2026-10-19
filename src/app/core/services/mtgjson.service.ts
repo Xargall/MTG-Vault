@@ -32,6 +32,11 @@ interface MtgjsonDeckCard {
 interface MtgjsonDeckJson {
   commander: MtgjsonDeckCard[];
   mainBoard: MtgjsonDeckCard[];
+  // Bonus cards the physical precon box ships with (e.g. Commander precons'
+  // creature/clue tokens) - a separate array from mainBoard in MTGJSON's own
+  // deck format, not part of the actual decklist. Optional since not every
+  // deck type has one.
+  tokens?: MtgjsonDeckCard[];
 }
 
 export const PRECON_TYPES = [
@@ -109,11 +114,13 @@ export class MtgjsonService {
   /**
    * One pass over a deck's full JSON that produces everything a caller might
    * need from it: every card name (for text search), the resolved
-   * scryfallId+quantity list (for collection/wishlist sync and match %), and
-   * the hero card (commander, or the first mainboard card where there is
-   * none). Used both for on-demand single-deck lookups and for
-   * `DeckCardIndexService`'s background index, so the same downloaded file is
-   * never parsed twice for different subsets of this data.
+   * scryfallId+quantity list (for collection/wishlist sync and match %,
+   * including `tokens` - bonus cards the physical box ships with, e.g. a
+   * Commander precon's creature tokens, live-confirmed missing entirely
+   * before this included them), and the hero card (commander, or the first
+   * mainboard card where there is none). Used both for on-demand single-deck
+   * lookups and for `DeckCardIndexService`'s background index, so the same
+   * downloaded file is never parsed twice for different subsets of this data.
    */
   async getDeckIndexData(fileName: string): Promise<MtgjsonDeckIndexData> {
     const deck = await this.getDeckJson(fileName);
@@ -122,7 +129,7 @@ export class MtgjsonService {
     const quantities = new Map<string, number>();
     let skippedCount = 0;
 
-    for (const entry of [...deck.commander, ...deck.mainBoard]) {
+    for (const entry of [...deck.commander, ...deck.mainBoard, ...(deck.tokens ?? [])]) {
       names.add(entry.name);
       const scryfallId = entry.identifiers?.scryfallId;
       if (!scryfallId) {

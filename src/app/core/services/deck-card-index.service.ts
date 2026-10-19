@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 
 import { PreconIndexData } from '../models/precon.model';
-import { idbGet, idbGetAll, idbPut, openIndexedDb } from './indexed-db.util';
+import { idbClear, idbGet, idbGetAll, idbPut, openIndexedDb } from './indexed-db.util';
 import { MtgPreconService } from './mtg-precon.service';
 
 const DB_NAME = 'mtg-vault';
@@ -9,6 +9,16 @@ const DB_VERSION = 3;
 const STORE_DECKS = 'deck-index';
 const STORE_META = 'deck-index-meta';
 const BATCH_SIZE = 8;
+// Bumped whenever MtgjsonService.getDeckIndexData's own parsing logic
+// changes in a way that invalidates already-cached entries - not just
+// newly-available Scryfall data, which skippedCount already recovers from
+// on its own (see the comment below). Live-confirmed gap: precon bonus
+// tokens (e.g. Keen Engineering's Thopter tokens) were added to that
+// parsing, but an already-cached, fully-resolved entry has no way to know
+// the *parsing itself* changed - skippedCount stays 0, so it never gets
+// refetched. Bumping this clears the whole cache once and rebuilds it.
+const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION_KEY = 'schemaVersion';
 
 // Only types where the fetch cost (one full deck JSON per entry) stays small
 // enough to index eagerly in the background. Bigger buckets (Theme Deck, Intro
@@ -18,7 +28,7 @@ const INDEXED_TYPES = ['Commander Deck', 'Starter Kit'];
 
 /**
  * Indexes every card name and the resolved card+quantity list (commander +
- * mainboard) for each Commander Deck / Starter Kit precon, so the deck
+ * mainboard + bonus tokens) for each Commander Deck / Starter Kit precon, so the deck
  * browser can be searched by any character or card it contains (not just
  * the retail product title), and so a "which precons am I already mostly
  * done with" scan can run entirely offline against this cache - building it
@@ -63,16 +73,25 @@ export class DeckCardIndexService {
     }
 
     if (db) {
-      const cached = await idbGetAll(db, STORE_DECKS);
-      for (const [key, value] of cached) {
-        this.entries.set(String(key), value as PreconIndexData);
-      }
-      this.indexedCount.set(this.entries.size);
+      const cachedSchemaVersion = await idbGet(db, STORE_META, SCHEMA_VERSION_KEY);
+      if (cachedSchemaVersion !== SCHEMA_VERSION) {
+        // Parsing itself changed since this cache was built - every entry
+        // is suspect, not just the ones with skipped cards, so start clean
+        // rather than mixing old- and new-shape entries together.
+        await idbClear(db, STORE_DECKS);
+        await idbPut(db, STORE_META, SCHEMA_VERSION_KEY, SCHEMA_VERSION);
+      } else {
+        const cached = await idbGetAll(db, STORE_DECKS);
+        for (const [key, value] of cached) {
+          this.entries.set(String(key), value as PreconIndexData);
+        }
+        this.indexedCount.set(this.entries.size);
 
-      // A completed cache is usable right away - the refresh pass below
-      // still runs, but only re-fetches the few entries that need it.
-      const complete = await idbGet(db, STORE_META, 'complete');
-      if (complete) this.ready.set(true);
+        // A completed cache is usable right away - the refresh pass below
+        // still runs, but only re-fetches the few entries that need it.
+        const complete = await idbGet(db, STORE_META, 'complete');
+        if (complete) this.ready.set(true);
+      }
     }
 
     // Not just "anything missing from the cache": a precon that MTGJSON
