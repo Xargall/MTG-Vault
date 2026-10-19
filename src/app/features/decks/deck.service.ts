@@ -143,7 +143,13 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    await this.grantMissingCards(deck.id, detail.cards);
+    // A precon is a sealed physical product, unlike importDeck/
+    // addArchetypeDeck's "a decklist to build from what I already own" -
+    // every listed card (and bonus token) ships in the box regardless of
+    // what's already owned from elsewhere or claimed by another deck, so
+    // this always adds the full quantity rather than topping up a shared
+    // pool (see grantAllCards's own doc comment).
+    await this.grantAllCards(detail.cards);
   }
 
   /** Deck built from a pasted card list (see DeckImportDialog) rather than a bundled precon. */
@@ -228,14 +234,44 @@ export class DeckService {
   }
 
   /**
+   * Precon decks are sealed physical products (see addPreconDeck) - every
+   * listed card and bonus token ships in the box regardless of what's
+   * already owned from elsewhere or claimed by another deck, so this always
+   * adds the deck's full listed quantity on top of whatever collection row
+   * already exists, rather than topping up a shared pool. Buying 3 precons
+   * that each include a Sol Ring means 3 physical Sol Rings, full stop -
+   * unlike grantMissingCards below (used by importDeck/addArchetypeDeck,
+   * which build a decklist out of the user's *existing* collection instead
+   * of a new sealed product, so topping up instead of blindly re-adding is
+   * the right call there).
+   */
+  private async grantAllCards(cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
+    const isMtg = this.gameService.currentSlug() === 'mtg';
+    const resolvedCards = isMtg ? await this.gameService.cardApi().getCardsByIds(cards.map((card) => card.cardId)) : [];
+    const oracleIdByCardId = new Map(resolvedCards.map((card) => [card.id, card.oracleId]));
+
+    const collectionInputs: AddCardInput[] = cards.map((card) => ({
+      cardId: card.cardId,
+      quantity: card.quantity,
+      foil: false,
+      condition: 'NM',
+      oracleId: oracleIdByCardId.get(card.cardId) ?? null,
+    }));
+    await this.collectionService.addCards(collectionInputs);
+  }
+
+  /**
    * Grants any not-yet-*available* copies of a newly added deck's cards into
-   * the collection - shared by addPreconDeck/importDeck/addEdhrecDeck.
-   * "Available" excludes copies already committed to another of the user's
-   * decks (see deck-stats.ts's assigned-elsewhere maps) - otherwise a card
-   * shared across several decks (e.g. Howling Golem across every Game Night
-   * 2022 precon) only ever gets granted once, leaving every later deck
-   * short a copy it needs of its own even though the first deck "already
-   * owns" it. Resolves each card's oracle_id via the card API (scryfall_cards
+   * the collection - shared by importDeck/addEdhrecDeck (a decklist built
+   * out of the user's own existing collection, not a sealed product - see
+   * grantAllCards above for the precon case). "Available" excludes copies
+   * already committed to another of the user's decks (see deck-stats.ts's
+   * assigned-elsewhere maps) - otherwise a card shared across several decks
+   * (e.g. Howling Golem across every Game Night 2022 precon, back when
+   * precons also went through this same method) only ever gets granted
+   * once, leaving every later deck short a copy it needs of its own even
+   * though the first deck "already owns" it. Resolves each card's oracle_id
+   * via the card API (scryfall_cards
    * for MTG) - previously went through MtgBulkDataService's local IndexedDB
    * cache instead (built for the offline scanner), which returns null for
    * anything it hasn't downloaded/refreshed yet. Live-confirmed on a
