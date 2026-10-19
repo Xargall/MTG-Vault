@@ -93,40 +93,72 @@ export class DeckDetailDialog {
     buildAssignedElsewhereMaps(this.allDecks(), this.entry().deck.id),
   );
 
+  // Never mutated - only ever .get() against, to make getOwnedQuantity/
+  // getCardAvailability's oracle term resolve to 0 (see matchingMaps).
+  private static readonly EMPTY_MAP: Map<string, number> = new Map();
+
+  /** Every collection row's quantity keyed by its own exact card_id, regardless of whether it also carries an oracle_id - unlike ownedMap (which deliberately excludes any row that has one, see buildOwnedMap's own doc comment), this is needed for precon matching (see matchingMaps): a modern MTG row always has an oracle_id, so ownedMap alone is practically always empty for MTG. */
+  private readonly ownedByExactCardId = computed(() => {
+    const map = new Map<string, number>();
+    for (const { row } of this.collectionEntries()) {
+      map.set(row.card_id, (map.get(row.card_id) ?? 0) + row.quantity);
+    }
+    return map;
+  });
+
   /**
    * A precon is a sealed physical product - every card inside it is granted
    * into the collection as its own exact printing (see
    * DeckService.grantAllCards), so matching it against the collection (and
    * against other decks' own claims) should only ever recognize that exact
    * same printing, never "an equivalent card via a different print" -
-   * explicit user call ("Wir nutzen bei Precons KEINE Substitute"), after a
-   * false "83%, genuinely short" reading turned out to be my own debugging
-   * script's bug, not the app's, but the underlying ask stands on its own:
-   * oracle-based substitution is for a decklist built out of whatever's
-   * already owned (importDeck/addArchetypeDeck), not a box of specific
-   * printed cards. Returns null (suppressing oracle matching entirely, see
-   * getOwnedQuantity/getCardAvailability/getAssignedElsewhereDecks, which
-   * all fall back to exact card_id matching when given a null oracleId) for
-   * a precon, the card's real oracleId otherwise.
+   * explicit user call ("Wir nutzen bei Precons KEINE Substitute").
+   *
+   * The first attempt at this passed oracleId: null into
+   * getOwnedQuantity/getCardAvailability instead - live-confirmed as a real
+   * regression (every precon card read as entirely missing): those
+   * functions' two maps are keyed by whichever of card_id/oracle_id a row
+   * actually carries, and a modern MTG row always has an oracle_id, so its
+   * quantity lives in ownedOracleMap, never in ownedMap - passing a null
+   * oracleId doesn't redirect the lookup back to ownedMap, it just zeroes
+   * the oracle term out and finds nothing either way.
+   *
+   * This swaps in a purpose-built ownedByExactCardId/assignedByCardId pair
+   * (real data, keyed correctly regardless of oracle_id) alongside an
+   * always-empty stand-in for the oracle maps instead - the oracle term in
+   * getOwnedQuantity/getCardAvailability then always resolves to 0, so only
+   * the exact-card_id term ever contributes, for a precon. A non-precon
+   * deck gets the real, oracle-aware maps unchanged.
    */
-  private oracleIdFor(card: Card): string | null {
-    return this.entry().deck.is_precon ? null : card.oracleId;
+  private matchingMaps(): {
+    owned: Map<string, number>;
+    ownedByOracle: Map<string, number>;
+    assignedByCardId: Map<string, number>;
+    assignedByOracle: Map<string, number>;
+  } {
+    const { byCardId, byOracleId } = this.assignedMaps();
+    if (!this.entry().deck.is_precon) {
+      return { owned: this.ownedMap(), ownedByOracle: this.ownedOracleMap(), assignedByCardId: byCardId, assignedByOracle: byOracleId };
+    }
+    return {
+      owned: this.ownedByExactCardId(),
+      ownedByOracle: DeckDetailDialog.EMPTY_MAP,
+      assignedByCardId: byCardId,
+      assignedByOracle: DeckDetailDialog.EMPTY_MAP,
+    };
   }
 
-  /** Every deck card paired with its owned/partial/missing status, for the status-badged card grid - so an incomplete deck shows exactly *which* cards are missing, not just a count. Ownership is oracle-aware for a non-precon deck (any printing counts, see getOwnedQuantity/oracleIdFor) - this is plain ownership, not availability; see cardBindingDetails below for the "already claimed by another deck" picture. */
-  protected readonly cardsWithStatus = computed<DeckCardWithStatus[]>(() =>
-    this.sortedCards().map((entry) => ({
+  /** Every deck card paired with its owned/partial/missing status, for the status-badged card grid - so an incomplete deck shows exactly *which* cards are missing, not just a count. Ownership is oracle-aware for a non-precon deck (any printing counts, see getOwnedQuantity), exact-print-only for a precon (see matchingMaps) - this is plain ownership, not availability; see cardBindingDetails below for the "already claimed by another deck" picture. */
+  protected readonly cardsWithStatus = computed<DeckCardWithStatus[]>(() => {
+    const { owned, ownedByOracle } = this.matchingMaps();
+    return this.sortedCards().map((entry) => ({
       entry,
       status: getCardOwnedStatus(
         entry.row.quantity,
-        getOwnedQuantity(
-          { cardId: entry.row.card_id, oracleId: this.oracleIdFor(entry.card) },
-          this.ownedMap(),
-          this.ownedOracleMap(),
-        ),
+        getOwnedQuantity({ cardId: entry.row.card_id, oracleId: entry.card.oracleId }, owned, ownedByOracle),
       ),
-    })),
-  );
+    }));
+  });
 
   /**
    * Splits the status-badged grid into the deck's actual decklist and any
@@ -145,15 +177,15 @@ export class DeckDetailDialog {
     this.cardsWithStatus().filter((item) => item.entry.card.game === 'mtg' && item.entry.card.typeLine.startsWith('Token')),
   );
 
-  /** The real, weighted "can I actually build this" match - a card that's owned but fully claimed by another deck doesn't count as free, matching the flexible (half-credit) scoring the deck-search toggle defaults to. See getAvailabilityMatch. Exact-print-only for a precon (see oracleIdFor). */
+  /** The real, weighted "can I actually build this" match - a card that's owned but fully claimed by another deck doesn't count as free, matching the flexible (half-credit) scoring the deck-search toggle defaults to. See getAvailabilityMatch. Exact-print-only for a precon (see matchingMaps). */
   protected readonly availabilityMatch = computed(() => {
-    const { byCardId, byOracleId } = this.assignedMaps();
+    const { owned, ownedByOracle, assignedByCardId, assignedByOracle } = this.matchingMaps();
     const required = this.entry().cards.map(({ row, card }) => ({
       cardId: row.card_id,
-      oracleId: this.oracleIdFor(card),
+      oracleId: card.oracleId,
       quantity: row.quantity,
     }));
-    return getAvailabilityMatch(required, this.ownedMap(), this.ownedOracleMap(), byCardId, byOracleId, 'flexible');
+    return getAvailabilityMatch(required, owned, ownedByOracle, assignedByCardId, assignedByOracle, 'flexible');
   });
 
   /**
@@ -169,13 +201,11 @@ export class DeckDetailDialog {
    * status, since releasing a card to/from another deck remains a real
    * action independent of whether this card itself already reads as
    * available. A precon never gets a substitute note at all (see
-   * oracleIdFor) - it's always exact-print-only, so there's never an
+   * matchingMaps) - it's always exact-print-only, so there's never an
    * "equivalent" print to call out in the first place.
    */
   protected readonly cardBindingDetails = computed<DeckCardBindingDetail[]>(() => {
-    const owned = this.ownedMap();
-    const ownedByOracle = this.ownedOracleMap();
-    const { byCardId, byOracleId } = this.assignedMaps();
+    const { owned, ownedByOracle, assignedByCardId, assignedByOracle } = this.matchingMaps();
     const collectionEntries = this.collectionEntries();
     const allDecks = this.allDecks();
     const currentDeckId = this.entry().deck.id;
@@ -184,18 +214,21 @@ export class DeckDetailDialog {
     return this.sortedCards()
       .map((entry) => {
         const { row, card } = entry;
-        const oracleId = this.oracleIdFor(card);
         const availability = getCardAvailability(
-          { cardId: row.card_id, oracleId },
+          { cardId: row.card_id, oracleId: card.oracleId },
           row.quantity,
           owned,
           ownedByOracle,
-          byCardId,
-          byOracleId,
+          assignedByCardId,
+          assignedByOracle,
         );
         const substitute =
           isPrecon || availability.status === 'available' ? null : findSubstitute(card, row.quantity, collectionEntries);
-        const assignedElsewhere = getAssignedElsewhereDecks({ cardId: row.card_id, oracleId }, allDecks, currentDeckId);
+        const assignedElsewhere = getAssignedElsewhereDecks(
+          { cardId: row.card_id, oracleId: isPrecon ? null : card.oracleId },
+          allDecks,
+          currentDeckId,
+        );
         return {
           entry,
           status: availability.status,
@@ -208,24 +241,22 @@ export class DeckDetailDialog {
   });
 
   protected readonly missingCards = computed<DeckCardEntry[]>(() => {
-    const owned = this.ownedMap();
-    const ownedByOracle = this.ownedOracleMap();
+    const { owned, ownedByOracle } = this.matchingMaps();
     return this.entry().cards.filter(
       ({ row, card }) =>
-        getOwnedQuantity({ cardId: row.card_id, oracleId: this.oracleIdFor(card) }, owned, ownedByOracle) < row.quantity,
+        getOwnedQuantity({ cardId: row.card_id, oracleId: card.oracleId }, owned, ownedByOracle) < row.quantity,
     );
   });
 
   /** Total missing *copies* (needed minus owned, summed) - not the number of distinct cards that are short, which is what missingCards().length would give. */
   protected readonly missingQuantityTotal = computed(() => {
-    const owned = this.ownedMap();
-    const ownedByOracle = this.ownedOracleMap();
+    const { owned, ownedByOracle } = this.matchingMaps();
     return this.entry().cards.reduce(
       (sum, { row, card }) =>
         sum +
         getMissingQuantity(
           row.quantity,
-          getOwnedQuantity({ cardId: row.card_id, oracleId: this.oracleIdFor(card) }, owned, ownedByOracle),
+          getOwnedQuantity({ cardId: row.card_id, oracleId: card.oracleId }, owned, ownedByOracle),
         ),
       0,
     );
@@ -301,8 +332,7 @@ export class DeckDetailDialog {
     try {
       const existing = await this.wishlistService.getCardIds();
       const deckName = this.entry().deck.name;
-      const owned = this.ownedMap();
-      const ownedByOracle = this.ownedOracleMap();
+      const { owned, ownedByOracle } = this.matchingMaps();
       const inputs: UpsertWishlistInput[] = this.missingCards()
         .filter(({ row }) => !existing.has(row.card_id))
         .map(({ row, card }) => ({
@@ -311,7 +341,7 @@ export class DeckDetailDialog {
           notes: this.translate.instant('common.forDeck', { name: deckName }),
           quantity: getMissingQuantity(
             row.quantity,
-            getOwnedQuantity({ cardId: row.card_id, oracleId: this.oracleIdFor(card) }, owned, ownedByOracle),
+            getOwnedQuantity({ cardId: row.card_id, oracleId: card.oracleId }, owned, ownedByOracle),
           ),
         }));
 
