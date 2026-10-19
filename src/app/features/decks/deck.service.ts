@@ -80,6 +80,11 @@ export class DeckService {
         .from('deck_cards')
         .select('*')
         .in('deck_id', deckIds)
+        // See CollectionService.fetchAllPages's own doc comment - .range()
+        // has no guaranteed row order between pages without this, so a
+        // concurrent write between the two page requests can drop a row
+        // from both pages instead of landing it in either one.
+        .order('id')
         .range(from, from + DECK_CARDS_PAGE_SIZE - 1)
         .returns<DeckCardRow[]>();
       if (cardsError) throw cardsError;

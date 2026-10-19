@@ -70,7 +70,22 @@ export class CollectionService {
   private readonly supabase = inject(SupabaseService);
   private readonly gameService = inject(GameService);
 
-  /** Runs `query` repeatedly with an increasing `.range()` until a page comes back shorter than COLLECTION_PAGE_SIZE, concatenating every page - see COLLECTION_PAGE_SIZE's own doc comment for why a single unbounded select isn't safe here. `query` must apply every other filter itself; this only adds the range. */
+  /**
+   * Runs `query` repeatedly with an increasing `.range()` until a page comes
+   * back shorter than COLLECTION_PAGE_SIZE, concatenating every page - see
+   * COLLECTION_PAGE_SIZE's own doc comment for why a single unbounded select
+   * isn't safe here. `query` must apply every other filter *and* an
+   * `.order('id')` of its own - `.range()` without a stable order has no
+   * guaranteed row order between the two separate requests two pages are
+   * (Postgres is free to return a plain select in any order, and a
+   * concurrent write between the two requests - e.g. this exact app's own
+   * reconciliation scripts running while someone has the page open - can
+   * shift which rows land in which page), so a row can silently vanish from
+   * *both* pages instead of appearing in one of them. Live-confirmed: a
+   * collection one row short of a clean page boundary intermittently lost
+   * one specific exact printing (same oracle card, 3 copies owned across 3
+   * decks) from the rendered grid, with no error anywhere.
+   */
   private async fetchAllPages<T>(
     query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
   ): Promise<T[]> {
@@ -97,6 +112,7 @@ export class CollectionService {
         .from('collection_cards')
         .select('*')
         .eq('game_id', gameId)
+        .order('id')
         .range(from, to)
         .returns<CollectionCardRow[]>(),
     );
@@ -137,6 +153,7 @@ export class CollectionService {
         .select('card_id, quantity')
         .eq('game_id', gameId)
         .is('oracle_id', null)
+        .order('id')
         .range(from, to)
         .returns<Array<{ card_id: string; quantity: number }>>(),
     );
@@ -160,6 +177,7 @@ export class CollectionService {
         .select('oracle_id, quantity')
         .eq('game_id', gameId)
         .not('oracle_id', 'is', null)
+        .order('id')
         .range(from, to)
         .returns<Array<{ oracle_id: string; quantity: number }>>(),
     );
@@ -177,6 +195,7 @@ export class CollectionService {
       this.supabase.client
         .from('collection_cards')
         .select('game_id, quantity')
+        .order('id')
         .range(from, to)
         .returns<Array<{ game_id: string; quantity: number }>>(),
     );
