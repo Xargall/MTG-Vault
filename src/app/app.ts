@@ -1,12 +1,19 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { SwUpdate } from '@angular/service-worker';
 import { TranslateService } from '@ngx-translate/core';
 
 import { CardCategoryBackfillService } from './core/services/card-category-backfill.service';
 import { MtgBulkDataService } from './core/services/mtg-bulk-data.service';
 import { OracleIdBackfillService } from './core/services/oracle-id-backfill.service';
+import { ToastService } from './core/services/toast.service';
 import { LANG_STORAGE_KEY } from './core/utils/language.util';
 import { GlobalToast } from './shared/layout/global-toast/global-toast';
+
+// Gives someone mid-action (filling a form, scanning a card) a moment to
+// notice before the page reloads out from under them, rather than reloading
+// the instant an update is detected.
+const UPDATE_RELOAD_DELAY_MS = 8000;
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -40,5 +47,21 @@ export class App {
     // while token detection was broken (card_category = 'normal' instead
     // of 'token') - see CardCategoryBackfillService.
     void inject(CardCategoryBackfillService).start();
+
+    // Without this, the service worker (see ngsw-config.json) keeps serving
+    // an already-open tab's old cached bundle indefinitely after a new
+    // deploy - it only fetches the update in the background and never
+    // activates it on its own. Live-confirmed: several real fixes (the
+    // card-display-language feature among them) shipped and deployed
+    // successfully but never reached an already-open session at all.
+    const swUpdate = inject(SwUpdate);
+    const toast = inject(ToastService);
+    if (swUpdate.isEnabled) {
+      swUpdate.versionUpdates.subscribe((event) => {
+        if (event.type !== 'VERSION_READY') return;
+        toast.show('Update verfügbar – die Seite lädt sich gleich neu…', 'success', UPDATE_RELOAD_DELAY_MS);
+        setTimeout(() => document.location.reload(), UPDATE_RELOAD_DELAY_MS);
+      });
+    }
   }
 }
