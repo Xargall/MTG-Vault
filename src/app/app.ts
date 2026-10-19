@@ -60,7 +60,17 @@ export class App {
       swUpdate.versionUpdates.subscribe((event) => {
         if (event.type !== 'VERSION_READY') return;
         toast.show('Update verfügbar – die Seite lädt sich gleich neu…', 'success', UPDATE_RELOAD_DELAY_MS);
-        setTimeout(() => document.location.reload(), UPDATE_RELOAD_DELAY_MS);
+        // A "ready" update is only installed alongside the currently active
+        // one, not yet in control of this page - without explicitly
+        // activating it, the old service worker keeps serving every request
+        // (including this very reload) regardless of how many times the
+        // page reloads. Confirmed live: the first version of this fix
+        // reloaded unconditionally and never actually picked up a new
+        // version on its own, exactly the "only works after a manual hard
+        // reload" symptom it was meant to fix in the first place.
+        setTimeout(() => {
+          void swUpdate.activateUpdate().finally(() => document.location.reload());
+        }, UPDATE_RELOAD_DELAY_MS);
       });
     }
   }
