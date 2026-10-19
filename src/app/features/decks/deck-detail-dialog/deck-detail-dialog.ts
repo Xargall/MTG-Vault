@@ -132,7 +132,20 @@ export class DeckDetailDialog {
     return getAvailabilityMatch(required, this.ownedMap(), this.ownedOracleMap(), byCardId, byOracleId, 'flexible');
   });
 
-  /** Only cards with a substitution note and/or an "assigned elsewhere" note - a fully, simply available card has nothing worth calling out here (see the template's binding-details section). Once the deck is 100% buildable (see availabilityMatch), the substitute note itself is suppressed - "you own this via a different print" stops being worth surfacing once the deck doesn't need the callout to prove it's buildable at all; an assigned-elsewhere note stays regardless, since releasing a card to/from another deck remains a real action independent of this deck's own completeness. */
+  /**
+   * Only cards with a substitution note and/or an "assigned elsewhere" note
+   * - a fully, simply available card has nothing worth calling out here
+   * (see the template's binding-details section). The substitute note is
+   * gated per card, not on the whole deck's percent - live-confirmed bug:
+   * gating on availabilityMatch===100 left a card's own substitute note
+   * showing whenever *any other, unrelated* card in the same deck was still
+   * short (e.g. claimed by another deck), even though that specific card
+   * was already fully covered by its own substitute print. An
+   * assigned-elsewhere note still stays regardless of this card's own
+   * status, since releasing a card to/from another deck remains a real
+   * action independent of whether this card itself already reads as
+   * available.
+   */
   protected readonly cardBindingDetails = computed<DeckCardBindingDetail[]>(() => {
     const owned = this.ownedMap();
     const ownedByOracle = this.ownedOracleMap();
@@ -140,7 +153,6 @@ export class DeckDetailDialog {
     const collectionEntries = this.collectionEntries();
     const allDecks = this.allDecks();
     const currentDeckId = this.entry().deck.id;
-    const isComplete = this.availabilityMatch().percent === 100;
 
     return this.sortedCards()
       .map((entry) => {
@@ -153,7 +165,7 @@ export class DeckDetailDialog {
           byCardId,
           byOracleId,
         );
-        const substitute = isComplete ? null : findSubstitute(card, row.quantity, collectionEntries);
+        const substitute = availability.status === 'available' ? null : findSubstitute(card, row.quantity, collectionEntries);
         const assignedElsewhere = getAssignedElsewhereDecks(
           { cardId: row.card_id, oracleId: card.oracleId },
           allDecks,
