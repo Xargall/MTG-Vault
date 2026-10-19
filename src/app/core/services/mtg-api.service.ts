@@ -1002,48 +1002,55 @@ export class MtgApiService implements CardApiService {
     const lang = this.displayLanguage.current();
     if (lang === 'en') return cards;
 
-    const oracleIds = [...new Set(cards.map((card) => card.oracleId).filter((id): id is string => id !== null))];
-    if (oracleIds.length === 0) return cards;
+    // One request pair per distinct (oracle_id, set_code) actually present -
+    // a collection with several copies of the same printing (or several
+    // printings sharing an oracle_id across the visible cards) sends that
+    // pair only once, however many cards it backs.
+    const pairs = new Map<string, { oracleId: string; setCode: string }>();
+    for (const card of cards) {
+      if (!card.oracleId || card.game !== 'mtg') continue;
+      pairs.set(`${card.oracleId}:${card.setCode}`, { oracleId: card.oracleId, setCode: card.setCode });
+    }
+    if (pairs.size === 0) return cards;
 
-    const localized = await this.getLocalizedCardDataByOracleIds(oracleIds, lang);
+    const localized = await this.getLocalizedCardDataByPairs([...pairs.values()], lang);
     if (localized.size === 0) return cards;
 
     return cards.map((card) => {
-      const candidates = card.oracleId ? localized.get(card.oracleId) : undefined;
-      if (!candidates || candidates.length === 0) return card;
+      if (!card.oracleId || card.game !== 'mtg') return card;
+      const match = localized.get(`${card.oracleId}:${card.setCode}`);
+      if (!match) return card;
 
       // A land (and plenty of other cards) gets fresh art nearly every set,
       // so a localized printing from a *different* set is never safe to
       // show as this card's image - live-confirmed case: a Fallout
       // Collector Booster land showed a completely unrelated German
-      // reprint's artwork this way. Only swap the image when the matching
-      // language was actually printed in this exact set (common - many
-      // Universes Beyond crossovers, like Fallout, simply have no German
-      // printing at all); the translated name itself is safe to use from
-      // any matching printing, since it's the same text regardless of set.
-      const setCode = card.game === 'mtg' ? card.setCode : null;
-      const sameSet = setCode ? candidates.find((row) => row.setCode === setCode) : undefined;
-      const anyMatch = sameSet ?? candidates[0];
-
-      return sameSet
-        ? { ...card, name: anyMatch.name, imageUrl: sameSet.imageUrl, imageUrlSmall: sameSet.imageUrlSmall }
-        : { ...card, name: anyMatch.name };
+      // reprint's artwork this way (see same_set, resolved in Postgres -
+      // scryfall_cards_localized). The translated name itself is safe to
+      // use from any matching printing, since it's the same text
+      // regardless of set.
+      return match.sameSet
+        ? { ...card, name: match.name, imageUrl: match.imageUrl, imageUrlSmall: match.imageUrlSmall }
+        : { ...card, name: match.name };
     });
   }
 
-  /** Batched by oracle_id+lang (see 025_scryfall_cards_lang.sql's composite index) - one query for the whole list rather than one per card, which matters for a collection-grid-sized call. Every matching-language row per oracle_id is kept (not deduped) - translateCards itself picks the right one per card, since only a same-set match is safe to use for the image (see its own comment). */
-  private async getLocalizedCardDataByOracleIds(
-    oracleIds: string[],
+  /** Batched (see POSTGRES_BATCH_SIZE) and resolved entirely in Postgres (scryfall_cards_localized, backed by the (oracle_id, lang) index) - exactly one row per requested pair comes back, never every candidate reprint, which mattered a lot for a collection-grid-sized call (hundreds of pairs). */
+  private async getLocalizedCardDataByPairs(
+    pairs: Array<{ oracleId: string; setCode: string }>,
     lang: string,
-  ): Promise<Map<string, Array<{ setCode: string; name: string; imageUrl: string | null; imageUrlSmall: string | null }>>> {
+  ): Promise<
+    Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null; sameSet: boolean }>
+  > {
     const result = new Map<
       string,
-      Array<{ setCode: string; name: string; imageUrl: string | null; imageUrlSmall: string | null }>
+      { name: string; imageUrl: string | null; imageUrlSmall: string | null; sameSet: boolean }
     >();
-    for (let i = 0; i < oracleIds.length; i += POSTGRES_BATCH_SIZE) {
-      const batch = oracleIds.slice(i, i + POSTGRES_BATCH_SIZE);
+    for (let i = 0; i < pairs.length; i += POSTGRES_BATCH_SIZE) {
+      const batch = pairs.slice(i, i + POSTGRES_BATCH_SIZE);
       const { data, error } = await this.supabase.client.rpc('scryfall_cards_localized', {
-        oracle_ids: batch,
+        oracle_ids: batch.map((pair) => pair.oracleId),
+        set_codes: batch.map((pair) => pair.setCode),
         target_lang: lang,
       });
       if (error) {
@@ -1054,19 +1061,18 @@ export class MtgApiService implements CardApiService {
         oracle_id: string;
         set_code: string;
         printed_name: string | null;
-        name: string;
+        name: string | null;
         image_url: string | null;
         image_url_small: string | null;
+        same_set: boolean;
       }>) {
-        const entry = {
-          setCode: row.set_code,
+        if (!row.name) continue;
+        result.set(`${row.oracle_id}:${row.set_code}`, {
           name: row.printed_name ?? row.name,
           imageUrl: row.image_url,
           imageUrlSmall: row.image_url_small,
-        };
-        const existing = result.get(row.oracle_id);
-        if (existing) existing.push(entry);
-        else result.set(row.oracle_id, [entry]);
+          sameSet: row.same_set,
+        });
       }
     }
     return result;
