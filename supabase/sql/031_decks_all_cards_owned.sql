@@ -1,0 +1,21 @@
+-- Adds `all_cards_owned` to decks - a user-set flag for a deck added any
+-- way *other* than the precon browser (imported/pasted, an EDHREC
+-- recommendation, a Moxfield/MTGO format set) that represents a real,
+-- fully-owned physical pool just like a precon does. Checked at add-time
+-- via the new "Alle Karten vorhanden" checkbox (DeckImportDialog,
+-- CommanderRecommendationsDialog, FormatDeckRecommendationsDialog):
+--   - true  -> DeckService.grantAllCards (full, unconditional grant - see
+--              031's own addPreconDeck precedent) and, from then on,
+--              deck-detail-dialog.ts treats it exactly like is_precon
+--              (always exact-print-only, never a substitute note).
+--   - false (default) -> DeckService.grantMissingCards (only the shortfall
+--              against freely available collection stock, oracle-aware),
+--              and deck-detail-dialog.ts defaults to exact-print-only too,
+--              but offers a purely local, never-persisted "nach
+--              Substituten suchen" checkbox to switch that one open
+--              dialog instance to oracle-aware/substitute-crediting
+--              matching.
+--
+-- Run this once in the Supabase SQL editor. Safe to re-run (idempotent).
+
+alter table decks add column if not exists all_cards_owned boolean not null default false;

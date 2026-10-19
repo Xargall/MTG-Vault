@@ -30,6 +30,15 @@
         ></textarea>
       </label>
 
+      <label class="checkbox-label">
+        <input
+          type="checkbox"
+          [checked]="allCardsOwned()"
+          (change)="allCardsOwned.set($any($event.target).checked)"
+        />
+        {{ 'deckImport.allCardsOwnedOption' | translate }}
+      </label>
+
       <div class="dialog-actions">
         <button type="button" class="cancel-button" (click)="close.emit()">
           {{ 'deckImport.cancelButton' | translate }}

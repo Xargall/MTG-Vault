@@ -148,6 +148,8 @@ export class CommanderRecommendationsDialog {
   protected readonly addingDeck = signal(false);
   protected readonly addDeckError = signal<string | null>(null);
   protected readonly deckAdded = signal(false);
+  // "Alle Karten vorhanden" - see DeckService.importDeck's own doc comment.
+  protected readonly allCardsOwned = signal(false);
 
   protected readonly addingToWishlist = signal(false);
   protected readonly wishlistError = signal<string | null>(null);
@@ -294,6 +296,7 @@ export class CommanderRecommendationsDialog {
     this.detailError.set(null);
     this.deckAdded.set(false);
     this.addDeckError.set(null);
+    this.allCardsOwned.set(false);
     this.wishlistAdded.set(false);
     this.wishlistError.set(null);
     this.ownedCards.set([]);
@@ -361,7 +364,7 @@ export class CommanderRecommendationsDialog {
     this.addDeckError.set(null);
     try {
       const cards = mergeCardQuantities([...this.ownedCards(), ...this.missingCards()]);
-      await this.deckService.addEdhrecDeck(rec.name, cards);
+      await this.deckService.addEdhrecDeck(rec.name, cards, this.allCardsOwned());
       this.deckAdded.set(true);
       this.added.emit();
     } catch (error) {

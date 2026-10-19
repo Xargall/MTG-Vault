@@ -301,6 +301,15 @@
   cursor: pointer;
 }
 
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
 .delete-button {
   padding: 4px 12px;
   border-radius: var(--radius);

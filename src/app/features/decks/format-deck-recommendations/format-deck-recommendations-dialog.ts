@@ -150,6 +150,8 @@ export class FormatDeckRecommendationsDialog {
   protected readonly addingDeck = signal(false);
   protected readonly addDeckError = signal<string | null>(null);
   protected readonly deckAdded = signal(false);
+  // "Alle Karten vorhanden" - see DeckService.importDeck's own doc comment.
+  protected readonly allCardsOwned = signal(false);
 
   protected readonly addingToWishlist = signal(false);
   protected readonly wishlistError = signal<string | null>(null);
@@ -276,6 +278,7 @@ export class FormatDeckRecommendationsDialog {
     this.detailError.set(null);
     this.deckAdded.set(false);
     this.addDeckError.set(null);
+    this.allCardsOwned.set(false);
     this.wishlistAdded.set(false);
     this.wishlistError.set(null);
     this.ownedCards.set([]);
@@ -340,7 +343,7 @@ export class FormatDeckRecommendationsDialog {
     this.addDeckError.set(null);
     try {
       const cards = mergeCardQuantities([...this.ownedCards(), ...this.missingCards()]);
-      await this.deckService.addArchetypeDeck(rec.name, format, cards);
+      await this.deckService.addArchetypeDeck(rec.name, format, cards, this.allCardsOwned());
       this.deckAdded.set(true);
       this.added.emit();
     } catch (error) {

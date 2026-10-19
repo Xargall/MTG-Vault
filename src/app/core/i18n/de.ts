@@ -220,6 +220,7 @@ export const de = {
     wishlistButton: 'Fehlende Karten auf Wunschliste',
     containedCards: 'Enthaltene Karten',
     containedTokens: 'Enthaltene Token',
+    searchSubstitutesOption: 'Nach Substituten in allen Decks suchen',
     deleteLink: 'Deck entfernen',
     confirmDeleteText: 'Deck wirklich entfernen? Die Karten bleiben in deiner Sammlung.',
     removeCardsOption: 'Enthaltene Karten auch aus der Sammlung entfernen',
@@ -396,6 +397,8 @@ export const de = {
     defaultName: 'Importiertes Deck',
     listLabel: 'Kartenliste',
     listPlaceholder: '1 Aang, Air Nomad (TLE) 234\n1 Katara, Heroic Healer\n8 Plains',
+    allCardsOwnedOption:
+      'Alle Karten vorhanden (reales, bereits besessenes Produkt - exaktes Matching, keine Substitute)',
     importButton: 'Importieren',
     cancelButton: 'Abbrechen',
     progress: 'Importiere Karte {{current}} von {{total}}…',

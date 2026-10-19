@@ -18,7 +18,10 @@ import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.se
 import {
   AssignedElsewhereEntry,
   buildAssignedElsewhereMaps,
+  buildOwnedMap,
+  buildOwnedOracleMap,
   CardAvailabilityStatus,
+  findSubstitute,
   getAvailabilityMatch,
   getCardAvailability,
   getAssignedElsewhereDecks,
@@ -92,7 +95,7 @@ export class DeckDetailDialog {
   // getCardAvailability's oracle term resolve to 0 (see matchingMaps).
   private static readonly EMPTY_MAP: Map<string, number> = new Map();
 
-  /** Every collection row's quantity keyed by its own exact card_id, regardless of whether it also carries an oracle_id - unlike the now-unused buildOwnedMap (which deliberately excludes any row that has one), this is needed for exact-print matching (see matchingMaps): a modern MTG row always has an oracle_id, so buildOwnedMap's own map is practically always empty for MTG. */
+  /** Every collection row's quantity keyed by its own exact card_id, regardless of whether it also carries an oracle_id - unlike buildOwnedMap (which deliberately excludes any row that has one), this is needed for exact-print matching (see matchingMaps): a modern MTG row always has an oracle_id, so buildOwnedMap's own map is practically always empty for MTG. */
   private readonly ownedByExactCardId = computed(() => {
     const map = new Map<string, number>();
     for (const { row } of this.collectionEntries()) {
@@ -101,19 +104,45 @@ export class DeckDetailDialog {
     return map;
   });
 
+  private readonly ownedMap = computed(() => buildOwnedMap(this.collectionEntries()));
+  private readonly ownedOracleMap = computed(() => buildOwnedOracleMap(this.collectionEntries()));
+
   /**
-   * Every deck here is a sealed physical product (a Commander precon, a
-   * Starter Kit/Beginner Box, or a Game Night box pasted in via
-   * DeckImportDialog rather than pulled from the precon library) - every
-   * card inside it is granted into the collection as its own exact
-   * printing (see DeckService.grantAllCards), so matching a deck against
-   * the collection (and against other decks' own claims) should only ever
-   * recognize that exact same printing, never "an equivalent card via a
-   * different print" - explicit, repeated user call ("Wir nutzen bei
-   * Precons KEINE Substitute", later broadened to every deck regardless of
-   * how it was added).
-   *
-   * The first attempt at this (scoped to is_precon only) passed oracleId:
+   * A deck whose is_precon or all_cards_owned flag is set represents a
+   * real, sealed physical product (a Commander precon, a Starter Kit/
+   * Beginner Box, or a Game Night box pasted in via DeckImportDialog and
+   * marked "Alle Karten vorhanden") - every card inside it is granted into
+   * the collection as its own exact printing (see DeckService.
+   * grantAllCards), so matching it against the collection (and against
+   * other decks' own claims) should only ever recognize that exact same
+   * printing, never "an equivalent card via a different print" - explicit,
+   * repeated user call ("Wir nutzen bei Precons KEINE Substitute").
+   */
+  protected readonly treatAsComplete = computed(
+    () => this.entry().deck.is_precon || this.entry().deck.all_cards_owned,
+  );
+
+  /**
+   * Purely local, never-persisted UI toggle ("jederzeit änderbar und wird
+   * nie fix geschrieben") shown only for a deck that isn't treatAsComplete
+   * - lets the user explicitly opt back into oracle-aware ownership and
+   * substitute-print credit for a genuine "build from what I own" deck,
+   * which otherwise defaults to the same strict exact-print matching as a
+   * complete deck (just without the "never show a substitute" guarantee
+   * that implies - there IS a decklist to build here, so "what else could
+   * satisfy this" is a legitimate question, just an opt-in one). Resets to
+   * off every time a fresh DeckDetailDialog instance is created (e.g. the
+   * dialog is reopened) since it's a plain signal, not reloaded from
+   * anywhere.
+   */
+  protected readonly searchSubstitutes = signal(false);
+
+  private oracleModeActive(): boolean {
+    return !this.treatAsComplete() && this.searchSubstitutes();
+  }
+
+  /**
+   * The first attempt at a precon-only version of this passed oracleId:
    * null into getOwnedQuantity/getCardAvailability instead of swapping
    * maps - live-confirmed as a real regression (every precon card read as
    * entirely missing): those functions' two maps are keyed by whichever of
@@ -123,10 +152,11 @@ export class DeckDetailDialog {
    * to the card_id map, it just zeroes the oracle term out and finds
    * nothing either way.
    *
-   * This instead always pairs the real ownedByExactCardId/assignedByCardId
-   * data with an always-empty stand-in for the oracle maps - the oracle
-   * term in getOwnedQuantity/getCardAvailability then always resolves to
-   * 0, so only the exact-card_id term ever contributes.
+   * This instead always pairs a real owned/assigned map pair with an
+   * always-empty stand-in for whichever term should be ignored - the
+   * oracle term in getOwnedQuantity/getCardAvailability then resolves to
+   * 0 whenever oracle matching isn't active, so only the exact-card_id
+   * term ever contributes.
    */
   private matchingMaps(): {
     owned: Map<string, number>;
@@ -134,7 +164,10 @@ export class DeckDetailDialog {
     assignedByCardId: Map<string, number>;
     assignedByOracle: Map<string, number>;
   } {
-    const { byCardId } = this.assignedMaps();
+    const { byCardId, byOracleId } = this.assignedMaps();
+    if (this.oracleModeActive()) {
+      return { owned: this.ownedMap(), ownedByOracle: this.ownedOracleMap(), assignedByCardId: byCardId, assignedByOracle: byOracleId };
+    }
     return {
       owned: this.ownedByExactCardId(),
       ownedByOracle: DeckDetailDialog.EMPTY_MAP,
@@ -143,7 +176,7 @@ export class DeckDetailDialog {
     };
   }
 
-  /** Every deck card paired with its owned/partial/missing status, for the status-badged card grid - so an incomplete deck shows exactly *which* cards are missing, not just a count. Exact-print-only, see matchingMaps - this is plain ownership, not availability; see cardBindingDetails below for the "already claimed by another deck" picture. */
+  /** Every deck card paired with its owned/partial/missing status, for the status-badged card grid - so an incomplete deck shows exactly *which* cards are missing, not just a count. Exact-print-only unless oracleModeActive (see matchingMaps) - this is plain ownership, not availability; see cardBindingDetails below for the "already claimed by another deck" picture. */
   protected readonly cardsWithStatus = computed<DeckCardWithStatus[]>(() => {
     const { owned, ownedByOracle } = this.matchingMaps();
     return this.sortedCards().map((entry) => ({
@@ -172,7 +205,7 @@ export class DeckDetailDialog {
     this.cardsWithStatus().filter((item) => item.entry.card.game === 'mtg' && item.entry.card.typeLine.startsWith('Token')),
   );
 
-  /** The real, weighted "can I actually build this" match - a card that's owned but fully claimed by another deck doesn't count as free, matching the flexible (half-credit) scoring the deck-search toggle defaults to. See getAvailabilityMatch. Always exact-print-only, see matchingMaps. */
+  /** The real, weighted "can I actually build this" match - a card that's owned but fully claimed by another deck doesn't count as free, matching the flexible (half-credit) scoring the deck-search toggle defaults to. See getAvailabilityMatch. Exact-print-only unless oracleModeActive, see matchingMaps. */
   protected readonly availabilityMatch = computed(() => {
     const { owned, ownedByOracle, assignedByCardId, assignedByOracle } = this.matchingMaps();
     const required = this.entry().cards.map(({ row, card }) => ({
@@ -195,16 +228,18 @@ export class DeckDetailDialog {
    * assigned-elsewhere note still stays regardless of this card's own
    * status, since releasing a card to/from another deck remains a real
    * action independent of whether this card itself already reads as
-   * available. No deck ever gets a substitute note at all anymore (see
-   * matchingMaps) - every deck is exact-print-only now, so there's never an
-   * "equivalent" print to call out in the first place; findSubstitute stays
-   * imported/used here only to keep DeckCardBindingDetail's shape, always
-   * resolving to null.
+   * available. A deck never gets a substitute note unless it's not
+   * treatAsComplete AND the local searchSubstitutes toggle is on (see
+   * matchingMaps/oracleModeActive) - a complete/sealed deck is always
+   * exact-print-only, so there's never an "equivalent" print worth calling
+   * out for it in the first place.
    */
   protected readonly cardBindingDetails = computed<DeckCardBindingDetail[]>(() => {
     const { owned, ownedByOracle, assignedByCardId, assignedByOracle } = this.matchingMaps();
+    const collectionEntries = this.collectionEntries();
     const allDecks = this.allDecks();
     const currentDeckId = this.entry().deck.id;
+    const oracleModeActive = this.oracleModeActive();
 
     return this.sortedCards()
       .map((entry) => {
@@ -217,9 +252,12 @@ export class DeckDetailDialog {
           assignedByCardId,
           assignedByOracle,
         );
-        const substitute: CollectionEntry | null = null;
+        const substitute =
+          !oracleModeActive || availability.status === 'available'
+            ? null
+            : findSubstitute(card, row.quantity, collectionEntries);
         const assignedElsewhere = getAssignedElsewhereDecks(
-          { cardId: row.card_id, oracleId: null },
+          { cardId: row.card_id, oracleId: oracleModeActive ? card.oracleId : null },
           allDecks,
           currentDeckId,
         );

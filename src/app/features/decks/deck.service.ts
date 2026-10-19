@@ -14,6 +14,12 @@ export interface DeckRow {
   name: string;
   format: string | null;
   is_precon: boolean;
+  // Set at add-time by the "Alle Karten vorhanden" checkbox for any deck
+  // *other* than a precon (import/EDHREC/Moxfield/MTGO format set) that the
+  // user says represents a real, fully-owned physical pool just like a
+  // precon does - see grantAllCards/grantMissingCards and
+  // deck-detail-dialog.ts's matchingMaps.
+  all_cards_owned: boolean;
   release_date: string | null;
   mtgjson_file_name: string | null;
   created_at: string;
@@ -126,6 +132,7 @@ export class DeckService {
         name,
         format: type,
         is_precon: true,
+        all_cards_owned: false,
         release_date: releaseDate,
         mtgjson_file_name: fileName,
       })
@@ -152,8 +159,22 @@ export class DeckService {
     await this.grantAllCards(detail.cards);
   }
 
-  /** Deck built from a pasted card list (see DeckImportDialog) rather than a bundled precon. */
-  async importDeck(name: string, cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
+  /**
+   * Deck built from a pasted card list (see DeckImportDialog) rather than a
+   * bundled precon. `allCardsOwned` is the "Alle Karten vorhanden"
+   * checkbox - checked when the pasted list is itself a real, fully-owned
+   * physical pool (e.g. a Game Night/Beginner Box product typed in by
+   * hand rather than pulled from the precon library): grants the full
+   * list unconditionally and, from then on, is matched exact-print-only
+   * forever (see deck-detail-dialog.ts). Left unchecked (default), this is
+   * a "build from what I already own" decklist instead: only the
+   * shortfall against freely available stock is granted (grantMissingCards).
+   */
+  async importDeck(
+    name: string,
+    cards: Array<{ cardId: string; quantity: number }>,
+    allCardsOwned = false,
+  ): Promise<void> {
     await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;
     if (!userId) throw new Error('Nicht eingeloggt.');
@@ -168,6 +189,7 @@ export class DeckService {
         name,
         format: null,
         is_precon: false,
+        all_cards_owned: allCardsOwned,
         release_date: null,
         mtgjson_file_name: null,
       })
@@ -185,14 +207,19 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    await this.grantAllCards(cards);
+    if (allCardsOwned) {
+      await this.grantAllCards(cards);
+    } else {
+      await this.grantMissingCards(deck.id, cards);
+    }
   }
 
-  /** Deck built from a computed average-decklist (EDHREC for Commander via CommanderRecommendationsDialog, Moxfield for 60-card formats via FormatDeckRecommendationsDialog) - same shape/side effects as importDeck (grants the full card list into the collection), just tagged with the given format instead of a free-text one. */
+  /** Deck built from a computed average-decklist (EDHREC for Commander via CommanderRecommendationsDialog, Moxfield for 60-card formats via FormatDeckRecommendationsDialog) - same shape/side effects as importDeck (the "Alle Karten vorhanden" checkbox picks grantAllCards vs grantMissingCards), just tagged with the given format instead of a free-text one. */
   async addArchetypeDeck(
     name: string,
     format: string,
     cards: Array<{ cardId: string; quantity: number }>,
+    allCardsOwned = false,
   ): Promise<void> {
     await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;
@@ -208,6 +235,7 @@ export class DeckService {
         name,
         format,
         is_precon: false,
+        all_cards_owned: allCardsOwned,
         release_date: null,
         mtgjson_file_name: null,
       })
@@ -225,12 +253,20 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    await this.grantAllCards(cards);
+    if (allCardsOwned) {
+      await this.grantAllCards(cards);
+    } else {
+      await this.grantMissingCards(deck.id, cards);
+    }
   }
 
   /** Thin wrapper around addArchetypeDeck for the Commander case - kept as its own method since CommanderRecommendationsDialog already calls it by this name. */
-  addEdhrecDeck(commanderName: string, cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
-    return this.addArchetypeDeck(commanderName, 'Commander', cards);
+  addEdhrecDeck(
+    commanderName: string,
+    cards: Array<{ cardId: string; quantity: number }>,
+    allCardsOwned = false,
+  ): Promise<void> {
+    return this.addArchetypeDeck(commanderName, 'Commander', cards, allCardsOwned);
   }
 
   /**
@@ -262,6 +298,47 @@ export class DeckService {
       oracleId: oracleIdByCardId.get(card.cardId) ?? null,
     }));
     await this.collectionService.addCards(collectionInputs);
+  }
+
+  /**
+   * Grants only the *shortfall* of a newly added deck's cards - the
+   * "build from what I already own" counterpart to grantAllCards, used for
+   * importDeck/addArchetypeDeck when the "Alle Karten vorhanden" checkbox
+   * is left unchecked (this deck isn't a claim on a sealed physical
+   * product, just a decklist to assemble). A card already free (owned
+   * minus whatever's committed to the user's *other* decks) counts toward
+   * this deck's need instead of adding a redundant copy; only what's left
+   * short gets added. `deckId` is the just-created deck's own id, excluded
+   * from "assigned elsewhere" so its own freshly-inserted deck_cards rows
+   * don't count against themselves.
+   */
+  private async grantMissingCards(deckId: string, cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
+    const isMtg = this.gameService.currentSlug() === 'mtg';
+    const resolvedCards = isMtg ? await this.gameService.cardApi().getCardsByIds(cards.map((card) => card.cardId)) : [];
+    const oracleIdByCardId = new Map(resolvedCards.map((card) => [card.id, card.oracleId]));
+
+    const [ownedByCardId, ownedByOracle, allDecks] = await Promise.all([
+      this.collectionService.getQuantitiesByCardId(),
+      this.collectionService.getQuantitiesByOracleId(),
+      this.getMyDecks(),
+    ]);
+    const { byCardId: assignedByCardId, byOracleId: assignedByOracle } = buildAssignedElsewhereMaps(allDecks, deckId);
+
+    const collectionInputs: AddCardInput[] = [];
+    for (const card of cards) {
+      const oracleId = oracleIdByCardId.get(card.cardId) ?? null;
+      const cardRef = { cardId: card.cardId, oracleId };
+      const owned = getOwnedQuantity(cardRef, ownedByCardId, ownedByOracle);
+      const assignedElsewhere = getOwnedQuantity(cardRef, assignedByCardId, assignedByOracle);
+      const free = Math.max(0, owned - assignedElsewhere);
+      const shortfall = card.quantity - free;
+      if (shortfall <= 0) continue;
+      collectionInputs.push({ cardId: card.cardId, quantity: shortfall, foil: false, condition: 'NM', oracleId });
+    }
+
+    if (collectionInputs.length > 0) {
+      await this.collectionService.addCards(collectionInputs);
+    }
   }
 
   /**

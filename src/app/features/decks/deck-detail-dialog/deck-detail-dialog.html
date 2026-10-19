@@ -29,6 +29,17 @@
     </div>
 
     <div class="card-list">
+      @if (!treatAsComplete()) {
+        <label class="checkbox-label">
+          <input
+            type="checkbox"
+            [checked]="searchSubstitutes()"
+            (change)="searchSubstitutes.set($any($event.target).checked)"
+          />
+          {{ 'deckDetail.searchSubstitutesOption' | translate }}
+        </label>
+      }
+
       @if (missingCards().length > 0) {
         <div class="wishlist-row">
           <span>{{ 'deckDetail.missingCards' | translate: { count: missingQuantityTotal() } }}</span>

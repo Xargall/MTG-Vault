@@ -74,6 +74,15 @@
   white-space: pre;
 }
 
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
 .state-message {
   color: var(--color-text-muted);
   margin: 0;

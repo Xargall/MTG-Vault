@@ -110,6 +110,14 @@
           @if (deckAdded()) {
             <p class="wishlist-confirm">{{ 'commanderRecs.deckAdded' | translate }}</p>
           } @else {
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                [checked]="allCardsOwned()"
+                (change)="allCardsOwned.set($any($event.target).checked)"
+              />
+              {{ 'deckImport.allCardsOwnedOption' | translate }}
+            </label>
             <button type="button" class="submit-button" [disabled]="addingDeck()" (click)="addDeck()">
               {{ 'decks.addToMyDecks' | translate }}
             </button>

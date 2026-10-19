@@ -49,6 +49,11 @@ export class DeckImportDialog {
 
   protected readonly deckName = signal('');
   protected readonly listText = signal('');
+  // "Alle Karten vorhanden" - checked when this pasted list is itself a
+  // real, fully-owned physical product (e.g. a Game Night/Beginner Box),
+  // not a decklist to assemble from what's already owned - see
+  // DeckService.importDeck's own doc comment.
+  protected readonly allCardsOwned = signal(false);
 
   protected readonly status = signal<ImportStatus>('form');
   protected readonly current = signal(0);
@@ -115,7 +120,7 @@ export class DeckImportDialog {
     if (cards.length > 0) {
       try {
         const name = this.deckName().trim() || this.translate.instant('deckImport.defaultName');
-        await this.deckService.importDeck(name, cards);
+        await this.deckService.importDeck(name, cards, this.allCardsOwned());
         this.imported.emit();
       } catch (error) {
         this.errorMessage.set(
