@@ -93,13 +93,37 @@ export class DeckDetailDialog {
     buildAssignedElsewhereMaps(this.allDecks(), this.entry().deck.id),
   );
 
-  /** Every deck card paired with its owned/partial/missing status, for the status-badged card grid - so an incomplete deck shows exactly *which* cards are missing, not just a count. Ownership is oracle-aware (any printing counts, see getOwnedQuantity) - this is plain ownership, not availability; see cardBindingDetails below for the "already claimed by another deck" picture. */
+  /**
+   * A precon is a sealed physical product - every card inside it is granted
+   * into the collection as its own exact printing (see
+   * DeckService.grantAllCards), so matching it against the collection (and
+   * against other decks' own claims) should only ever recognize that exact
+   * same printing, never "an equivalent card via a different print" -
+   * explicit user call ("Wir nutzen bei Precons KEINE Substitute"), after a
+   * false "83%, genuinely short" reading turned out to be my own debugging
+   * script's bug, not the app's, but the underlying ask stands on its own:
+   * oracle-based substitution is for a decklist built out of whatever's
+   * already owned (importDeck/addArchetypeDeck), not a box of specific
+   * printed cards. Returns null (suppressing oracle matching entirely, see
+   * getOwnedQuantity/getCardAvailability/getAssignedElsewhereDecks, which
+   * all fall back to exact card_id matching when given a null oracleId) for
+   * a precon, the card's real oracleId otherwise.
+   */
+  private oracleIdFor(card: Card): string | null {
+    return this.entry().deck.is_precon ? null : card.oracleId;
+  }
+
+  /** Every deck card paired with its owned/partial/missing status, for the status-badged card grid - so an incomplete deck shows exactly *which* cards are missing, not just a count. Ownership is oracle-aware for a non-precon deck (any printing counts, see getOwnedQuantity/oracleIdFor) - this is plain ownership, not availability; see cardBindingDetails below for the "already claimed by another deck" picture. */
   protected readonly cardsWithStatus = computed<DeckCardWithStatus[]>(() =>
     this.sortedCards().map((entry) => ({
       entry,
       status: getCardOwnedStatus(
         entry.row.quantity,
-        getOwnedQuantity({ cardId: entry.row.card_id, oracleId: entry.card.oracleId }, this.ownedMap(), this.ownedOracleMap()),
+        getOwnedQuantity(
+          { cardId: entry.row.card_id, oracleId: this.oracleIdFor(entry.card) },
+          this.ownedMap(),
+          this.ownedOracleMap(),
+        ),
       ),
     })),
   );
@@ -121,12 +145,12 @@ export class DeckDetailDialog {
     this.cardsWithStatus().filter((item) => item.entry.card.game === 'mtg' && item.entry.card.typeLine.startsWith('Token')),
   );
 
-  /** The real, weighted "can I actually build this" match - a card that's owned but fully claimed by another deck doesn't count as free, matching the flexible (half-credit) scoring the deck-search toggle defaults to. See getAvailabilityMatch. */
+  /** The real, weighted "can I actually build this" match - a card that's owned but fully claimed by another deck doesn't count as free, matching the flexible (half-credit) scoring the deck-search toggle defaults to. See getAvailabilityMatch. Exact-print-only for a precon (see oracleIdFor). */
   protected readonly availabilityMatch = computed(() => {
     const { byCardId, byOracleId } = this.assignedMaps();
     const required = this.entry().cards.map(({ row, card }) => ({
       cardId: row.card_id,
-      oracleId: card.oracleId,
+      oracleId: this.oracleIdFor(card),
       quantity: row.quantity,
     }));
     return getAvailabilityMatch(required, this.ownedMap(), this.ownedOracleMap(), byCardId, byOracleId, 'flexible');
@@ -144,7 +168,9 @@ export class DeckDetailDialog {
    * assigned-elsewhere note still stays regardless of this card's own
    * status, since releasing a card to/from another deck remains a real
    * action independent of whether this card itself already reads as
-   * available.
+   * available. A precon never gets a substitute note at all (see
+   * oracleIdFor) - it's always exact-print-only, so there's never an
+   * "equivalent" print to call out in the first place.
    */
   protected readonly cardBindingDetails = computed<DeckCardBindingDetail[]>(() => {
     const owned = this.ownedMap();
@@ -153,24 +179,23 @@ export class DeckDetailDialog {
     const collectionEntries = this.collectionEntries();
     const allDecks = this.allDecks();
     const currentDeckId = this.entry().deck.id;
+    const isPrecon = this.entry().deck.is_precon;
 
     return this.sortedCards()
       .map((entry) => {
         const { row, card } = entry;
+        const oracleId = this.oracleIdFor(card);
         const availability = getCardAvailability(
-          { cardId: row.card_id, oracleId: card.oracleId },
+          { cardId: row.card_id, oracleId },
           row.quantity,
           owned,
           ownedByOracle,
           byCardId,
           byOracleId,
         );
-        const substitute = availability.status === 'available' ? null : findSubstitute(card, row.quantity, collectionEntries);
-        const assignedElsewhere = getAssignedElsewhereDecks(
-          { cardId: row.card_id, oracleId: card.oracleId },
-          allDecks,
-          currentDeckId,
-        );
+        const substitute =
+          isPrecon || availability.status === 'available' ? null : findSubstitute(card, row.quantity, collectionEntries);
+        const assignedElsewhere = getAssignedElsewhereDecks({ cardId: row.card_id, oracleId }, allDecks, currentDeckId);
         return {
           entry,
           status: availability.status,
@@ -187,7 +212,7 @@ export class DeckDetailDialog {
     const ownedByOracle = this.ownedOracleMap();
     return this.entry().cards.filter(
       ({ row, card }) =>
-        getOwnedQuantity({ cardId: row.card_id, oracleId: card.oracleId }, owned, ownedByOracle) < row.quantity,
+        getOwnedQuantity({ cardId: row.card_id, oracleId: this.oracleIdFor(card) }, owned, ownedByOracle) < row.quantity,
     );
   });
 
@@ -200,7 +225,7 @@ export class DeckDetailDialog {
         sum +
         getMissingQuantity(
           row.quantity,
-          getOwnedQuantity({ cardId: row.card_id, oracleId: card.oracleId }, owned, ownedByOracle),
+          getOwnedQuantity({ cardId: row.card_id, oracleId: this.oracleIdFor(card) }, owned, ownedByOracle),
         ),
       0,
     );
@@ -286,7 +311,7 @@ export class DeckDetailDialog {
           notes: this.translate.instant('common.forDeck', { name: deckName }),
           quantity: getMissingQuantity(
             row.quantity,
-            getOwnedQuantity({ cardId: row.card_id, oracleId: card.oracleId }, owned, ownedByOracle),
+            getOwnedQuantity({ cardId: row.card_id, oracleId: this.oracleIdFor(card) }, owned, ownedByOracle),
           ),
         }));
 
