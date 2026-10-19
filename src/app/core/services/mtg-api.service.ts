@@ -1030,14 +1030,19 @@ export class MtgApiService implements CardApiService {
     const lang = this.displayLanguage.current();
     if (lang === 'en') return cards;
 
-    // One request pair per distinct (oracle_id, set_code) actually present -
-    // a collection with several copies of the same printing (or several
-    // printings sharing an oracle_id across the visible cards) sends that
-    // pair only once, however many cards it backs.
-    const pairs = new Map<string, { oracleId: string; setCode: string }>();
+    // One request per distinct (oracle_id, set_code, collector_number)
+    // actually present - a collection with several copies of the same
+    // printing (or several printings sharing an oracle_id across the
+    // visible cards) sends that combination only once, however many cards
+    // it backs.
+    const pairs = new Map<string, { oracleId: string; setCode: string; collectorNumber: string }>();
     for (const card of cards) {
       if (!card.oracleId || card.game !== 'mtg') continue;
-      pairs.set(`${card.oracleId}:${card.setCode}`, { oracleId: card.oracleId, setCode: card.setCode });
+      pairs.set(`${card.oracleId}:${card.setCode}:${card.collectorNumber}`, {
+        oracleId: card.oracleId,
+        setCode: card.setCode,
+        collectorNumber: card.collectorNumber,
+      });
     }
     if (pairs.size === 0) return cards;
 
@@ -1046,31 +1051,33 @@ export class MtgApiService implements CardApiService {
 
     return cards.map((card) => {
       if (!card.oracleId || card.game !== 'mtg') return card;
-      const match = localized.get(`${card.oracleId}:${card.setCode}`);
+      const match = localized.get(`${card.oracleId}:${card.setCode}:${card.collectorNumber}`);
       if (!match) return card;
 
-      // A land (and plenty of other cards) gets fresh art nearly every set,
-      // so a localized printing from a *different* set is never safe to
-      // show as this card's image - live-confirmed case: a Fallout
-      // Collector Booster land showed a completely unrelated German
-      // reprint's artwork this way (see same_set, resolved in Postgres -
-      // scryfall_cards_localized). The translated name itself is safe to
+      // A single set can print several distinct-art versions of the same
+      // card under different collector numbers (live-confirmed: Fallout's
+      // "Sol Ring" has separate Nuka-Cola-bottle and Bobblehead arts, both
+      // set_code "pip") - matching on set_code alone wasn't precise enough
+      // and could show the wrong art even within the right set. Only the
+      // exact same printing (set_code + collector_number, see
+      // same_printing, resolved in Postgres - scryfall_cards_localized) is
+      // safe to use for the image. The translated name itself is safe to
       // use from any matching printing, since it's the same text
-      // regardless of set.
-      return match.sameSet
+      // regardless of which one.
+      return match.samePrinting
         ? { ...card, name: match.name, imageUrl: match.imageUrl, imageUrlSmall: match.imageUrlSmall }
         : { ...card, name: match.name };
     });
   }
 
-  /** Batched (see POSTGRES_BATCH_SIZE) and resolved entirely in Postgres (scryfall_cards_localized, backed by the (oracle_id, lang) index) - exactly one row per requested pair comes back, never every candidate reprint, which mattered a lot for a collection-grid-sized call (hundreds of pairs). All batches fire at once (see queryScryfallCards's doc comment for why), not one after another. */
+  /** Batched (see POSTGRES_BATCH_SIZE) and resolved entirely in Postgres (scryfall_cards_localized, backed by the (oracle_id, lang) index) - exactly one row per requested printing comes back, never every candidate reprint, which mattered a lot for a collection-grid-sized call (hundreds of printings). All batches fire at once (see queryScryfallCards's doc comment for why), not one after another. */
   private async getLocalizedCardDataByPairs(
-    pairs: Array<{ oracleId: string; setCode: string }>,
+    pairs: Array<{ oracleId: string; setCode: string; collectorNumber: string }>,
     lang: string,
   ): Promise<
-    Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null; sameSet: boolean }>
+    Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null; samePrinting: boolean }>
   > {
-    const batches: Array<Array<{ oracleId: string; setCode: string }>> = [];
+    const batches: Array<Array<{ oracleId: string; setCode: string; collectorNumber: string }>> = [];
     for (let i = 0; i < pairs.length; i += POSTGRES_BATCH_SIZE) {
       batches.push(pairs.slice(i, i + POSTGRES_BATCH_SIZE));
     }
@@ -1080,6 +1087,7 @@ export class MtgApiService implements CardApiService {
         this.supabase.client.rpc('scryfall_cards_localized', {
           oracle_ids: batch.map((pair) => pair.oracleId),
           set_codes: batch.map((pair) => pair.setCode),
+          collector_numbers: batch.map((pair) => pair.collectorNumber),
           target_lang: lang,
         }),
       ),
@@ -1087,7 +1095,7 @@ export class MtgApiService implements CardApiService {
 
     const result = new Map<
       string,
-      { name: string; imageUrl: string | null; imageUrlSmall: string | null; sameSet: boolean }
+      { name: string; imageUrl: string | null; imageUrlSmall: string | null; samePrinting: boolean }
     >();
     for (const settled of results) {
       if (settled.status === 'rejected' || settled.value.error) {
@@ -1100,18 +1108,19 @@ export class MtgApiService implements CardApiService {
       for (const row of (settled.value.data ?? []) as Array<{
         oracle_id: string;
         set_code: string;
+        collector_number: string;
         printed_name: string | null;
         name: string | null;
         image_url: string | null;
         image_url_small: string | null;
-        same_set: boolean;
+        same_printing: boolean;
       }>) {
         if (!row.name) continue;
-        result.set(`${row.oracle_id}:${row.set_code}`, {
+        result.set(`${row.oracle_id}:${row.set_code}:${row.collector_number}`, {
           name: row.printed_name ?? row.name,
           imageUrl: row.image_url,
           imageUrlSmall: row.image_url_small,
-          sameSet: row.same_set,
+          samePrinting: row.same_printing,
         });
       }
     }
