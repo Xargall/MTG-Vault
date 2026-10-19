@@ -11,62 +11,21 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { PSM } from 'tesseract.js';
 
 import { DEFAULT_CARD_LANGUAGE, PRINTED_LANGUAGE_CODES } from '../../core/constants/card-languages';
 import { Card } from '../../core/models/card.model';
-import { CardIdentification, MtgIdentificationResult, ScoredCandidate } from '../../core/services/card-api.interface';
+import { CardIdentification, ScoredCandidate } from '../../core/services/card-api.interface';
 import { AddCardResult, CollectionService } from '../collection/collection.service';
 import { GameService } from '../../core/services/game.service';
 import { GeminiVisionService } from '../../core/services/gemini-vision.service';
 import { CardCategory, MtgApiService } from '../../core/services/mtg-api.service';
 import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
-import { OcrLine, OcrService } from '../../core/services/ocr.service';
 import { UserSecretsService } from '../../core/services/user-secrets.service';
 import { YugiohApiService } from '../../core/services/yugioh-api.service';
-import { ScryfallRateLimitError } from '../../core/utils/scryfall-queue';
 import { CollectorFinish } from '../../core/utils/set-code-parser';
-import { extractNameFromLines } from '../../core/utils/string-similarity';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
-// Queue-based, not a fixed interval: Tesseract itself is the bottleneck, so
-// waiting a flat 800ms on top of however long OCR just took only makes
-// every frame slower for no benefit. Wait only long enough to keep a
-// minimum gap between captures (device doesn't overheat, no back-to-back
-// camera reads), never a fixed amount regardless of how long OCR took.
 const MIN_CAPTURE_GAP_MS = 300;
-const MAX_OCR_WIDTH = 1280;
-// Two tiers: set-code+number extraction is exact/structural, so it's worth
-// trying even on a shakier frame; the fuzzy name search needs cleaner text
-// to avoid false matches, so it only kicks in above a higher bar.
-// (Yu-Gi-Oh's name-only path only - see MTG's own crop-based pipeline below.)
-const MIN_CONFIDENCE_FOR_SET_CODE = 50;
-const MIN_CONFIDENCE_FOR_NAME = 65;
-const NO_MATCH_STREAK_FOR_TOAST = 8;
-
-interface CropStrategy {
-  name: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-// MTG's set-code/collector-number corner always prints bottom-left - these
-// three crop windows (fractions of the full captured frame) are tried in
-// order until one OCRs cleanly enough (see scoreCollectorNumberText),
-// covering a card held slightly higher/lower or shifted right of ideal
-// instead of requiring exact, precise framing.
-const CROP_STRATEGIES: CropStrategy[] = [
-  { name: 'optimal', x: 0.0, y: 0.82, w: 0.5, h: 0.1 },
-  { name: 'wider', x: 0.0, y: 0.78, w: 0.6, h: 0.15 },
-  { name: 'offsetRight', x: 0.1, y: 0.82, w: 0.5, h: 0.1 },
-];
-// Only a clean, unambiguous read ("U 0082", "0082") is accepted outright -
-// anything looser just moves on to the next crop strategy instead of
-// risking a wrong exact lookup.
-const MIN_SCORE_TO_ACCEPT = 80;
-const COLLECTOR_NUMBER_CHAR_WHITELIST = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/*-';
 // Yu-Gi-Oh print code as it appears on the card, e.g. "SDAZ-DE001" or
 // "LOB-EN001" - set code, two-letter language, then a 2-4 digit number.
 const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]{2,6}-[A-Z]{2}\d{2,4}$/;
@@ -80,16 +39,15 @@ function extractYugiohLanguage(printCode: string): string {
 
 /**
  * Percentile-clipped linear contrast stretch (a "levels"/auto-contrast
- * adjustment), applied in place to a crop's own pixel data. Unlike
- * processNormalCropPixels/processFoilCropPixels below, this does NOT
+ * adjustment), applied in place to a crop's own pixel data. Does NOT
  * greyscale or binarize - it keeps full color, just remaps the crop's own
- * (often compressed) luminance range to span the full 0-255 - so a Gemini
- * vision call still gets a color image, but one where e.g. black print-code
- * text on a dark blue card frame (near-identical luminance, easy to read for
- * a human who sees the hue difference, hard for a compressed/downsampled
- * photo) is pulled apart instead of crushed together. Clipping to the 1st/
- * 99th percentile (rather than the crop's literal min/max) keeps a single
- * stray bright/dark pixel from skewing the whole remap.
+ * (often compressed) luminance range to span the full 0-255 - so Gemini
+ * still gets a color image, but one where e.g. black print-code text on a
+ * dark blue card frame (near-identical luminance, easy to read for a human
+ * who sees the hue difference, hard for a compressed/downsampled photo) is
+ * pulled apart instead of crushed together. Clipping to the 1st/99th
+ * percentile (rather than the crop's literal min/max) keeps a single stray
+ * bright/dark pixel from skewing the whole remap.
  */
 function applyContrastStretch(data: Uint8ClampedArray): void {
   const pixelCount = data.length / 4;
@@ -126,7 +84,7 @@ function applyContrastStretch(data: Uint8ClampedArray): void {
   }
 }
 
-/** Gemini's own crop for its collector-number guess - deliberately looser than CROP_STRATEGIES (a vision model reads a wider region fine). Contrast-stretched (see applyContrastStretch) but kept in color, since Gemini isn't Tesseract's binarize-first pipeline. */
+/** Gemini's own crop for its collector-number guess - wide enough that a vision model reads it fine without needing a tight, precise frame. Contrast-stretched (see applyContrastStretch) but kept in color. */
 function cropCollectorArea(source: HTMLCanvasElement): HTMLCanvasElement {
   const crop = document.createElement('canvas');
   // 20%→25% / 60%→65%: overlay UI elements sitting low on the viewport can
@@ -147,125 +105,6 @@ function cropCollectorArea(source: HTMLCanvasElement): HTMLCanvasElement {
   return crop;
 }
 
-interface ImageCharacteristics {
-  colorVariance: number;
-  darkPixelRatio: number;
-  brightPixelRatio: number;
-  midtonePixelRatio: number;
-}
-
-/** Per-pixel brightness/color-variance profile of a crop - foil cards scatter light in a way a plain grayscale+contrast pass handles badly, so this decides which preprocessing pass to use before OCR. */
-function analyzeImageCharacteristics(data: Uint8ClampedArray): ImageCharacteristics {
-  let colorVariance = 0;
-  let darkPixels = 0;
-  let brightPixels = 0;
-  let midtonePixels = 0;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const brightness = (r + g + b) / 3;
-    colorVariance += Math.abs(r - g) + Math.abs(g - b) + Math.abs(r - b);
-    if (brightness < 85) darkPixels++;
-    else if (brightness > 170) brightPixels++;
-    else midtonePixels++;
-  }
-
-  const total = data.length / 4;
-  return {
-    colorVariance: colorVariance / total,
-    darkPixelRatio: darkPixels / total,
-    brightPixelRatio: brightPixels / total,
-    midtonePixelRatio: midtonePixels / total,
-  };
-}
-
-function isFoilImage(stats: ImageCharacteristics): boolean {
-  return (
-    [
-      stats.colorVariance > 15,
-      stats.midtonePixelRatio > 0.4,
-      stats.darkPixelRatio < 0.3 && stats.brightPixelRatio < 0.3,
-    ].filter(Boolean).length >= 2
-  );
-}
-
-/** Normal (non-foil) crop: grayscale, contrast boost, then a flat threshold - a plain card's info strip is high-contrast enough that a single global cutoff reads cleanly. */
-function processNormalCropPixels(data: Uint8ClampedArray): void {
-  for (let i = 0; i < data.length; i += 4) {
-    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    const enhanced = Math.max(0, Math.min(255, (gray - 128) * 2.5 + 128));
-    const binarized = enhanced >= 128 ? 255 : 0;
-    data[i] = binarized;
-    data[i + 1] = binarized;
-    data[i + 2] = binarized;
-  }
-}
-
-/** Foil crop: grayscale, sigmoid smoothing (softens the holofoil pattern's harsh local contrast), then thresholded against the crop's own average brightness instead of a fixed cutoff - the foil surface's brightness varies too much frame-to-frame for one hardcoded value to work. */
-function processFoilCropPixels(data: Uint8ClampedArray): void {
-  const pixelCount = data.length / 4;
-  const smoothed = new Float32Array(pixelCount);
-  const sigmoidSteepness = 20;
-  let sum = 0;
-
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    const value = 255 / (1 + Math.exp(-(gray - 128) / sigmoidSteepness));
-    smoothed[p] = value;
-    sum += value;
-  }
-
-  const dynamicThreshold = sum / pixelCount;
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    const binarized = smoothed[p] >= dynamicThreshold ? 255 : 0;
-    data[i] = binarized;
-    data[i + 1] = binarized;
-    data[i + 2] = binarized;
-  }
-}
-
-/** How closely OCR'd text matches the expected "[rarity] collector-number" shape - a clean match (100) accepts the crop outright, a loose one (70) still moves on to try the next crop strategy rather than risking a wrong exact lookup. U/C/R/M are the normal rarities; T marks a token card, S a Scryfall "special" rarity (un-sets/masterpieces) - both print the same way. */
-function scoreCollectorNumberText(text: string): number {
-  const trimmed = text.trim();
-  if (/^[UCRMTS]?\s*\d{3,4}$/.test(trimmed)) return 100;
-  // Pre-2023 fraction format ("017/017", optionally with a trailing T/H
-  // token/halo flag) - just as exact a read as the plain 4-digit form
-  // above, see parseCollectorNumber.
-  if (/^\d{3,5}\/\d{3,5}(\s+[A-Z])?$/.test(trimmed)) return 100;
-  if (/\d{3,4}/.test(trimmed)) return 70;
-  return 0;
-}
-
-// Yu-Gi-Oh's print code prints in the bottom corner - unlike MTG it isn't
-// consistently left-aligned (see the Gemini prompt's own "unten links oder
-// unten rechts" note), so both corners are tried; bottom-right first since
-// that's the more common modern placement.
-const YUGIOH_CROP_STRATEGIES: CropStrategy[] = [
-  { name: 'bottomRight', x: 0.5, y: 0.87, w: 0.47, h: 0.1 },
-  { name: 'bottomRightWider', x: 0.4, y: 0.83, w: 0.57, h: 0.14 },
-  { name: 'bottomLeft', x: 0.03, y: 0.87, w: 0.47, h: 0.1 },
-];
-
-/** How closely OCR'd text matches the "SETCODE-LANGNUM" print-code shape - a clean match (100, the exact same format identifyByPrintCode expects) accepts the crop outright; a loose one (70, right general shape but not exactly right - e.g. a misread digit count) still just moves on to the next crop strategy instead of risking a wrong exact lookup. */
-function scoreYugiohPrintCodeText(text: string): number {
-  const trimmed = text.trim().toUpperCase();
-  if (YUGIOH_PRINT_CODE_PATTERN.test(trimmed)) return 100;
-  if (/^[A-Z0-9]{2,6}-[A-Z0-9]{3,6}$/.test(trimmed)) return 70;
-  return 0;
-}
-
-// MTG's multi-field scoring is a per-frame best guess, not a certainty - a
-// sliding window over the last few frames confirms a result once the same
-// oracle_id wins enough of them, tolerating a single noisy/no-match frame
-// in between instead of resetting the whole streak over one outlier.
-const FRAME_HISTORY_SIZE = 3;
-const CONSISTENT_MATCHES_REQUIRED = 2;
-// A filter-sourced top score at or above this auto-confirms just like an
-// exact set+number match; below it, MtgApiService already sized `runners`
-// to the right picker tier (5 for medium confidence, 10 for low).
-const AUTO_CONFIRM_THRESHOLD = 70;
 const SUCCESS_TOAST_DURATION_MS = 3000;
 const FAILURE_TOAST_DURATION_MS = 2000;
 // Just long enough that "added" doesn't feel like an instant UI flash -
@@ -273,20 +112,7 @@ const FAILURE_TOAST_DURATION_MS = 2000;
 // own SUCCESS_TOAST_DURATION_MS) and the top-left undo thumbnail both keep
 // that confirmation visible well after scanning has already resumed.
 const AUTO_RESUME_DELAY_MS = 400;
-const RATE_LIMIT_TOAST_DURATION_MS = 3000;
 const LIMIT_TOAST_DURATION_MS = 6000;
-// Non-blocking: a 403 sets a "cool off until" timestamp rather than
-// awaiting a delay inline, so the loop (and the UI) never freezes for it.
-const RATE_LIMIT_PAUSE_MS = 5000;
-const RATE_LIMIT_RETRY_DELAY_MS = 1000;
-
-// Gemini alone already recognizes ~97% of scans, so Tesseract stays idle by
-// default (no worker spun up, no CPU spent on a redundant local pass) -
-// it's only woken up once Gemini has failed this many gate-triggered
-// attempts in a row within the current session (unreachable, rate-limited,
-// or genuinely misread), and goes back to sleep as soon as Gemini succeeds
-// again. See geminiFailureStreak/tesseractFallbackActive().
-const GEMINI_FAILURE_STREAK_FOR_TESSERACT_FALLBACK = 5;
 
 // How long a matched card sits in the panel before it's added automatically -
 // long enough to glance at the result and tap "keep scanning" if it's wrong,
@@ -346,14 +172,12 @@ export class Scanner {
   private readonly yugiohApi = inject(YugiohApiService);
   protected readonly bulkData = inject(MtgBulkDataService);
   private readonly collectionService = inject(CollectionService);
-  private readonly ocrService = inject(OcrService);
   private readonly geminiVision = inject(GeminiVisionService);
   private readonly userSecrets = inject(UserSecretsService);
   private readonly translate = inject(TranslateService);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
-  private readonly captureCanvas = document.createElement('canvas');
   private readonly rawFrameCanvas = document.createElement('canvas');
   private readonly gateCanvas = document.createElement('canvas');
   private stream: MediaStream | null = null;
@@ -363,16 +187,6 @@ export class Scanner {
   private autoResumeTimeout: ReturnType<typeof setTimeout> | null = null;
   private autoAddTimeout: ReturnType<typeof setTimeout> | null = null;
   private isScanning = false;
-  private noMatchStreak = 0;
-  // Consecutive gate-triggered Gemini attempts (autoGeminiScan) that ended
-  // without a match - drives tesseractFallbackActive(). Reset to 0 on the
-  // next Gemini success, not on a Tesseract-sourced match, so the fallback
-  // stays engaged for as long as Gemini itself keeps failing.
-  private geminiFailureStreak = 0;
-  // "Basis-Modus aktiv" toast, shown once per session the moment the
-  // fallback first engages - same one-shot pattern as limitWarningShown/
-  // geminiErrorShown below.
-  private tesseractFallbackToastShown = false;
   // Tick-to-tick baseline for the Gemini trigger gate (see GATE_* constants
   // above) - reset whenever the frame stream restarts (camera switch) or a
   // card finishes its cycle (keepScanning), so a stale comparison from
@@ -380,13 +194,6 @@ export class Scanner {
   private lastGateSample: Uint8ClampedArray | null = null;
   private gateStableTicks = 0;
   private geminiInFlight = false;
-  // Rolling window of the last few frames' resolved cards (null for a frame
-  // with no result at all) - see getConsistentResult(). Carries the parsed
-  // finish/category alongside each card, so confirming a match doesn't lose
-  // that signal across the sliding window (see confirmMtgCard).
-  private frameHistory: Array<{ id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null> =
-    [];
-  private rateLimitedUntil = 0;
 
   protected readonly status = signal<ScannerStatus>('starting');
   protected readonly cameraErrorMessage = signal<string | null>(null);
@@ -397,10 +204,9 @@ export class Scanner {
   protected readonly focusRange = signal<FocusRange>({ min: 0, max: 1, step: 0.05 });
   protected readonly focusDistance = signal(0.5);
 
-  // Which engine most recently produced an OCR reading - drives the small
-  // "🤖 Gemini" / "📝 Tesseract" / "⚠️ Limit" indicator; null while nothing
+  // Drives the small "🤖 Gemini" / "⚠️ Limit" indicator; null while nothing
   // has read yet.
-  protected readonly ocrEngine = signal<'gemini' | 'tesseract' | 'limit' | null>(null);
+  protected readonly ocrEngine = signal<'gemini' | 'limit' | null>(null);
   // Gates the automatic Gemini path (see updateGeminiGate) and drives the
   // "set up your own key" hint - null (not checked yet) fails open, so a
   // flaky/unmigrated status check never silently disables a working feature.
@@ -419,10 +225,10 @@ export class Scanner {
   // Drives the match panel's countdown progress bar - true from the moment
   // a card is matched until it's added (auto or manual) or skipped.
   protected readonly autoAddArmed = signal(false);
-  // Set alongside detectedCard whenever the crop-based MTG path resolved it
-  // (Tesseract auto-loop or the gate-triggered Gemini scan) - stays at the
-  // defaults for every other path (picker selection, Yu-Gi-Oh, Pokémon),
-  // since only MTG's collector-number corner carries a token/halo flag to read.
+  // Set alongside detectedCard whenever the gate-triggered Gemini scan
+  // resolved an MTG card - stays at the defaults for every other path
+  // (picker selection, Yu-Gi-Oh, Pokémon), since only MTG's collector-number
+  // corner carries a token/halo flag to read.
   protected readonly detectedFinish = signal<CollectorFinish>('nonfoil');
   protected readonly detectedCardCategory = signal<CardCategory>('normal');
   // Same lifecycle as detectedFinish/detectedCardCategory above - the
@@ -453,7 +259,6 @@ export class Scanner {
       if (this.autoResumeTimeout) clearTimeout(this.autoResumeTimeout);
       if (this.autoAddTimeout) clearTimeout(this.autoAddTimeout);
       this.stream?.getTracks().forEach((track) => track.stop());
-      void this.ocrService.terminate();
       this.bulkData.releaseNameIndex();
     });
 
@@ -597,17 +402,16 @@ export class Scanner {
     this.timerHandle = setTimeout(() => void this.captureAndAnalyze(), delayMs);
   }
 
-  private async captureAndAnalyze() {
+  /**
+   * Gemini is the only detection path now (see updateGeminiGate/
+   * autoGeminiScan below) - this tick just keeps the gate's stability/
+   * variance check running and reschedules itself. Archived: the
+   * per-tick local Tesseract pass (MTG's cropped collector-number corner,
+   * Yu-Gi-Oh's print-code corner, Pokémon/Yu-Gi-Oh's whole-frame name OCR)
+   * that used to run here as Gemini's fallback.
+   */
+  private captureAndAnalyze() {
     if (!this.isScanning || this.status() !== 'scanning') return;
-
-    // Non-blocking rate-limit cool-off: a prior 403 set a "retry after"
-    // timestamp rather than awaiting a delay inline, so a tick that lands
-    // during the cool-off just reschedules itself further out instead of
-    // doing any work (or freezing the loop/UI while waiting it out).
-    if (Date.now() < this.rateLimitedUntil) {
-      this.scheduleNextCapture(RATE_LIMIT_RETRY_DELAY_MS);
-      return;
-    }
 
     const videoEl = this.video()?.nativeElement;
     if (!videoEl || videoEl.readyState < 2) {
@@ -615,146 +419,8 @@ export class Scanner {
       return;
     }
 
-    // Fire-and-forget: the gate's own Gemini call paces and awaits itself
-    // (see GeminiVisionService), so it must never block this tick's fast
-    // local OCR path below it.
     this.updateGeminiGate(videoEl);
-
-    const start = Date.now();
-    try {
-      const matched = await this.analyzeFrame(videoEl);
-      // MTG has two silent local/automatic paths (Tesseract crop loop above,
-      // gate-triggered Gemini below) with no "not recognized" noise, so a
-      // miss there just means "keep holding it steady." Yu-Gi-Oh/Pokémon's
-      // whole-frame Tesseract path has no such local fallback, so it keeps
-      // this streak-based toast as its only feedback.
-      if (matched) {
-        this.noMatchStreak = 0;
-      } else if (this.gameService.currentSlug() !== 'mtg' && this.tesseractFallbackActive()) {
-        // Only meaningful while Tesseract's whole-frame pass is actually the
-        // one running each tick (see analyzeFrame) - during normal
-        // Gemini-only operation there's no per-tick local read to have
-        // failed, so this streak would otherwise fire on every single tick.
-        this.noMatchStreak++;
-        if (this.noMatchStreak >= NO_MATCH_STREAK_FOR_TOAST) {
-          this.showToast(this.translate.instant('scanner.notRecognized'), 'warning', FAILURE_TOAST_DURATION_MS);
-          this.noMatchStreak = 0;
-        }
-      }
-    } catch (error) {
-      if (error instanceof ScryfallRateLimitError) {
-        this.rateLimitedUntil = Date.now() + RATE_LIMIT_PAUSE_MS;
-        this.showToast(this.translate.instant('scanner.rateLimited'), 'warning', RATE_LIMIT_TOAST_DURATION_MS);
-      }
-      // Bad lighting, blur, no text, a network hiccup on the lookup - all
-      // expected and transient otherwise. Stay silent and just keep scanning.
-    } finally {
-      if (this.isScanning && this.status() === 'scanning') {
-        if (Date.now() < this.rateLimitedUntil) {
-          this.scheduleNextCapture(RATE_LIMIT_RETRY_DELAY_MS);
-        } else {
-          const elapsed = Date.now() - start;
-          this.scheduleNextCapture(Math.max(0, MIN_CAPTURE_GAP_MS - elapsed));
-        }
-      }
-    }
-  }
-
-  /**
-   * True when Tesseract is allowed to spend CPU on a per-tick local pass:
-   * either there's no Gemini key configured at all (updateGeminiGate's own
-   * guard means autoGeminiScan - and so geminiFailureStreak - would never
-   * even run for these users, so Tesseract has to be their only detector,
-   * exactly as before this fallback existed), or Gemini has a key but has
-   * failed enough gate-triggered attempts in a row this session - see
-   * GEMINI_FAILURE_STREAK_FOR_TESSERACT_FALLBACK.
-   */
-  private tesseractFallbackActive(): boolean {
-    return (
-      this.hasGeminiKey() === false || this.geminiFailureStreak >= GEMINI_FAILURE_STREAK_FOR_TESSERACT_FALLBACK
-    );
-  }
-
-  private async analyzeFrame(videoEl: HTMLVideoElement): Promise<boolean> {
-    // MTG no longer OCRs the whole frame at all - only its own cropped
-    // set-code/collector-number corner (see handleMtgFrame), so it branches
-    // out before the whole-frame capture below even runs.
-    if (this.gameService.currentSlug() === 'mtg') {
-      return this.handleMtgFrame(videoEl);
-    }
-
-    // Tesseract stays idle until Gemini has proven unreliable this session -
-    // gate-triggered Gemini (via updateGeminiGate above) is the only active
-    // path otherwise.
-    if (!this.tesseractFallbackActive()) return false;
-
-    // Yu-Gi-Oh has its own structured print-code corner too (see
-    // handleYugiohFrame) - tried before falling back to the same whole-frame
-    // name OCR Pokémon uses (it has no compact printed code to crop toward
-    // at all, just its printed name up top).
-    if (this.gameService.currentSlug() === 'yugioh') {
-      return this.handleYugiohFrame(videoEl);
-    }
-
-    return this.tryWholeFrameNameOcr(videoEl);
-  }
-
-  /**
-   * MTG's own crop-based Tesseract pass - only runs once tesseractFallbackActive()
-   * (Gemini has failed enough gate-triggered attempts in a row this session);
-   * otherwise the gate-triggered Gemini call below is the only detection path.
-   */
-  private async handleMtgFrame(videoEl: HTMLVideoElement): Promise<boolean> {
-    if (!this.tesseractFallbackActive()) return false;
-
-    const result = await this.tryTesseractPath(videoEl);
-
-    const confirmed = this.confirmMtgCard(result);
-    if (!confirmed) return false;
-
-    this.onMatch({ card: confirmed.card, confidence: 1 }, confirmed);
-    return true;
-  }
-
-  /**
-   * Yu-Gi-Oh's own crop-based Tesseract pass for the print-code corner
-   * (mirrors handleMtgFrame/tryTesseractPath - see tryYugiohTesseractPath).
-   * A clean read is run through the same sliding-window consistency check
-   * MTG uses (confirmMtgCard - already game-agnostic in implementation
-   * despite the name, keyed only by card.id) before being trusted, since a
-   * misread print code could coincidentally exact-match a wrong real card.
-   * Falls back to the whole-frame name-OCR pass (previously the *only*
-   * Yu-Gi-Oh Tesseract path) when the structural read doesn't score well
-   * enough this frame.
-   */
-  private async handleYugiohFrame(videoEl: HTMLVideoElement): Promise<boolean> {
-    const result = await this.tryYugiohTesseractPath(videoEl);
-    const confirmed = this.confirmMtgCard(result);
-    if (confirmed) {
-      this.onMatch({ card: confirmed.card, confidence: 1 }, confirmed);
-      return true;
-    }
-
-    return this.tryWholeFrameNameOcr(videoEl);
-  }
-
-  /** Whole-frame OCR feeding the name-only lookup - Pokémon's only detection path (no compact printed code to crop toward), and Yu-Gi-Oh's fallback when its own structured print-code crop (see tryYugiohTesseractPath) didn't score well enough this frame. */
-  private async tryWholeFrameNameOcr(videoEl: HTMLVideoElement): Promise<boolean> {
-    const canvas = this.captureFrame(videoEl);
-    if (!canvas) return false;
-
-    const ocrResult = await this.ocrService.recognizeText(canvas);
-    if (ocrResult.confidence < MIN_CONFIDENCE_FOR_SET_CODE) return false;
-
-    if (ocrResult.confidence >= MIN_CONFIDENCE_FOR_NAME) {
-      const byName = await this.tryIdentifyByName(ocrResult.lines);
-      if (byName) {
-        this.onMatch(byName);
-        return true;
-      }
-    }
-
-    return false;
+    this.scheduleNextCapture();
   }
 
   /**
@@ -822,32 +488,13 @@ export class Scanner {
    * The gate-triggered Gemini attempt - reuses tryGeminiPath as-is (same
    * crop, same rate limiting, same per-game identification). Runs
    * independently of the tick loop's own scheduling; onMatch guards against
-   * landing after the Tesseract path (or a previous call) already matched.
+   * landing after a previous call already matched.
    */
   private async autoGeminiScan(videoEl: HTMLVideoElement): Promise<void> {
     this.geminiInFlight = true;
     try {
       const result = await this.tryGeminiPath(videoEl);
-      if (result) {
-        // A live Gemini success is the only thing that proves it's working
-        // again - a Tesseract-sourced match during the fallback window
-        // deliberately does NOT reset this, so the fallback stays engaged
-        // for as long as Gemini itself keeps failing.
-        this.geminiFailureStreak = 0;
-        this.tesseractFallbackToastShown = false;
-        this.onMatch({ card: result.card, confidence: 1 }, result);
-      } else {
-        this.geminiFailureStreak++;
-        if (this.tesseractFallbackActive() && !this.tesseractFallbackToastShown) {
-          this.tesseractFallbackToastShown = true;
-          this.showToast(
-            this.translate.instant('scanner.tesseractFallbackMessage'),
-            'warning',
-            LIMIT_TOAST_DURATION_MS,
-            this.translate.instant('scanner.tesseractFallbackTitle'),
-          );
-        }
-      }
+      if (result) this.onMatch({ card: result.card, confidence: 1 }, result);
     } finally {
       this.geminiInFlight = false;
     }
@@ -902,7 +549,7 @@ export class Scanner {
 
       return await this.mtgApi.identifyByGeminiResult(text);
     } catch (error) {
-      console.error('Gemini Vision fehlgeschlagen, Tesseract-Fallback:', error);
+      console.error('Gemini Vision fehlgeschlagen:', error);
       if (!this.geminiErrorShown) {
         this.geminiErrorShown = true;
         this.showToast(
@@ -916,144 +563,7 @@ export class Scanner {
     }
   }
 
-  /**
-   * Crop-based collector-number scan (mtgscan-derived): tries each of
-   * CROP_STRATEGIES's bottom-left corner windows in turn, foil-detects the
-   * crop to pick the right adaptive preprocessing pass, OCRs it with a
-   * numeric-only Tesseract config, and stops at the first strategy whose
-   * result scores well enough (see scoreCollectorNumberText). That text is
-   * then resolved to an exact set+number hit only - no name/power-
-   * toughness/keyword fallback, since a crop this tight never has those
-   * fields in it anyway.
-   */
-  private async tryTesseractPath(
-    videoEl: HTMLVideoElement,
-  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null> {
-    let result: { card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null = null;
-
-    for (const strategy of CROP_STRATEGIES) {
-      const cropCanvas = this.cropToStrategy(videoEl, strategy);
-      if (!cropCanvas) continue;
-
-      const ctx = cropCanvas.getContext('2d');
-      if (!ctx) continue;
-
-      const imageData = ctx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
-      const stats = analyzeImageCharacteristics(imageData.data);
-      if (isFoilImage(stats)) {
-        processFoilCropPixels(imageData.data);
-      } else {
-        processNormalCropPixels(imageData.data);
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      const ocrResult = await this.ocrService.recognizeText(cropCanvas, {
-        pageSegMode: PSM.SINGLE_LINE,
-        charWhitelist: COLLECTOR_NUMBER_CHAR_WHITELIST,
-      });
-      const score = scoreCollectorNumberText(ocrResult.text);
-      if (score < MIN_SCORE_TO_ACCEPT) continue;
-
-      // Only claim the badge once Tesseract actually found something -
-      // this runs continuously in the background, so setting it unconditionally
-      // at the top of this method would immediately overwrite a "gemini" badge
-      // from the very next tick, regardless of whether this attempt succeeds.
-      this.ocrEngine.set('tesseract');
-      result = await this.mtgApi.identifyByCroppedText(ocrResult.text);
-      break;
-    }
-
-    return result;
-  }
-
-  /**
-   * Crop-based print-code scan for Yu-Gi-Oh (mirrors tryTesseractPath):
-   * tries each of YUGIOH_CROP_STRATEGIES's corner windows, reuses the same
-   * foil-aware adaptive preprocessing MTG's pass uses (modern Yu-Gi-Oh foil/
-   * holo rarities are exactly the case that pipeline's foil-vs-normal branch
-   * was built for) and the same char whitelist (digits, letters, hyphen all
-   * already included), and stops at the first strategy whose result scores
-   * well enough (see scoreYugiohPrintCodeText). That text is resolved via
-   * the now locally-cached identifyByPrintCode - no name fallback, since
-   * this crop is tight enough to never contain the card name anyway.
-   */
-  private async tryYugiohTesseractPath(
-    videoEl: HTMLVideoElement,
-  ): Promise<{ card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null> {
-    for (const strategy of YUGIOH_CROP_STRATEGIES) {
-      const cropCanvas = this.cropToStrategy(videoEl, strategy);
-      if (!cropCanvas) continue;
-
-      const ctx = cropCanvas.getContext('2d');
-      if (!ctx) continue;
-
-      const imageData = ctx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
-      const stats = analyzeImageCharacteristics(imageData.data);
-      if (isFoilImage(stats)) {
-        processFoilCropPixels(imageData.data);
-      } else {
-        processNormalCropPixels(imageData.data);
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      const ocrResult = await this.ocrService.recognizeText(cropCanvas, {
-        pageSegMode: PSM.SINGLE_LINE,
-        charWhitelist: COLLECTOR_NUMBER_CHAR_WHITELIST,
-      });
-      const code = ocrResult.text.trim().toUpperCase();
-      if (scoreYugiohPrintCodeText(code) < MIN_SCORE_TO_ACCEPT) continue;
-
-      // Same reasoning as tryTesseractPath's own badge update - only claim
-      // it once something was actually found.
-      this.ocrEngine.set('tesseract');
-      const card = await this.yugiohApi.identifyByPrintCode(code);
-      if (card) return { card, finish: 'nonfoil', cardCategory: 'normal', language: extractYugiohLanguage(code) };
-    }
-
-    return null;
-  }
-
-  private pushFrameHistory(entry: { id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null) {
-    this.frameHistory.push(entry);
-    if (this.frameHistory.length > FRAME_HISTORY_SIZE) this.frameHistory.shift();
-  }
-
-  /** Sliding-window consistency check: within the last FRAME_HISTORY_SIZE frames, the same card must appear at least CONSISTENT_MATCHES_REQUIRED times - tolerates a single noisy/no-match frame in between two real hits instead of a strict streak. */
-  private confirmMtgCard(
-    result: { card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null,
-  ): { card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } | null {
-    this.pushFrameHistory(result ? { id: result.card.id, ...result } : null);
-    if (!result) return null;
-
-    const entries = this.frameHistory.filter(
-      (entry): entry is { id: string; card: Card; finish: CollectorFinish; cardCategory: CardCategory; language: string } =>
-        entry !== null,
-    );
-
-    const counts = new Map<string, number>();
-    for (const entry of entries) counts.set(entry.id, (counts.get(entry.id) ?? 0) + 1);
-
-    let topId: string | null = null;
-    let topCount = 0;
-    for (const [id, count] of counts) {
-      if (count > topCount) {
-        topId = id;
-        topCount = count;
-      }
-    }
-
-    if (!topId || topCount < CONSISTENT_MATCHES_REQUIRED) return null;
-
-    // Use the most recent frame that agreed, not the oldest - its OCR read
-    // is the freshest one.
-    const latest = [...entries].reverse().find((entry) => entry.id === topId);
-    if (!latest) return null;
-
-    this.frameHistory = [];
-    return latest;
-  }
-
-  /** Full, unfiltered color frame for Gemini - unlike captureFrame() below, no grayscale/contrast pass, since that's a Tesseract-specific preprocessing step a general vision model doesn't need. */
+  /** Full, unfiltered color frame for Gemini. */
   private captureRawFrame(videoEl: HTMLVideoElement): HTMLCanvasElement | null {
     const width = videoEl.videoWidth;
     const height = videoEl.videoHeight;
@@ -1068,72 +578,12 @@ export class Scanner {
     return this.rawFrameCanvas;
   }
 
-  private cropToStrategy(videoEl: HTMLVideoElement, strategy: CropStrategy): HTMLCanvasElement | null {
-    const videoWidth = videoEl.videoWidth;
-    const videoHeight = videoEl.videoHeight;
-    if (!videoWidth || !videoHeight) return null;
-
-    const sx = Math.round(strategy.x * videoWidth);
-    const sy = Math.round(strategy.y * videoHeight);
-    const sw = Math.round(strategy.w * videoWidth);
-    const sh = Math.round(strategy.h * videoHeight);
-    // Same guard as captureFrame() - a transiently tiny reported video size
-    // while the stream settles would otherwise produce a near-zero crop.
-    if (sw < 10 || sh < 10) return null;
-
-    this.captureCanvas.width = sw;
-    this.captureCanvas.height = sh;
-    const ctx = this.captureCanvas.getContext('2d');
-    if (!ctx) return null;
-
-    ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, sw, sh);
-    return this.captureCanvas;
-  }
-
-  private async tryIdentifyByName(lines: OcrLine[]): Promise<CardIdentification | null> {
-    const candidate = extractNameFromLines(lines);
-    if (!candidate) return null;
-
-    return this.gameService.cardApi().identifyCard(candidate);
-  }
-
-  private captureFrame(videoEl: HTMLVideoElement): HTMLCanvasElement | null {
-    const width = videoEl.videoWidth;
-    const height = videoEl.videoHeight;
-    if (!width || !height) return null;
-
-    // Cap the OCR input at 1280px wide - a bigger image doesn't meaningfully
-    // help Tesseract's accuracy but costs a lot more CPU time per frame,
-    // which matters a lot more on mobile hardware than on a desktop.
-    const scale = width > MAX_OCR_WIDTH ? MAX_OCR_WIDTH / width : 1;
-    const outWidth = Math.round(width * scale);
-    const outHeight = Math.round(height * scale);
-
-    this.captureCanvas.width = outWidth;
-    this.captureCanvas.height = outHeight;
-
-    // Some browsers briefly report a tiny placeholder videoWidth/videoHeight
-    // while the stream is still settling - drawing from that produces a
-    // near-zero canvas Tesseract can't handle. Skip the frame; the next
-    // capture tick will have real dimensions.
-    if (this.captureCanvas.width < 10 || this.captureCanvas.height < 10) return null;
-
-    const ctx = this.captureCanvas.getContext('2d');
-    if (!ctx) return null;
-
-    ctx.filter = 'grayscale(1) contrast(1.4)';
-    ctx.drawImage(videoEl, 0, 0, width, height, 0, 0, outWidth, outHeight);
-    return this.captureCanvas;
-  }
-
   private onMatch(
     result: CardIdentification,
     meta?: { finish: CollectorFinish; cardCategory: CardCategory; language: string },
   ) {
-    // Guards against a race between the two concurrent auto-detection paths
-    // (MTG's per-tick Tesseract crop and the gate-triggered Gemini call) -
-    // whichever resolves first wins; the other lands here after the panel
-    // is already showing and must be a no-op instead of overwriting it.
+    // Guards against landing here after a previous call already matched and
+    // the panel is already showing - must be a no-op, not overwrite it.
     if (this.status() !== 'scanning') return;
 
     this.addError.set(null);
@@ -1158,16 +608,6 @@ export class Scanner {
       this.autoAddTimeout = null;
     }
     this.autoAddArmed.set(false);
-  }
-
-  private onAmbiguousMatch(result: MtgIdentificationResult) {
-    // MtgApiService already sized `runners` to the tier (4 for medium
-    // confidence -> 5 total, 9 for low -> 10 total) - read the tier back
-    // from that instead of re-checking the score threshold here too.
-    this.pickerTier.set(result.runners.length <= 4 ? 'medium' : 'low');
-    this.candidateChoices.set([result.topCandidate, ...result.runners]);
-    this.status.set('choosing');
-    if (navigator.vibrate) navigator.vibrate(200);
   }
 
   // Picking a candidate is itself the confirming action - add it straight
@@ -1255,7 +695,6 @@ export class Scanner {
       this.autoResumeTimeout = null;
     }
     this.clearAutoAddTimeout();
-    this.frameHistory = [];
     // Fresh baseline for the next card - otherwise its first tick would
     // diff against whatever was in frame before this one was matched/added.
     this.lastGateSample = null;

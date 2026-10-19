@@ -5,14 +5,7 @@ import { Card, MtgCard } from '../models/card.model';
 import { withSignal } from '../utils/abortable-query';
 import { ExtractedFields, extractFields } from '../utils/card-field-extraction';
 import { ScryfallQueue, ScryfallRateLimitError } from '../utils/scryfall-queue';
-import {
-  CollectorFinish,
-  SetCodeMatch,
-  findPrintedLanguage,
-  parseCollectorNumber,
-  parseGeminiMtgResult,
-  parseSetCode,
-} from '../utils/set-code-parser';
+import { CollectorFinish, SetCodeMatch, parseGeminiMtgResult } from '../utils/set-code-parser';
 import { OcrLineLike, cleanOcrText, similarity } from '../utils/string-similarity';
 import { CardApiService, CardIdentification, MtgIdentificationResult, ScoredCandidate } from './card-api.interface';
 import { CardDisplayLanguageService } from './card-display-language.service';
@@ -487,10 +480,8 @@ export class MtgApiService implements CardApiService {
   }
 
   /**
-   * Resolves an already-parsed set+number match (see parseSetCode /
-   * parseGeminiMtgResult) to an actual card, shared by identifyByCroppedText
-   * and identifyByGeminiResult so both parsing paths feed the exact same
-   * lookup. Token cards print a "T" marker next to the collector number, but
+   * Resolves an already-parsed set+number match (see parseGeminiMtgResult)
+   * to an actual card. Token cards print a "T" marker next to the collector number, but
    * where they actually live on Scryfall varies by product: some print it
    * as a "T"-prefixed number inline in the parent set (e.g. "clb"/"T17"),
    * tried first per the newer convention; others instead keep tokens in a
@@ -541,58 +532,12 @@ export class MtgApiService implements CardApiService {
   }
 
   /**
-   * Identifies a card from OCR text scoped to just the card's bottom-left
-   * set-code/collector-number corner (see Scanner's crop-based capture) -
-   * an exact set+number hit only, no name/power-toughness/keyword fallback,
-   * since a tight crop of that corner never has those fields in it anyway.
-   * Also reports the finish and card category (token vs. special/Helper
-   * card vs. normal) parsed off the same collector-number flags, so the
-   * caller can store them on the collection row (see collection.service.ts).
-   */
-  async identifyByCroppedText(text: string): Promise<CroppedIdentification | null> {
-    const validSetCodes = await this.getValidSetCodes();
-    const match = parseSetCode(text, validSetCodes);
-
-    if (match) {
-      const resolved = await this.resolveSetCodeMatch(match);
-      if (resolved) return resolved;
-    }
-
-    // The crop is tight enough that the set code sometimes falls just
-    // outside it (it often prints on the line just below/above the rarity
-    // + collector number) while the number itself still reads cleanly -
-    // fall back to every locally-known printing at that number, but only
-    // when there's exactly one. With no other field left to score against,
-    // a tie can't be resolved safely, so it's treated as no match rather
-    // than guessing. When a token or Helper-card marker was read, narrow
-    // that search to token sets only first - both live there (see
-    // resolveSetCodeMatch) - the plain fallback is otherwise hopeless for
-    // either specifically (a bare number recurs across hundreds of sets,
-    // but far fewer token sets share it).
-    const bareMatch = parseCollectorNumber(text);
-    if (!bareMatch) return null;
-
-    const allMatches = await this.bulkData.findAllByCollectorNumber(bareMatch.number);
-    const candidates =
-      bareMatch.isToken || bareMatch.isHelper ? allMatches.filter((card) => card.set.startsWith('t')) : allMatches;
-    return candidates.length === 1
-      ? {
-          card: this.toCard(candidates[0]),
-          finish: bareMatch.finish,
-          cardCategory: this.categoryForMatch(bareMatch),
-          language: findPrintedLanguage(text),
-        }
-      : null;
-  }
-
-  /**
    * Identifies a card from Gemini's already-normalized MTG answer (see
    * gemini-ocr's MTG_PROMPT - always "SET NUM" / "SET TNUM" / "SET HNUM",
    * unpadded, single line, covering every format actually printed on a
    * card: new 4-digit, old "X/Y" fraction, and both token/Helper-card flag
-   * positions). Unlike identifyByCroppedText, Gemini's answer needs no
-   * fuzzy OCR recovery - just a strict format check (parseGeminiMtgResult)
-   * - before reusing the exact same set+number lookup.
+   * positions) - just a strict format check (parseGeminiMtgResult) before
+   * reusing the exact same set+number lookup.
    */
   async identifyByGeminiResult(text: string): Promise<CroppedIdentification | null> {
     const match = parseGeminiMtgResult(text);

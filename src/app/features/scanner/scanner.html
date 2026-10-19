@@ -22,10 +22,8 @@
   @if (ocrEngine(); as engine) {
     @if (engine === 'gemini') {
       <span class="ocr-engine-badge ocr-engine-badge--gemini">🤖 Gemini</span>
-    } @else if (engine === 'limit') {
-      <span class="ocr-engine-badge ocr-engine-badge--limit">⚠️ Limit erreicht</span>
     } @else {
-      <span class="ocr-engine-badge ocr-engine-badge--tesseract">📝 Tesseract</span>
+      <span class="ocr-engine-badge ocr-engine-badge--limit">⚠️ Limit erreicht</span>
     }
   }
 
