@@ -185,10 +185,10 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    await this.grantMissingCards(deck.id, cards);
+    await this.grantAllCards(cards);
   }
 
-  /** Deck built from a computed average-decklist (EDHREC for Commander via CommanderRecommendationsDialog, Moxfield for 60-card formats via FormatDeckRecommendationsDialog) - same shape/side effects as importDeck (grants any missing cards into the collection), just tagged with the given format instead of a free-text one. */
+  /** Deck built from a computed average-decklist (EDHREC for Commander via CommanderRecommendationsDialog, Moxfield for 60-card formats via FormatDeckRecommendationsDialog) - same shape/side effects as importDeck (grants the full card list into the collection), just tagged with the given format instead of a free-text one. */
   async addArchetypeDeck(
     name: string,
     format: string,
@@ -225,7 +225,7 @@ export class DeckService {
     );
     if (cardsError) throw cardsError;
 
-    await this.grantMissingCards(deck.id, cards);
+    await this.grantAllCards(cards);
   }
 
   /** Thin wrapper around addArchetypeDeck for the Commander case - kept as its own method since CommanderRecommendationsDialog already calls it by this name. */
@@ -234,16 +234,20 @@ export class DeckService {
   }
 
   /**
-   * Precon decks are sealed physical products (see addPreconDeck) - every
-   * listed card and bonus token ships in the box regardless of what's
-   * already owned from elsewhere or claimed by another deck, so this always
-   * adds the deck's full listed quantity on top of whatever collection row
-   * already exists, rather than topping up a shared pool. Buying 3 precons
-   * that each include a Sol Ring means 3 physical Sol Rings, full stop -
-   * unlike grantMissingCards below (used by importDeck/addArchetypeDeck,
-   * which build a decklist out of the user's *existing* collection instead
-   * of a new sealed product, so topping up instead of blindly re-adding is
-   * the right call there).
+   * Grants a newly added deck's *full* listed quantity of every card into
+   * the collection, regardless of what's already owned from elsewhere or
+   * claimed by another deck - explicit user call: duplicates across decks
+   * are fine as long as the collection ends up reflecting the full,
+   * physical card pool across every deck added (including ones added by
+   * pasting/importing a list, not just the precon browser - e.g. "Political
+   * Trickery (Game Night 2022)", a real boxed product someone would import
+   * rather than pull from the precon library, previously came up short on
+   * Counterspell/Pull from Tomorrow because an *other* deck's own need for
+   * the same card silently absorbed the "already owned" copies instead of
+   * this deck getting its own). Used by every deck-adding path
+   * (addPreconDeck/importDeck/addArchetypeDeck) - a plain top-up (only
+   * granting the shortfall against a shared pool) used to be the behavior
+   * for anything other than a precon, which is exactly what caused this.
    */
   private async grantAllCards(cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
     const isMtg = this.gameService.currentSlug() === 'mtg';
@@ -258,65 +262,6 @@ export class DeckService {
       oracleId: oracleIdByCardId.get(card.cardId) ?? null,
     }));
     await this.collectionService.addCards(collectionInputs);
-  }
-
-  /**
-   * Grants any not-yet-*available* copies of a newly added deck's cards into
-   * the collection - shared by importDeck/addEdhrecDeck (a decklist built
-   * out of the user's own existing collection, not a sealed product - see
-   * grantAllCards above for the precon case). "Available" excludes copies
-   * already committed to another of the user's decks (see deck-stats.ts's
-   * assigned-elsewhere maps) - otherwise a card shared across several decks
-   * (e.g. Howling Golem across every Game Night 2022 precon, back when
-   * precons also went through this same method) only ever gets granted
-   * once, leaving every later deck short a copy it needs of its own even
-   * though the first deck "already owns" it. Resolves each card's oracle_id
-   * via the card API (scryfall_cards
-   * for MTG) - previously went through MtgBulkDataService's local IndexedDB
-   * cache instead (built for the offline scanner), which returns null for
-   * anything it hasn't downloaded/refreshed yet. Live-confirmed on a
-   * recently-released set (Final Fantasy): oracle_id came back null for
-   * every card of a deck added this way, so none of those collection rows
-   * ever counted as "owned" via oracle_id afterwards - only a same-printing
-   * or name match still caught them, and OracleIdBackfillService (see its
-   * own doc comment) treats a bulk-cache miss as permanent, so a row like
-   * that never got a second chance either. scryfall_cards is kept fully
-   * synced server-side now (see the daily sync workflow), so there's no
-   * reason to depend on a giant, separately-refreshed local cache just to
-   * look up an id this table already has.
-   */
-  private async grantMissingCards(deckId: string, cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
-    const isMtg = this.gameService.currentSlug() === 'mtg';
-    const [ownedByCardId, ownedByOracle, allDecks, resolvedCards] = await Promise.all([
-      this.collectionService.getQuantitiesByCardId(),
-      this.collectionService.getQuantitiesByOracleId(),
-      this.getMyDecks(),
-      // oracle_id is a Scryfall/MTG-only concept (see card.model.ts) - no
-      // lookup at all for other games, same as everywhere else.
-      isMtg ? this.gameService.cardApi().getCardsByIds(cards.map((card) => card.cardId)) : Promise.resolve([]),
-    ]);
-    const oracleIdByCardId = new Map(resolvedCards.map((card) => [card.id, card.oracleId]));
-    // Excludes this deck's own just-inserted rows - only *other* decks'
-    // claims should shrink what's available to grant here.
-    const { byCardId: assignedByCardId, byOracleId: assignedByOracle } = buildAssignedElsewhereMaps(
-      allDecks,
-      deckId,
-    );
-
-    const collectionInputs = cards
-      .map((card): AddCardInput => {
-        const oracleId = oracleIdByCardId.get(card.cardId) ?? null;
-        const cardRef = { cardId: card.cardId, oracleId };
-        const owned = getOwnedQuantity(cardRef, ownedByCardId, ownedByOracle);
-        const assignedElsewhere = getOwnedQuantity(cardRef, assignedByCardId, assignedByOracle);
-        const available = Math.max(0, owned - assignedElsewhere);
-        return { cardId: card.cardId, quantity: card.quantity - available, foil: false, condition: 'NM', oracleId };
-      })
-      .filter((input) => input.quantity > 0);
-
-    if (collectionInputs.length > 0) {
-      await this.collectionService.addCards(collectionInputs);
-    }
   }
 
   /**
