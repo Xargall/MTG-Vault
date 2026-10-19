@@ -646,16 +646,34 @@ export class MtgApiService implements CardApiService {
   }
 
   /** Shared batching for an `.in(column, [...])` PostgREST query (see POSTGRES_BATCH_SIZE) - a failed batch is logged and skipped rather than failing the whole call, same degrade-gracefully philosophy as everywhere else card lookups are batched in this file. */
+  /**
+   * Every batch fires at once (Promise.allSettled), not one after another -
+   * a single round trip to this project's PostgREST already costs a few
+   * real seconds (confirmed live, not just a theoretical concern), so a
+   * large collection's worth of sequential batches was the dominant cost in
+   * a live-reported ~55s dashboard load. Each batch still fails
+   * independently (same "skip and warn" semantics as before) rather than
+   * one slow/failed batch taking the rest down with it.
+   */
   private async queryScryfallCards(column: 'id' | 'name', values: string[]): Promise<ScryfallCardRow[]> {
-    const rows: ScryfallCardRow[] = [];
+    const batches: string[][] = [];
     for (let i = 0; i < values.length; i += POSTGRES_BATCH_SIZE) {
-      const batch = values.slice(i, i + POSTGRES_BATCH_SIZE);
-      const { data, error } = await this.supabase.client.from('scryfall_cards').select('*').in(column, batch);
-      if (error) {
-        console.warn(`scryfall_cards ${column} batch failed, skipping ${batch.length} row(s):`, error);
+      batches.push(values.slice(i, i + POSTGRES_BATCH_SIZE));
+    }
+
+    const results = await Promise.allSettled(
+      batches.map((batch) => this.supabase.client.from('scryfall_cards').select('*').in(column, batch)),
+    );
+
+    const rows: ScryfallCardRow[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === 'rejected' || result.value.error) {
+        const error = result.status === 'rejected' ? result.reason : result.value.error;
+        console.warn(`scryfall_cards ${column} batch failed, skipping ${batches[i].length} row(s):`, error);
         continue;
       }
-      rows.push(...((data ?? []) as ScryfallCardRow[]));
+      rows.push(...((result.value.data ?? []) as ScryfallCardRow[]));
     }
     return rows;
   }
@@ -673,15 +691,25 @@ export class MtgApiService implements CardApiService {
    * number of names requested rather than by their combined printing count.
    */
   private async queryScryfallCardsByName(names: string[]): Promise<ScryfallCardRow[]> {
-    const rows: ScryfallCardRow[] = [];
+    const batches: string[][] = [];
     for (let i = 0; i < names.length; i += POSTGRES_BATCH_SIZE) {
-      const batch = names.slice(i, i + POSTGRES_BATCH_SIZE);
-      const { data, error } = await this.supabase.client.rpc('scryfall_cards_by_name', { names: batch });
-      if (error) {
-        console.warn(`scryfall_cards_by_name batch failed, skipping ${batch.length} name(s):`, error);
+      batches.push(names.slice(i, i + POSTGRES_BATCH_SIZE));
+    }
+
+    // All batches fire at once (see queryScryfallCards's doc comment for why).
+    const results = await Promise.allSettled(
+      batches.map((batch) => this.supabase.client.rpc('scryfall_cards_by_name', { names: batch })),
+    );
+
+    const rows: ScryfallCardRow[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === 'rejected' || result.value.error) {
+        const error = result.status === 'rejected' ? result.reason : result.value.error;
+        console.warn(`scryfall_cards_by_name batch failed, skipping ${batches[i].length} name(s):`, error);
         continue;
       }
-      rows.push(...((data ?? []) as ScryfallCardRow[]));
+      rows.push(...((result.value.data ?? []) as ScryfallCardRow[]));
     }
     return rows;
   }
@@ -1035,29 +1063,41 @@ export class MtgApiService implements CardApiService {
     });
   }
 
-  /** Batched (see POSTGRES_BATCH_SIZE) and resolved entirely in Postgres (scryfall_cards_localized, backed by the (oracle_id, lang) index) - exactly one row per requested pair comes back, never every candidate reprint, which mattered a lot for a collection-grid-sized call (hundreds of pairs). */
+  /** Batched (see POSTGRES_BATCH_SIZE) and resolved entirely in Postgres (scryfall_cards_localized, backed by the (oracle_id, lang) index) - exactly one row per requested pair comes back, never every candidate reprint, which mattered a lot for a collection-grid-sized call (hundreds of pairs). All batches fire at once (see queryScryfallCards's doc comment for why), not one after another. */
   private async getLocalizedCardDataByPairs(
     pairs: Array<{ oracleId: string; setCode: string }>,
     lang: string,
   ): Promise<
     Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null; sameSet: boolean }>
   > {
+    const batches: Array<Array<{ oracleId: string; setCode: string }>> = [];
+    for (let i = 0; i < pairs.length; i += POSTGRES_BATCH_SIZE) {
+      batches.push(pairs.slice(i, i + POSTGRES_BATCH_SIZE));
+    }
+
+    const results = await Promise.allSettled(
+      batches.map((batch) =>
+        this.supabase.client.rpc('scryfall_cards_localized', {
+          oracle_ids: batch.map((pair) => pair.oracleId),
+          set_codes: batch.map((pair) => pair.setCode),
+          target_lang: lang,
+        }),
+      ),
+    );
+
     const result = new Map<
       string,
       { name: string; imageUrl: string | null; imageUrlSmall: string | null; sameSet: boolean }
     >();
-    for (let i = 0; i < pairs.length; i += POSTGRES_BATCH_SIZE) {
-      const batch = pairs.slice(i, i + POSTGRES_BATCH_SIZE);
-      const { data, error } = await this.supabase.client.rpc('scryfall_cards_localized', {
-        oracle_ids: batch.map((pair) => pair.oracleId),
-        set_codes: batch.map((pair) => pair.setCode),
-        target_lang: lang,
-      });
-      if (error) {
-        console.warn('scryfall_cards_localized batch failed, skipping:', error);
+    for (const settled of results) {
+      if (settled.status === 'rejected' || settled.value.error) {
+        console.warn(
+          'scryfall_cards_localized batch failed, skipping:',
+          settled.status === 'rejected' ? settled.reason : settled.value.error,
+        );
         continue;
       }
-      for (const row of (data ?? []) as Array<{
+      for (const row of (settled.value.data ?? []) as Array<{
         oracle_id: string;
         set_code: string;
         printed_name: string | null;
