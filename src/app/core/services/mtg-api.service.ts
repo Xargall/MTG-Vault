@@ -198,6 +198,16 @@ const SET_CARDS_LIMIT = 600;
 // DNS hiccup) gets the same treatment, on the same retry budget.
 const FETCH_RETRY_ATTEMPTS = 3;
 const FETCH_RETRY_BASE_DELAY_MS = 1000;
+// A single batch query (scryfall_cards or an RPC against it) failing isn't
+// necessarily bad data - running every batch in parallel (see
+// queryScryfallCards's own doc comment) means several can land on the
+// database at once, and a "57014 canceling statement due to statement
+// timeout" under that concurrent load (the exact same error seen live
+// during the Scryfall bulk sync, see scripts/sync-scryfall-cards.mjs's own
+// retry) is very likely to succeed a moment later, once that load has
+// eased. Retried before a batch is treated as a permanent failure.
+const BATCH_RETRY_ATTEMPTS = 3;
+const BATCH_RETRY_BASE_DELAY_MS = 500;
 
 // Real set codes vary in length and can coincide with ordinary words (e.g.
 // "war" for War of the Spark) - matching the scanner's set-code guesses
@@ -259,6 +269,21 @@ export class MtgApiService implements CardApiService {
       // fallback - only give up on it entirely if there's nothing cached.
       return cachedJson ? new Set(JSON.parse(cachedJson)) : null;
     }
+  }
+
+  /** Retries one batch query up to BATCH_RETRY_ATTEMPTS times (see its own doc comment) before handing back whatever the last attempt got, success or not - `run` is a factory (not a bare promise) since a Postgrest/RPC builder can only be awaited once, so each retry needs its own fresh call. */
+  private async runBatchWithRetry<T>(
+    run: () => PromiseLike<{ data: T | null; error: unknown }>,
+  ): Promise<{ data: T | null; error: unknown }> {
+    let last: { data: T | null; error: unknown } = { data: null, error: null };
+    for (let attempt = 0; attempt < BATCH_RETRY_ATTEMPTS; attempt++) {
+      last = await run();
+      if (!last.error) return last;
+      if (attempt < BATCH_RETRY_ATTEMPTS - 1) {
+        await new Promise((resolve) => setTimeout(resolve, BATCH_RETRY_BASE_DELAY_MS * 2 ** attempt));
+      }
+    }
+    return last;
   }
 
   private scryfallFetch(url: string, init?: RequestInit, queue: ScryfallQueue = this.queue): Promise<Response> {
@@ -662,7 +687,9 @@ export class MtgApiService implements CardApiService {
     }
 
     const results = await Promise.allSettled(
-      batches.map((batch) => this.supabase.client.from('scryfall_cards').select('*').in(column, batch)),
+      batches.map((batch) =>
+        this.runBatchWithRetry(() => this.supabase.client.from('scryfall_cards').select('*').in(column, batch)),
+      ),
     );
 
     const rows: ScryfallCardRow[] = [];
@@ -698,7 +725,9 @@ export class MtgApiService implements CardApiService {
 
     // All batches fire at once (see queryScryfallCards's doc comment for why).
     const results = await Promise.allSettled(
-      batches.map((batch) => this.supabase.client.rpc('scryfall_cards_by_name', { names: batch })),
+      batches.map((batch) =>
+        this.runBatchWithRetry(() => this.supabase.client.rpc('scryfall_cards_by_name', { names: batch })),
+      ),
     );
 
     const rows: ScryfallCardRow[] = [];
@@ -1084,12 +1113,14 @@ export class MtgApiService implements CardApiService {
 
     const results = await Promise.allSettled(
       batches.map((batch) =>
-        this.supabase.client.rpc('scryfall_cards_localized', {
-          oracle_ids: batch.map((pair) => pair.oracleId),
-          set_codes: batch.map((pair) => pair.setCode),
-          collector_numbers: batch.map((pair) => pair.collectorNumber),
-          target_lang: lang,
-        }),
+        this.runBatchWithRetry(() =>
+          this.supabase.client.rpc('scryfall_cards_localized', {
+            oracle_ids: batch.map((pair) => pair.oracleId),
+            set_codes: batch.map((pair) => pair.setCode),
+            collector_numbers: batch.map((pair) => pair.collectorNumber),
+            target_lang: lang,
+          }),
+        ),
       ),
     );
 
