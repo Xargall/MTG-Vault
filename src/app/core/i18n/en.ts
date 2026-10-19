@@ -124,6 +124,8 @@ export const en: typeof de = {
     noResults: 'No cards found.',
     oracleBackfillDone: 'Collection updated',
     surplusFilter: '⚠ Surplus',
+    setFilter: 'Sets',
+    setFilterClear: 'Clear',
     surplusBadge: '+{{count}} extra',
     surplusSearchPlaceholder: 'Search card or deck…',
     hideLands: 'Hide lands',

@@ -122,6 +122,8 @@ export const de = {
     noResults: 'Keine Karten gefunden.',
     oracleBackfillDone: 'Sammlung wurde aktualisiert',
     surplusFilter: '⚠ Überschuss',
+    setFilter: 'Sets',
+    setFilterClear: 'Zurücksetzen',
     surplusBadge: '+{{count}} übrig',
     surplusSearchPlaceholder: 'Karte oder Deck suchen…',
     hideLands: 'Länder ausblenden',

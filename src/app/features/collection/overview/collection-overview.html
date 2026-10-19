@@ -79,6 +79,51 @@
               {{ 'collection.surplusFilter' | translate }}
             </button>
           }
+
+          @if (availableSets().length > 0) {
+            <div class="set-filter">
+              <button
+                type="button"
+                class="filter-button"
+                [class.is-active]="selectedSets().size > 0"
+                (click)="showSetMenu.set(!showSetMenu())"
+              >
+                {{ 'collection.setFilter' | translate }}
+                @if (selectedSets().size > 0) {
+                  <span class="set-filter-count">{{ selectedSets().size }}</span>
+                }
+                ▾
+              </button>
+
+              @if (showSetMenu()) {
+                <div class="set-filter-menu">
+                  <div class="set-filter-menu-header">
+                    <span>{{ 'collection.setFilter' | translate }}</span>
+                    @if (selectedSets().size > 0) {
+                      <button type="button" class="set-filter-clear" (click)="clearSets()">
+                        {{ 'collection.setFilterClear' | translate }}
+                      </button>
+                    }
+                  </div>
+                  <ul class="set-filter-list">
+                    @for (set of availableSets(); track set.name) {
+                      <li>
+                        <label class="set-filter-option">
+                          <input
+                            type="checkbox"
+                            [checked]="selectedSets().has(set.name)"
+                            (change)="toggleSet(set.name)"
+                          />
+                          <span class="set-filter-name">{{ set.name }}</span>
+                          <span class="set-filter-count-badge">{{ set.count }}</span>
+                        </label>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            </div>
+          }
         </div>
 
         @if (showSurplusOnly()) {

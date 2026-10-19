@@ -28,6 +28,26 @@ interface CardBase {
   // different print (or a basic land from a different set) of the same card
   // as a valid substitute, instead of requiring an exact print match.
   oracleId: string | null;
+  // The canonical English/oracle name - unlike `name` (which the card
+  // display-language toggle may have swapped to a translated printed name,
+  // see MtgApiService.translateCards), this never changes with display
+  // language. Equal to `name` for Yu-Gi-Oh/Pokémon (no translation feature
+  // there) and for an MTG card before any translation has been applied.
+  // Lets a search match a card by its English name even while its own
+  // display name is shown translated.
+  oracleName: string;
+  // The best *known* translated name for this card's oracle across every
+  // printing of it the current collection load actually resolved a
+  // translation for - not necessarily *this* exact printing's own
+  // translation (see translateCards's own doc comment on why a printing
+  // with no release in the target language is never shown with a
+  // "borrowed" translated name). Null when the display language is English,
+  // or no printing of this oracle card resolved a translation at all. Lets
+  // a search in the display language find a printing that's itself only
+  // ever been released in English (e.g. an English-only Commander-deck
+  // exclusive printing of an otherwise-translated card), by matching
+  // against a sibling printing's known translation instead of this one's.
+  localizedName: string | null;
 }
 
 export interface MtgCard extends CardBase {

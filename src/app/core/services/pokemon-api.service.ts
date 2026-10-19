@@ -139,6 +139,8 @@ export class PokemonApiService implements CardApiService {
       id: raw.id,
       oracleId: null,
       name: raw.name,
+      oracleName: raw.name,
+      localizedName: null,
       imageUrl: raw.image ? `${raw.image}/high.webp` : null,
       // TCGdex's documented quality suffixes are "low"/"high" - same base
       // URL, smaller variant for the grid thumbnail (see card-tile.html).

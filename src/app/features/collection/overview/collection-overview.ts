@@ -75,6 +75,12 @@ export class CollectionOverview {
 
   protected readonly searchQuery = signal('');
   protected readonly selectedCategory = signal<string | null>(null);
+  // Which set(s) (CollectionEntry.card.setName) to restrict the grid to -
+  // empty means no restriction. A small click-to-open menu (see
+  // showSetMenu/availableSets below), not a row of buttons like the color
+  // categories, since a collection can span dozens of different sets.
+  protected readonly selectedSets = signal<Set<string>>(new Set());
+  protected readonly showSetMenu = signal(false);
   protected readonly showSurplusOnly = signal(false);
   // Only meaningful (and only shown) alongside showSurplusOnly - lands
   // dominate that view with large, uninteresting counts (see isLandCard's
@@ -96,7 +102,8 @@ export class CollectionOverview {
   private readonly deckNamesByCard = computed(() => buildDeckNamesByCard(this.allDecks()));
   protected readonly getDeckNames = (entry: CollectionEntry) => getEntryDeckNames(entry, this.deckNamesByCard());
 
-  protected readonly filteredEntries = computed(() => {
+  /** Every filter except the set menu - its own available options (see availableSets) are drawn from *this*, not from filteredEntries, so the menu still offers every set relevant to the current search/category/surplus filter instead of narrowing to just whatever's already been picked from it. */
+  private readonly entriesBeforeSetFilter = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
     const category = this.selectedCategory();
     const surplusOnly = this.showSurplusOnly();
@@ -110,15 +117,45 @@ export class CollectionOverview {
       // surplus card that deck lists, regardless of what the cards
       // themselves are called, so cleanup can go deck by deck instead of
       // hunting through the whole surplus list by eye.
+      // Matches the card's own displayed name, its canonical English/oracle
+      // name, and the best known translated name across any *other* owned
+      // printing of the same card (see Card.localizedName's own doc
+      // comment) - so a search finds every printing of a card regardless of
+      // which language each specific printing happens to be displayed in
+      // (e.g. a Commander-deck-exclusive English-only printing still turns
+      // up under a German search, as long as some other owned printing of
+      // the same card is known to translate to that German name).
       const matchesQuery =
         !query ||
         entry.card.name.toLowerCase().includes(query) ||
+        entry.card.oracleName.toLowerCase().includes(query) ||
+        (entry.card.localizedName?.toLowerCase().includes(query) ?? false) ||
         (surplusOnly && getEntryDeckNames(entry, deckNamesByCard).some((name) => name.toLowerCase().includes(query)));
       const matchesCategory = !category || categoryKeyFor(entry) === category;
       const matchesSurplus = !surplusOnly || getEntrySurplus(entry, surplusMap) > 0;
       const matchesLandFilter = !(surplusOnly && hideLands) || !isLandCard(entry.card);
       return matchesQuery && matchesCategory && matchesSurplus && matchesLandFilter;
     });
+  });
+
+  /** Every set name present among entriesBeforeSetFilter, with how many matching cards each has - feeds the set-filter menu's own checkbox list, sorted by count (the sets actually worth filtering by show up first) then name. */
+  protected readonly availableSets = computed(() => {
+    const counts = new Map<string, number>();
+    for (const entry of this.entriesBeforeSetFilter()) {
+      const setName = entry.card.setName;
+      if (!setName) continue;
+      counts.set(setName, (counts.get(setName) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  });
+
+  protected readonly filteredEntries = computed(() => {
+    const selectedSets = this.selectedSets();
+    const entries = this.entriesBeforeSetFilter();
+    if (selectedSets.size === 0) return entries;
+    return entries.filter((entry) => entry.card.setName && selectedSets.has(entry.card.setName));
   });
 
   protected readonly manaCurve = computed<BarChartDatum[]>(() => getManaCurve(this.filteredEntries()));
@@ -155,6 +192,7 @@ export class CollectionOverview {
     effect(() => {
       this.searchQuery();
       this.selectedCategory();
+      this.selectedSets();
       this.showSurplusOnly();
       this.hideLands();
       untracked(() => this.renderLimit.set(INITIAL_RENDER_LIMIT));
@@ -180,6 +218,19 @@ export class CollectionOverview {
 
   toggleCategory(key: string) {
     this.selectedCategory.set(this.selectedCategory() === key ? null : key);
+  }
+
+  protected toggleSet(name: string) {
+    this.selectedSets.update((current) => {
+      const next = new Set(current);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  protected clearSets() {
+    this.selectedSets.set(new Set());
   }
 
   protected onScanButtonClick(event: MouseEvent) {

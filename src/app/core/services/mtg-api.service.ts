@@ -937,6 +937,8 @@ export class MtgApiService implements CardApiService {
       id: raw.id,
       oracleId: raw.oracle_id,
       name: raw.printed_name ?? raw.name,
+      oracleName: raw.name,
+      localizedName: null,
       imageUrl: raw.image_uris?.normal ?? raw.card_faces?.[0]?.image_uris?.normal ?? null,
       imageUrlSmall: raw.image_uris?.small ?? raw.card_faces?.[0]?.image_uris?.small ?? null,
       setName: raw.set_name,
@@ -964,6 +966,15 @@ export class MtgApiService implements CardApiService {
       id: row.id,
       oracleId: row.oracle_id,
       name: row.printed_name ?? row.name,
+      // row.name is always the canonical English/oracle name regardless of
+      // this specific row's own lang (confirmed live: even a German-lang
+      // row's `name` column holds the English name, with the German one
+      // only in `printed_name`) - unlike `name` above, never overwritten by
+      // translateCards.
+      oracleName: row.name,
+      // Only translateCards (when the display-language toggle is active)
+      // ever has reason to fill this in - see its own doc comment.
+      localizedName: null,
       imageUrl: row.image_url,
       imageUrlSmall: row.image_url_small,
       setName: row.set_name,
@@ -1023,21 +1034,36 @@ export class MtgApiService implements CardApiService {
     const localized = await this.getLocalizedCardDataByPairs([...pairs.values()], lang);
     if (localized.size === 0) return cards;
 
+    // The best *genuinely translated* name seen for each oracle_id across
+    // this whole batch - not every pair above necessarily got a real
+    // printed_name back (see the map's own isTranslated flag), so this only
+    // picks up the ones that did. Powers Card.localizedName (search-only,
+    // see its own doc comment) - deliberately never used for *display* name/
+    // art below, which stays exact-printing-only by design (see that
+    // decision's own long-standing comment, kept as-is).
+    const oracleLocalizedName = new Map<string, string>();
+    for (const value of localized.values()) {
+      if (value.isTranslated) oracleLocalizedName.set(value.oracleId, value.name);
+    }
+
     return cards.map((card) => {
       if (!card.oracleId || card.game !== 'mtg') return card;
+      const localizedName = oracleLocalizedName.get(card.oracleId) ?? null;
       const match = localized.get(`${card.oracleId}:${card.setCode}:${card.collectorNumber}`);
-      if (!match) return card;
+      if (!match) return { ...card, localizedName };
 
       // Only an exact same-printing match (set_code + collector_number,
-      // resolved in Postgres - scryfall_cards_localized) is ever returned -
-      // a card genuinely never printed in the target language (live-
-      // confirmed: several Fallout Commander-precon-exclusive cards have no
-      // German printing at all) stays fully untranslated by design, rather
-      // than "borrowing" a translated name from some other printing of the
-      // same oracle card while keeping the original art - that mixed
+      // resolved in Postgres - scryfall_cards_localized) is ever used for
+      // *display* - a card genuinely never printed in the target language
+      // (live-confirmed: several Fallout Commander-precon-exclusive cards
+      // have no German printing at all) stays fully untranslated by design,
+      // rather than "borrowing" a translated name from some other printing
+      // of the same oracle card while keeping the original art - that mixed
       // DE-name/EN-art combination read as a bug even though it was
       // arguably correct, so full consistency won out (explicit choice).
-      return { ...card, name: match.name, imageUrl: match.imageUrl, imageUrlSmall: match.imageUrlSmall };
+      // localizedName above is the one place a borrowed name from a sibling
+      // printing *is* wanted (search only, never shown as this card's name).
+      return { ...card, name: match.name, imageUrl: match.imageUrl, imageUrlSmall: match.imageUrlSmall, localizedName };
     });
   }
 
@@ -1045,7 +1071,9 @@ export class MtgApiService implements CardApiService {
   private async getLocalizedCardDataByPairs(
     pairs: Array<{ oracleId: string; setCode: string; collectorNumber: string }>,
     lang: string,
-  ): Promise<Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null }>> {
+  ): Promise<
+    Map<string, { oracleId: string; name: string; imageUrl: string | null; imageUrlSmall: string | null; isTranslated: boolean }>
+  > {
     const batches: Array<Array<{ oracleId: string; setCode: string; collectorNumber: string }>> = [];
     for (let i = 0; i < pairs.length; i += POSTGRES_BATCH_SIZE) {
       batches.push(pairs.slice(i, i + POSTGRES_BATCH_SIZE));
@@ -1064,7 +1092,10 @@ export class MtgApiService implements CardApiService {
       ),
     );
 
-    const result = new Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null }>();
+    const result = new Map<
+      string,
+      { oracleId: string; name: string; imageUrl: string | null; imageUrlSmall: string | null; isTranslated: boolean }
+    >();
     for (const settled of results) {
       if (settled.status === 'rejected' || settled.value.error) {
         console.warn(
@@ -1084,9 +1115,11 @@ export class MtgApiService implements CardApiService {
       }>) {
         if (!row.name) continue;
         result.set(`${row.oracle_id}:${row.set_code}:${row.collector_number}`, {
+          oracleId: row.oracle_id,
           name: row.printed_name ?? row.name,
           imageUrl: row.image_url,
           imageUrlSmall: row.image_url_small,
+          isTranslated: row.printed_name != null,
         });
       }
     }
