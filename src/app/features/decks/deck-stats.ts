@@ -67,7 +67,28 @@ export interface CardAvailability {
   available: number;
 }
 
-/** Sums quantity across every *other* deck's is_assigned deck_cards, keyed by card_id and by oracle_id - the "committed elsewhere" half of the availability calculation. Deck cards are always freshly resolved via the card API (see DeckService.getMyDecks), so oracleId is never missing the way a legacy collection row's can be - no card_id-only fallback bucket needed here the way buildOwnedOracleMap needs one. */
+/**
+ * Sums quantity across every *other* deck's is_assigned deck_cards, keyed by
+ * card_id and by oracle_id - the "committed elsewhere" half of the
+ * availability calculation. Deck cards are always freshly resolved via the
+ * card API (see DeckService.getMyDecks), so oracleId is never missing the
+ * way a legacy collection row's can be - no card_id-only fallback bucket
+ * needed here the way buildOwnedOracleMap needs one.
+ *
+ * Skips any deck that's itself a complete, sealed product (is_precon or
+ * all_cards_owned - see DeckService.grantAllCards) - that deck's cards were
+ * each granted as their own independent, full allocation specifically for
+ * it, never drawn from a pool other decks compete over, so it should never
+ * register as "claiming" shared stock from anyone. Live-confirmed bug
+ * without this: 5 Game Night decks each listing their own exact 1x Howling
+ * Golem (5 copies owned total, one per deck, by design) each counted the
+ * *other* 4 as competing claims against the same card_id, which happened to
+ * still net out to "available" here (the math coincidentally balances when
+ * every complete deck's own need is already fully granted) but also fed
+ * getAssignedElsewhereDecks below, which has no such cancellation and
+ * showed a spurious "already claimed by deck X" note on every single one of
+ * them.
+ */
 export function buildAssignedElsewhereMaps(
   allDecks: DeckEntry[],
   // null for a deck that doesn't exist yet (the precon-browsing preview) -
@@ -78,6 +99,7 @@ export function buildAssignedElsewhereMaps(
   const byOracleId = new Map<string, number>();
   for (const deckEntry of allDecks) {
     if (currentDeckId !== null && deckEntry.deck.id === currentDeckId) continue;
+    if (deckEntry.deck.is_precon || deckEntry.deck.all_cards_owned) continue;
     for (const { row, card } of deckEntry.cards) {
       if (!row.is_assigned) continue;
       if (card.oracleId) {
@@ -169,7 +191,7 @@ export interface AssignedElsewhereEntry {
   cardIds: string[];
 }
 
-/** Which of the user's *other* decks (and how many copies) already claim this card - feeds the deck-detail row's "↳ Bereits in 'X' verplant" line and its "Freigeben" action. Matches by oracle_id when both sides resolved one (always true for deck cards), falling back to the exact card_id otherwise. */
+/** Which of the user's *other* decks (and how many copies) already claim this card - feeds the deck-detail row's "↳ Bereits in 'X' verplant" line and its "Freigeben" action. Matches by oracle_id when both sides resolved one (always true for deck cards), falling back to the exact card_id otherwise. Skips a complete/sealed deck (is_precon or all_cards_owned) the same way buildAssignedElsewhereMaps does - its cards are its own independent allocation, never a shared claim worth surfacing here. */
 export function getAssignedElsewhereDecks(
   card: { cardId: string; oracleId?: string | null },
   allDecks: DeckEntry[],
@@ -178,6 +200,7 @@ export function getAssignedElsewhereDecks(
   const results: AssignedElsewhereEntry[] = [];
   for (const deckEntry of allDecks) {
     if (deckEntry.deck.id === currentDeckId) continue;
+    if (deckEntry.deck.is_precon || deckEntry.deck.all_cards_owned) continue;
     let quantity = 0;
     const cardIds = new Set<string>();
     for (const { row, card: deckCard } of deckEntry.cards) {
