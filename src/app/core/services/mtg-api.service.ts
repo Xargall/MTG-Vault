@@ -1009,18 +1009,37 @@ export class MtgApiService implements CardApiService {
     if (localized.size === 0) return cards;
 
     return cards.map((card) => {
-      const match = card.oracleId ? localized.get(card.oracleId) : undefined;
-      if (!match) return card;
-      return { ...card, name: match.name, imageUrl: match.imageUrl, imageUrlSmall: match.imageUrlSmall };
+      const candidates = card.oracleId ? localized.get(card.oracleId) : undefined;
+      if (!candidates || candidates.length === 0) return card;
+
+      // A land (and plenty of other cards) gets fresh art nearly every set,
+      // so a localized printing from a *different* set is never safe to
+      // show as this card's image - live-confirmed case: a Fallout
+      // Collector Booster land showed a completely unrelated German
+      // reprint's artwork this way. Only swap the image when the matching
+      // language was actually printed in this exact set (common - many
+      // Universes Beyond crossovers, like Fallout, simply have no German
+      // printing at all); the translated name itself is safe to use from
+      // any matching printing, since it's the same text regardless of set.
+      const setCode = card.game === 'mtg' ? card.setCode : null;
+      const sameSet = setCode ? candidates.find((row) => row.setCode === setCode) : undefined;
+      const anyMatch = sameSet ?? candidates[0];
+
+      return sameSet
+        ? { ...card, name: anyMatch.name, imageUrl: sameSet.imageUrl, imageUrlSmall: sameSet.imageUrlSmall }
+        : { ...card, name: anyMatch.name };
     });
   }
 
-  /** Batched by oracle_id+lang (see 025_scryfall_cards_lang.sql's composite index) - one query for the whole list rather than one per card, which matters for a collection-grid-sized call. `distinct on` picks any one matching-language printing per oracle_id (its name/art is the same across sets for a given card in practice), same "one row per card" reasoning as scryfall_cards_by_name. */
+  /** Batched by oracle_id+lang (see 025_scryfall_cards_lang.sql's composite index) - one query for the whole list rather than one per card, which matters for a collection-grid-sized call. Every matching-language row per oracle_id is kept (not deduped) - translateCards itself picks the right one per card, since only a same-set match is safe to use for the image (see its own comment). */
   private async getLocalizedCardDataByOracleIds(
     oracleIds: string[],
     lang: string,
-  ): Promise<Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null }>> {
-    const result = new Map<string, { name: string; imageUrl: string | null; imageUrlSmall: string | null }>();
+  ): Promise<Map<string, Array<{ setCode: string; name: string; imageUrl: string | null; imageUrlSmall: string | null }>>> {
+    const result = new Map<
+      string,
+      Array<{ setCode: string; name: string; imageUrl: string | null; imageUrlSmall: string | null }>
+    >();
     for (let i = 0; i < oracleIds.length; i += POSTGRES_BATCH_SIZE) {
       const batch = oracleIds.slice(i, i + POSTGRES_BATCH_SIZE);
       const { data, error } = await this.supabase.client.rpc('scryfall_cards_localized', {
@@ -1033,16 +1052,21 @@ export class MtgApiService implements CardApiService {
       }
       for (const row of (data ?? []) as Array<{
         oracle_id: string;
+        set_code: string;
         printed_name: string | null;
         name: string;
         image_url: string | null;
         image_url_small: string | null;
       }>) {
-        result.set(row.oracle_id, {
+        const entry = {
+          setCode: row.set_code,
           name: row.printed_name ?? row.name,
           imageUrl: row.image_url,
           imageUrlSmall: row.image_url_small,
-        });
+        };
+        const existing = result.get(row.oracle_id);
+        if (existing) existing.push(entry);
+        else result.set(row.oracle_id, [entry]);
       }
     }
     return result;
