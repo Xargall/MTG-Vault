@@ -7,6 +7,8 @@ export const en: typeof de = {
     decks: 'Decks',
     wishlist: 'Wishlist',
     logout: 'Logout',
+    primary: 'Main navigation',
+    gameSwitch: 'Switch game',
   },
   games: {
     mtg: 'Magic: The Gathering',

@@ -65,6 +65,7 @@ h1 {
 }
 
 .toolbar-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
@@ -101,14 +102,23 @@ h1 {
   background: transparent;
   border: 1px solid var(--color-border-strong);
   color: var(--color-text-muted);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 4px 12px;
   font-size: 0.8rem;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 
-  &:hover {
-    border-color: var(--filter-color);
-    color: var(--color-text);
+  // A full thumb target on touch; the chip itself stays slim on desktop.
+  @media (pointer: coarse) {
+    min-height: 2.5rem;
+    padding-inline: 14px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: var(--filter-color);
+      color: var(--color-text);
+    }
   }
 
   &.is-active {
@@ -125,6 +135,11 @@ h1 {
 
 .set-filter {
   position: relative;
+
+  // Lets the menu below position against the whole toolbar panel instead.
+  @media (max-width: 640px) {
+    position: static;
+  }
 }
 
 .set-filter-count {
@@ -155,6 +170,14 @@ h1 {
   border-radius: var(--radius);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   padding: var(--spacing-sm);
+
+  // Phones: anchor to the toolbar panel (full width) instead of the chip,
+  // which sits near the right edge and pushed a 260px menu off-screen.
+  @media (max-width: 640px) {
+    left: var(--spacing-md);
+    right: var(--spacing-md);
+    width: auto;
+  }
 }
 
 .set-filter-menu-header {

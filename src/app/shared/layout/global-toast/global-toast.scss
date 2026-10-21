@@ -1,6 +1,6 @@
 .global-toast {
   position: fixed;
-  bottom: 24px;
+  bottom: calc(24px + var(--tabbar-offset));
   left: 50%;
   transform: translateX(-50%);
   max-width: 85%;

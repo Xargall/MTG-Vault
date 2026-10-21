@@ -17,15 +17,15 @@
 
 .scanner-close {
   position: absolute;
-  top: var(--spacing-md);
-  right: var(--spacing-md);
+  top: calc(var(--spacing-md) + env(safe-area-inset-top));
+  right: calc(var(--spacing-md) + env(safe-area-inset-right));
   z-index: 1;
   background: var(--scrim);
   color: var(--color-text);
   border: none;
   border-radius: 50%;
-  width: 36px;
-  height: 36px;
+  width: var(--tap-min);
+  height: var(--tap-min);
   font-size: 1rem;
   cursor: pointer;
 }

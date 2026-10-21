@@ -5,6 +5,8 @@ export const de = {
     decks: 'Decks',
     wishlist: 'Wishlist',
     logout: 'Logout',
+    primary: 'Hauptnavigation',
+    gameSwitch: 'Spiel wechseln',
   },
   games: {
     mtg: 'Magic: The Gathering',

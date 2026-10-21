@@ -1,5 +1,5 @@
 <div class="shell">
-  <header class="shell-header">
+  <header class="shell-header" #shellHeader>
     <svg class="corner-flourish corner-flourish--left" width="48" height="48" aria-hidden="true">
       <use href="#flourish-swirl" />
     </svg>
@@ -20,6 +20,7 @@
           class="game-switch"
           [value]="gameService.currentSlug()"
           (change)="setGame($any($event.target).value)"
+          [attr.aria-label]="'nav.gameSwitch' | translate"
         >
           <option value="mtg">{{ 'games.mtg' | translate }}</option>
           <option value="yugioh">{{ 'games.yugioh' | translate }}</option>
@@ -59,6 +60,17 @@
     </nav>
   </header>
 
+  <!-- Phones: once the full plaque has scrolled away, a slim plaque slides in
+       so the wordmark and the active game stay in view. Purely visual - the
+       full header (with its controls) is one tap on the wordmark away. -->
+  <div class="shell-compact" [class.is-visible]="headerScrolledAway()" aria-hidden="true">
+    <button type="button" class="shell-compact-brand" tabindex="-1" (click)="scrollToTop()">
+      <svg class="shell-compact-logo" viewBox="0 0 120 120"><use href="#logo-seal" /></svg>
+      <span class="shell-compact-title">TCG Vault</span>
+    </button>
+    <span class="shell-compact-game">{{ 'games.' + gameService.currentSlug() | translate }}</span>
+  </div>
+
   <app-guest-banner />
 
   <main class="shell-content">
@@ -66,6 +78,29 @@
   </main>
 
   <app-footer />
+
+  <!-- Phones: the primary navigation lives at the bottom edge, within thumb
+       reach - a tooled-leather "book spine" with gilt-inlaid active tab. -->
+  <nav class="shell-tabbar" [attr.aria-label]="'nav.primary' | translate">
+    <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">
+      <svg aria-hidden="true"><use href="#icon-nav-overview" /></svg>
+      <span>{{ 'nav.overview' | translate }}</span>
+    </a>
+    <a routerLink="/collection" routerLinkActive="is-active">
+      <svg aria-hidden="true"><use href="#icon-nav-collection" /></svg>
+      <span>{{ 'nav.collection' | translate }}</span>
+    </a>
+    @if (gameService.decksSupported()) {
+      <a routerLink="/decks" routerLinkActive="is-active">
+        <svg aria-hidden="true"><use href="#icon-nav-decks" /></svg>
+        <span>{{ 'nav.decks' | translate }}</span>
+      </a>
+    }
+    <a routerLink="/wishlist" routerLinkActive="is-active">
+      <svg aria-hidden="true"><use href="#icon-nav-wishlist" /></svg>
+      <span>{{ 'nav.wishlist' | translate }}</span>
+    </a>
+  </nav>
 
   @if (showGeminiOnboarding()) {
     <app-gemini-onboarding-dialog
