@@ -104,6 +104,8 @@ export const en: typeof de = {
     attributeDistribution: 'Attribute Distribution',
     priceDistribution: 'Price Distribution',
     popularCards: 'Popular Cards',
+    popularCardsSubtitle: 'Most played in Commander decks',
+    popularRank: '#{{rank}} of {{total}}',
     saltiestCards: 'Saltiest Cards',
     saltiestCardsSubtitle: 'Cards that annoy your playgroup the most',
     colorCategories: 'Color Categories',
@@ -112,7 +114,6 @@ export const en: typeof de = {
     typeCategories: 'Type Categories',
     noCards: 'No cards',
     treasuryLabel: 'Treasury',
-    emptyCategories: 'No cards yet:',
   },
   collection: {
     title: 'Collection',

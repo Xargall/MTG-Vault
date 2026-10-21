@@ -20,7 +20,7 @@ import { EdhrecService } from '../../core/services/edhrec.service';
 import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
 import { getCategoryDistribution, getCategorySummaries } from '../collection/card-category-stats';
-import { getPriceDistribution, getTotalValue } from '../collection/card-price-stats';
+import { getEntryPrice, getPriceDistribution, getTotalValue } from '../collection/card-price-stats';
 import { CollectionEntry, CollectionService } from '../collection/collection.service';
 import { getWishlistTotals } from '../wishlist/wishlist-stats';
 import { WishlistService } from '../wishlist/wishlist.service';
@@ -66,8 +66,6 @@ export class Dashboard {
 
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
-  // Placeholder count for the loading skeleton grid - purely cosmetic, not tied to real data.
-  protected readonly skeletonPlaceholders = Array.from({ length: 4 });
   private readonly entries = signal<CollectionEntry[]>([]);
 
   protected readonly hasCards = computed(() => this.entries().length > 0);
@@ -82,15 +80,12 @@ export class Dashboard {
   protected readonly cardCount = computed(() =>
     this.entries().reduce((sum, entry) => sum + entry.row.quantity, 0),
   );
-  // Categories with no cards collapse into one muted line instead of a
-  // card-sized empty tile each.
+  // Categories with no cards render last as muted placeholder tiles.
   protected readonly filledCategories = computed(() =>
     this.colorCategories().filter((category) => category.count > 0),
   );
-  protected readonly emptyCategoryLabels = computed(() =>
-    this.colorCategories()
-      .filter((category) => category.count === 0)
-      .map((category) => category.label),
+  protected readonly emptyCategories = computed(() =>
+    this.colorCategories().filter((category) => category.count === 0),
   );
   /** Null while unknown (not loaded or failed) - the treasury shows a dash rather than a misleading 0. */
   protected readonly wishlistTotals = signal<{ value: number; count: number } | null>(null);
@@ -113,6 +108,13 @@ export class Dashboard {
   protected readonly currentPopularCard = computed(
     () => this.popularCards()[this.popularIndex()] ?? null,
   );
+  /** 1-based position of the shown card in EDHREC's popularity order. */
+  protected readonly popularRank = computed(() => this.popularIndex() + 1);
+
+  /** EUR price of a category's showcase card (its most valuable one), or null when unknown. */
+  protected showcasePrice(entry: CollectionEntry): number | null {
+    return getEntryPrice(entry, 'eur') || null;
+  }
 
   // Same rotating-single-card presentation as popularCards/currentPopularCard
   // above (see the template - it's the exact same box/size, just styled with

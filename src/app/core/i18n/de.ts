@@ -102,6 +102,8 @@ export const de = {
     attributeDistribution: 'Attributverteilung',
     priceDistribution: 'Preisverteilung',
     popularCards: 'Beliebte Karten',
+    popularCardsSubtitle: 'Am häufigsten in Commander-Decks gespielt',
+    popularRank: 'Platz {{rank}} von {{total}}',
     saltiestCards: 'Salzigste Karten',
     saltiestCardsSubtitle: 'Karten, die deine Mitspieler am meisten nerven',
     colorCategories: 'Farbkategorien',
@@ -110,7 +112,6 @@ export const de = {
     typeCategories: 'Typkategorien',
     noCards: 'Keine Karten',
     treasuryLabel: 'Schatzkammer',
-    emptyCategories: 'Noch ohne Karten:',
   },
   collection: {
     title: 'Sammlung',
