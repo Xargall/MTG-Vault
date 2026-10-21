@@ -34,7 +34,9 @@
 .progress-fill {
   height: 100%;
   background: var(--color-accent);
-  transition: width 0.2s ease-out;
+  transform: scaleX(var(--p, 0));
+  transform-origin: left;
+  transition: transform 250ms var(--ease-out);
 }
 
 .failed-lines {

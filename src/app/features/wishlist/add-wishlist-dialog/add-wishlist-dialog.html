@@ -10,7 +10,10 @@
       autofocus
     />
 
-    @if (searching()) {
+    <!-- While a new search runs, the previous results stay in place (dimmed)
+         instead of collapsing to a status line - the sheet doesn't jump on
+         every keystroke. -->
+    @if (searching() && results().length === 0) {
       <p class="state-message">{{ 'addCard.searching' | translate }}</p>
     } @else if (searchError()) {
       <div class="search-error" role="alert">
@@ -19,10 +22,10 @@
           {{ 'addCard.retry' | translate }}
         </button>
       </div>
-    } @else if (query().trim() && results().length === 0) {
+    } @else if (!searching() && query().trim() && results().length === 0) {
       <p class="state-message">{{ 'addCard.noCardsFound' | translate }}</p>
     } @else {
-      <div class="results-grid">
+      <div class="results-grid" [class.is-stale]="searching()" [attr.aria-busy]="searching()">
         @for (card of results(); track card.id) {
           <button type="button" class="result-item" (click)="selectCard(card)">
             <app-card-tile [card]="card" />
@@ -45,7 +48,7 @@
       } @else if (printsError()) {
         <p class="state-message error">{{ printsError() }}</p>
       } @else {
-        <div class="results-grid">
+        <div class="results-grid" [class.is-stale]="searching()" [attr.aria-busy]="searching()">
           @for (print of prints(); track print.id) {
             <button type="button" class="result-item" (click)="selectPrint(print)">
               <app-card-tile [card]="print" />

@@ -22,8 +22,13 @@
   gap: var(--spacing-md);
   animation: scroll 50s linear infinite;
 
-  .banner:hover & {
+  .banner:hover &,
+  .banner:focus-visible & {
     animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
   }
 }
 

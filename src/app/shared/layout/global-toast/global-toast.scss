@@ -1,26 +1,47 @@
+// A small leather plaque with a status-colored gilt edge, rising from the
+// bottom - in the world, instead of a stock green alert bar.
 .global-toast {
+  --toast-edge: var(--color-success-text);
   position: fixed;
   bottom: calc(24px + var(--tabbar-offset));
   left: 50%;
-  transform: translateX(-50%);
-  width: max-content;
-  max-width: min(calc(100vw - 2rem), 28rem);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius);
-  background: var(--color-success);
-  color: var(--color-on-success);
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-align: center;
   z-index: 9999;
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  width: max-content;
+  max-width: min(calc(100vw - 2rem), 28rem);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border-strong);
+  border-top: 2px solid var(--toast-edge);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  transform: translateX(-50%);
+  // A transition (not keyframes), so a new message arriving mid-entrance
+  // retargets smoothly instead of restarting.
+  transition:
+    opacity 260ms var(--ease-sheet),
+    transform 260ms var(--ease-sheet);
+
+  @starting-style {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
 
   &--warning {
-    background: var(--color-warning);
-    color: var(--color-on-warning);
+    --toast-edge: var(--color-warning);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: opacity 150ms ease;
+
+    @starting-style {
+      opacity: 0;
+      transform: translateX(-50%);
+    }
   }
 }
 
@@ -37,7 +58,7 @@
   border: none;
   border-radius: var(--radius);
   background: transparent;
-  color: inherit;
+  color: var(--color-accent-hover);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;

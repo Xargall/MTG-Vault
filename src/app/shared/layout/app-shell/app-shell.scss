@@ -136,20 +136,23 @@
     &::after {
       content: '';
       position: absolute;
-      left: 50%;
+      left: 0;
       bottom: 0;
-      width: 0;
+      width: 100%;
       height: 2px;
       background: var(--color-accent);
-      transform: translateX(-50%);
-      transition: width 0.2s ease-out;
+      transform: scaleX(0);
+      transform-origin: center;
+      transition: transform 200ms var(--ease-out);
     }
 
-    &:hover {
-      color: var(--color-accent-hover);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        color: var(--color-accent-hover);
 
-      &::after {
-        width: 60%;
+        &::after {
+          transform: scaleX(0.6);
+        }
       }
     }
 
@@ -158,7 +161,7 @@
       text-shadow: 0 0 10px color-mix(in oklab, var(--color-accent-hover) 45%, transparent);
 
       &::after {
-        width: 100%;
+        transform: scaleX(1);
         box-shadow: 0 0 6px var(--color-accent);
       }
     }

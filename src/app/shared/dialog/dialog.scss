@@ -7,6 +7,11 @@
   justify-content: center;
   padding: var(--spacing-lg);
   background: rgba(0, 0, 0, 0.6);
+  transition: opacity 200ms ease;
+
+  @starting-style {
+    opacity: 0;
+  }
 }
 
 .dialog-panel {
@@ -26,6 +31,16 @@
   border-radius: var(--radius);
   background: var(--color-surface);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  // Rises into place - a short, decelerating arrival (no exit animation:
+  // closing is the user's own decision and should feel immediate).
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
 
   &:focus {
     outline: none;
@@ -39,17 +54,36 @@
 
 // Sticky so the title and close button stay reachable while long dialog
 // content (card lists, deck lists) scrolls underneath.
-.dialog-header {
+.dialog-drag-zone {
   position: sticky;
   top: calc(-1 * var(--spacing-lg));
   z-index: 2;
+  margin: calc(-1 * var(--spacing-lg)) calc(-1 * var(--spacing-lg)) 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+
+  // The bare variant draws its own header (deck hero): the zone just
+  // overlays the top edge to carry the grabber.
+  .dialog-panel--bare & {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    margin: 0;
+    border: none;
+    background: none;
+  }
+}
+
+.dialog-grabber {
+  display: none;
+}
+
+.dialog-header {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  margin: calc(-1 * var(--spacing-lg)) calc(-1 * var(--spacing-lg)) 0;
   padding: var(--spacing-md) var(--spacing-sm) var(--spacing-md) var(--spacing-lg);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
 }
 
 .dialog-title {
@@ -64,7 +98,8 @@
 }
 
 // Phones: dock as a bottom sheet - the thumb reaches the bottom edge, not
-// a centered box's top-right corner.
+// a centered box's top-right corner - sliding up from below, with a grab
+// handle to swipe it back down.
 @media (max-width: 480px) {
   .dialog-backdrop {
     align-items: flex-end;
@@ -72,14 +107,53 @@
   }
 
   .dialog-panel {
+    position: relative;
     max-width: none;
     max-height: 92dvh;
     padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom));
     border-bottom: none;
     border-radius: 12px 12px 0 0;
+    transition: transform 300ms var(--ease-sheet);
+
+    @starting-style {
+      opacity: 1;
+      transform: translateY(100%);
+    }
   }
 
   .dialog-panel--bare {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .dialog-drag-zone {
+    touch-action: none;
+  }
+
+  .dialog-grabber {
+    display: block;
+    width: 2.25rem;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-border-strong);
+
+    .dialog-panel--bare & {
+      background: color-mix(in oklab, var(--color-text) 60%, transparent);
+    }
+  }
+
+  .dialog-header {
+    padding-top: var(--spacing-sm);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-panel {
+    transition: opacity 150ms ease;
+
+    @starting-style {
+      opacity: 0;
+      transform: none;
+    }
   }
 }

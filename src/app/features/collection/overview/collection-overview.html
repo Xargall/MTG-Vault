@@ -151,7 +151,7 @@
     } @else if (filteredEntries().length === 0) {
       <p class="state-message">{{ 'collection.noResults' | translate }}</p>
     } @else {
-      <div class="card-grid">
+      <div class="card-grid" [class.reveal-grid]="revealing()">
         @for (entry of visibleEntries(); track entry.row.id) {
           <button type="button" class="card-link" (click)="selectedEntry.set(entry)">
             <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" [language]="entry.row.language" />

@@ -33,7 +33,9 @@
       </a>
     </nav>
 
-    <div class="top-row">
+    <!-- Rendered once per load (and per game switch), so the arrival reveal
+         can stay on permanently here. -->
+    <div class="top-row reveal-grid">
       <section class="overview-card overview-card--distribution">
         <svg class="corner corner--tl" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <svg class="corner corner--tr" aria-hidden="true"><use href="#flourish-vine" /></svg>
@@ -95,7 +97,7 @@
 
     <section class="color-categories">
       <h2>{{ categoryListHeading() | translate }}</h2>
-      <div class="category-grid" [class.category-grid--yugioh]="gameService.currentSlug() === 'yugioh'">
+      <div class="category-grid reveal-grid" [class.category-grid--yugioh]="gameService.currentSlug() === 'yugioh'">
         @for (category of filledCategories(); track category.label) {
           <a class="category-card" routerLink="/collection" [queryParams]="{ color: category.key }">
             <span class="category-bar" [style.background]="category.color"></span>

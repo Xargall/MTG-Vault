@@ -74,15 +74,28 @@
   border-radius: var(--radius);
   color: var(--color-text);
   cursor: pointer;
-  transition: border-color 0.15s ease-out, transform 0.1s ease-out;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color var(--dur-state) ease,
+    transform var(--dur-release) var(--ease-out);
 
-  &:hover:not(:disabled) {
-    border-color: var(--color-accent);
-    transform: translateY(-2px);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled) {
+      border-color: var(--color-accent);
+      transform: translateY(-2px);
+    }
   }
 
   &:active:not(:disabled) {
-    transform: translateY(0);
+    transform: translateY(1px) scale(0.98);
+    transition-duration: var(--dur-press);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:hover:not(:disabled),
+    &:active:not(:disabled) {
+      transform: none;
+    }
   }
 
   &:disabled {

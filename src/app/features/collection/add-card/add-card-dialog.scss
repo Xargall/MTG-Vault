@@ -106,3 +106,10 @@
   align-items: center;
   gap: var(--spacing-sm) var(--spacing-md);
 }
+
+// Previous results while the next search runs: still readable, clearly
+// not current.
+.results-grid.is-stale {
+  opacity: 0.5;
+  transition: opacity var(--dur-state) ease;
+}

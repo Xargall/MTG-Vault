@@ -11,22 +11,37 @@
     (click)="$event.stopPropagation()"
     (keydown)="onKeydown($event)"
   >
-    @if (!bare()) {
-      <header class="dialog-header">
-        <h2 class="dialog-title" [id]="headingId">{{ heading() }}</h2>
-        <ng-content select="[dialogHeaderActions]" />
-        @if (closable()) {
-          <button
-            type="button"
-            class="icon-btn dialog-close"
-            (click)="requestClose()"
-            [attr.aria-label]="'common.close' | translate"
-          >
-            <svg aria-hidden="true"><use href="#icon-close" /></svg>
-          </button>
-        }
-      </header>
-    }
+    <!-- Sticky top of the panel. On phones it is also the sheet's grab zone:
+         drag it down to dismiss. -->
+    <div
+      class="dialog-drag-zone"
+      (pointerdown)="onDragStart($event)"
+      (pointermove)="onDragMove($event)"
+      (pointerup)="onDragEnd($event)"
+      (pointercancel)="cancelDrag()"
+      (lostpointercapture)="cancelDrag()"
+    >
+      @if (closable()) {
+        <span class="dialog-grabber" aria-hidden="true"></span>
+      }
+
+      @if (!bare()) {
+        <header class="dialog-header">
+          <h2 class="dialog-title" [id]="headingId">{{ heading() }}</h2>
+          <ng-content select="[dialogHeaderActions]" />
+          @if (closable()) {
+            <button
+              type="button"
+              class="icon-btn dialog-close"
+              (click)="requestClose()"
+              [attr.aria-label]="'common.close' | translate"
+            >
+              <svg aria-hidden="true"><use href="#icon-close" /></svg>
+            </button>
+          }
+        </header>
+      }
+    </div>
 
     <ng-content />
   </div>

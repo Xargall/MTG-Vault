@@ -294,6 +294,21 @@ body {
   }
 }
 
+// Reduced motion: the placeholder stays visible (it used to vanish entirely)
+// and breathes gently instead of sweeping.
+@media (prefers-reduced-motion: reduce) {
+  @keyframes skeleton-breathe {
+    50% {
+      opacity: 0.6;
+    }
+  }
+
+  .skeleton-shimmer {
+    background: var(--color-surface-alt);
+    animation: skeleton-breathe 1.6s ease-in-out infinite;
+  }
+}
+
 html,
 body {
   margin: 0;
@@ -358,47 +373,30 @@ a {
   background: var(--color-accent);
 }
 
-// Shared page-load reveal: a single staggered fade+rise applied to the
-// dashboard's top-row panels, its color-category grid, and card tiles
-// everywhere they appear (collection grid, search results, deck previews).
-// One choreographed reveal reads as more premium than scattered
-// micro-interactions - see design-audit Phase 3.
+// Arrival reveal: grid items rise in once when a page's data first lands.
+// Opt-in per container (.reveal-grid) and removed again by the component
+// after that first paint - filtering, searching or loading more must never
+// replay it (that made every filter tap feel slow). Children are staggered
+// 30ms apart, capped at the 6th so a long grid doesn't trickle in.
 @media (prefers-reduced-motion: no-preference) {
   @keyframes reveal-rise {
     from {
       opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
+      transform: translateY(6px);
     }
   }
 
-  .overview-card,
-  .category-card,
-  app-card-tile {
-    animation: reveal-rise 0.4s ease-out both;
-  }
+  .reveal-grid > * {
+    animation: reveal-rise 240ms var(--ease-out) both;
 
-  .overview-card:nth-of-type(2) {
-    animation-delay: 0.08s;
-  }
-  .overview-card:nth-of-type(3) {
-    animation-delay: 0.16s;
-  }
-
-  .category-card,
-  app-card-tile {
-    @for $i from 1 through 20 {
-      $step: $i;
-      @if $i > 8 {
-        $step: 8;
-      }
-
+    @for $i from 2 through 6 {
       &:nth-child(#{$i}) {
-        animation-delay: #{$step * 0.04}s;
+        animation-delay: #{($i - 1) * 30}ms;
       }
+    }
+
+    &:nth-child(n + 7) {
+      animation-delay: 150ms;
     }
   }
 }

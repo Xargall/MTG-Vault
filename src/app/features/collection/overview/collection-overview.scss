@@ -170,6 +170,16 @@ h1 {
   border-radius: var(--radius);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   padding: var(--spacing-sm);
+  // Grows out of its chip rather than popping in.
+  transform-origin: top left;
+  transition:
+    opacity 160ms var(--ease-out),
+    transform 160ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 
   // Phones: anchor to the toolbar panel (full width) instead of the chip,
   // which sits near the right edge and pushed a 260px menu off-screen.
@@ -303,10 +313,25 @@ h1 {
   color: inherit;
   cursor: pointer;
   border-radius: var(--radius);
-  transition: transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-release) var(--ease-out);
 
-  &:hover {
-    transform: translateY(-2px);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      transform: translateY(-2px);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+    transition-duration: var(--dur-press);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:hover,
+    &:active {
+      transform: none;
+    }
   }
 }
 

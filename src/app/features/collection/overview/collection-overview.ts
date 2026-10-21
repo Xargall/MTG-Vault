@@ -66,6 +66,8 @@ export class CollectionOverview {
   protected readonly categories = computed(() => getCategoriesForGame(this.gameService.currentSlug()));
 
   protected readonly loading = signal(true);
+  protected readonly revealing = signal(false);
+  private revealTimer: ReturnType<typeof setTimeout> | undefined;
   protected readonly errorMessage = signal<string | null>(null);
   private readonly entries = signal<CollectionEntry[]>([]);
   // Decks are an MTG-only concept (see CLAUDE.md) - always empty for other
@@ -213,7 +215,10 @@ export class CollectionOverview {
       this.observer.observe(sentinel.nativeElement);
     });
 
-    this.destroyRef.onDestroy(() => this.observer?.disconnect());
+    this.destroyRef.onDestroy(() => {
+      this.observer?.disconnect();
+      clearTimeout(this.revealTimer);
+    });
   }
 
   toggleCategory(key: string) {
@@ -240,21 +245,25 @@ export class CollectionOverview {
     }
   }
 
+  // Edits refresh in place (no "Loading…" swap): the grid, scroll position
+  // and any open filter stay put instead of the page blanking like a crash.
   protected onEntryDeleted() {
-    this.load();
+    this.load({ silent: true });
   }
 
   /** Keeps the still-open dialog showing the saved values too, not just the grid behind it - `entry` is a plain input bound to whatever object is in `selectedEntry`, which reloading `entries` alone wouldn't update in place. */
   protected async onEntryUpdated() {
-    await this.load();
+    await this.load({ silent: true });
     const current = this.selectedEntry();
     if (!current) return;
     this.selectedEntry.set(this.entries().find((e) => e.row.id === current.row.id) ?? null);
   }
 
-  protected async load() {
-    this.loading.set(true);
-    this.errorMessage.set(null);
+  protected async load({ silent = false } = {}) {
+    if (!silent) {
+      this.loading.set(true);
+      this.errorMessage.set(null);
+    }
     try {
       const [entries, allDecks] = await Promise.all([
         this.collectionService.getCollectionWithCardData(),
@@ -262,12 +271,24 @@ export class CollectionOverview {
       ]);
       this.entries.set(entries);
       this.allDecks.set(allDecks);
+      if (!silent) this.playArrivalReveal();
     } catch (error) {
-      this.errorMessage.set(
-        error instanceof Error ? error.message : this.translate.instant('collection.loadError'),
-      );
+      // A failed background refresh keeps the (slightly stale) grid; only a
+      // real load replaces the page with the error.
+      if (!silent) {
+        this.errorMessage.set(
+          error instanceof Error ? error.message : this.translate.instant('collection.loadError'),
+        );
+      }
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /** Lets the grid rise in once on arrival, then drops the class so filtering/searching/loading more never replays it. */
+  private playArrivalReveal() {
+    this.revealing.set(true);
+    clearTimeout(this.revealTimer);
+    this.revealTimer = setTimeout(() => this.revealing.set(false), 600);
   }
 }
