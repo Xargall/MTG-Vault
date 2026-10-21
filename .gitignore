@@ -54,5 +54,14 @@ supabase/.temp
 /.claude/skills
 skills-lock.json
 
+# Impeccable (Copilot-layout install; .github/workflows stays tracked)
+/.github/skills
+/.github/agents
+/.github/hooks
+/.impeccable
+
+# Playwright MCP snapshots/console logs from browser sessions
+/.playwright-mcp
+
 # Local Claude Code config (personal permissions, not shared)
 /.claude/settings.local.json
