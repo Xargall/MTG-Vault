@@ -372,8 +372,12 @@ export class MtgApiService implements CardApiService {
         signal,
       ),
     ]);
-    if (prefixResult.error) throw prefixResult.error;
-    if (wordResult.error) throw wordResult.error;
+    // Either pass alone still gives usable results (the prefix pass covers
+    // the most likely card) - only fail the search when both did.
+    if (prefixResult.error && wordResult.error) throw prefixResult.error;
+    if (prefixResult.error || wordResult.error) {
+      console.warn('Card search: one of two passes failed', prefixResult.error ?? wordResult.error);
+    }
 
     const prefixRows = (prefixResult.data ?? []) as ScryfallCardRow[];
     const wordRows = (wordResult.data ?? []) as ScryfallCardRow[];
