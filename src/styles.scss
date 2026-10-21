@@ -373,6 +373,14 @@ a {
   background: var(--color-accent);
 }
 
+// Game switch (see AppShell.setGame): the old skin cross-fades into the new
+// one - the app's single authored transition, so it may take a little longer.
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 320ms;
+  animation-timing-function: var(--ease-in-out);
+}
+
 // Arrival reveal: grid items rise in once when a page's data first lands.
 // Opt-in per container (.reveal-grid) and removed again by the component
 // after that first paint - filtering, searching or loading more must never

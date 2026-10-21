@@ -16,15 +16,14 @@
   border-radius: var(--radius);
   padding: var(--spacing-lg);
   gap: var(--spacing-sm);
-  // Slow, subtle breathing glow instead of the flat crest-ring watermark
-  // this replaced - gives the login screen presence without a static
-  // graphic competing for attention. Falls back to a fixed glow (no
-  // animation) when the user prefers reduced motion.
-  animation: auth-card-glow 3.5s ease-in-out infinite;
+  // Gold leaf catching the light once as the page opens, then a quiet
+  // resting glow - an endless "breathing" glow drew the eye forever and
+  // repainted the shadow on every frame.
+  box-shadow: 0 0 14px var(--glow-accent);
+  animation: auth-card-gild 1.2s var(--ease-out) both;
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
-    box-shadow: 0 0 18px var(--glow-accent);
   }
 
   h1 {
@@ -105,9 +104,10 @@
     animation: rune-spin 0.8s linear infinite;
   }
 
+  // Reduced motion: no rotation, but it still visibly says "working".
   @media (prefers-reduced-motion: reduce) {
     .loading-rune {
-      animation: none;
+      animation: rune-breathe 1.2s ease-in-out infinite;
     }
   }
 
@@ -125,12 +125,20 @@
   }
 }
 
-@keyframes auth-card-glow {
-  0%,
+@keyframes rune-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes auth-card-gild {
+  0% {
+    box-shadow: 0 0 0 transparent;
+  }
+  40% {
+    box-shadow: 0 0 30px var(--glow-accent-strong);
+  }
   100% {
     box-shadow: 0 0 14px var(--glow-accent);
-  }
-  50% {
-    box-shadow: 0 0 28px var(--glow-accent-strong);
   }
 }

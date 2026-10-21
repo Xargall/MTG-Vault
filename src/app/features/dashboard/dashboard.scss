@@ -205,6 +205,16 @@ h1 {
 
 .popular-image {
   object-fit: cover;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: popular-fade 300ms ease both;
+  }
+}
+
+@keyframes popular-fade {
+  from {
+    opacity: 0;
+  }
 }
 
 .popular-placeholder {

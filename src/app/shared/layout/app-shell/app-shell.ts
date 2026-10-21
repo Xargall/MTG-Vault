@@ -75,6 +75,7 @@ export class AppShell {
     // re-skin the whole app per game, not just the header.
     effect(() => {
       document.body.dataset['game'] = this.gameService.currentSlug();
+      syncThemeColor();
     });
   }
 
@@ -86,11 +87,34 @@ export class AppShell {
     setAppLanguage(this.translate, lang);
   }
 
+  /**
+   * Switching games re-skins the whole app - "turning to another chapter" -
+   * so it gets the one authored transition: a cross-fade of the old skin
+   * into the new. The skin is applied synchronously inside the callback
+   * (the effect above would only do it a tick later) so the transition
+   * captures it as its "after" state.
+   */
   setGame(slug: string) {
-    this.gameService.setGame(slug as GameSlug);
+    const apply = () => {
+      this.gameService.setGame(slug as GameSlug);
+      document.body.dataset['game'] = slug;
+      syncThemeColor();
+    };
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!document.startViewTransition || reduceMotion) {
+      apply();
+      return;
+    }
+    document.startViewTransition(apply);
   }
 
   async dismissGeminiOnboarding() {
     await this.authService.markGeminiOnboardingSeen();
   }
+}
+
+/** Browser chrome (mobile status bar, installed-PWA title bar) follows the active game's background instead of always showing the MTG brown. */
+function syncThemeColor() {
+  const background = getComputedStyle(document.body).getPropertyValue('--color-bg').trim();
+  if (background) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', background);
 }

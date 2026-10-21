@@ -27,6 +27,9 @@ import { WishlistService } from '../wishlist/wishlist.service';
 
 const POPULAR_CARD_COUNT = 12;
 const POPULAR_CARD_ROTATION_MS = 15000;
+// Offset from the popular-cards timer so the two panels never flip in the
+// same frame (two simultaneous swaps read like a glitch).
+const SALTIEST_CARD_ROTATION_MS = 22000;
 const SALTIEST_CARD_COUNT = 10;
 // >= 3.5 red ("very salty"), >= 2.5 orange, otherwise yellow.
 const SALT_HIGH_THRESHOLD = 3.5;
@@ -166,6 +169,8 @@ export class Dashboard {
       this.popularCards.set(cards);
       if (cards.length > 1) {
         const intervalId = setInterval(() => {
+          // No point flipping (and loading images) in a backgrounded tab.
+          if (document.hidden) return;
           this.popularIndex.update((i) => (i + 1) % cards.length);
         }, POPULAR_CARD_ROTATION_MS);
         this.destroyRef.onDestroy(() => clearInterval(intervalId));
@@ -198,8 +203,9 @@ export class Dashboard {
 
       if (saltiest.length > 1) {
         const intervalId = setInterval(() => {
+          if (document.hidden) return;
           this.saltiestIndex.update((i) => (i + 1) % saltiest.length);
-        }, POPULAR_CARD_ROTATION_MS);
+        }, SALTIEST_CARD_ROTATION_MS);
         this.destroyRef.onDestroy(() => clearInterval(intervalId));
       }
     } catch {

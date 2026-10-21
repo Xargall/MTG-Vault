@@ -54,9 +54,14 @@
               <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
               <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
               <h2>{{ 'dashboard.popularCards' | translate }}</h2>
-              @if (card.imageUrl; as imageUrl) {
-                <img class="popular-image" [src]="imageUrl" [alt]="card.name" loading="lazy" />
-              } @else {
+              <!-- Keyed by card id: each rotation mounts a fresh image that
+                   fades in, instead of swapping src under a visible frame. -->
+              @for (shown of [card]; track shown.id) {
+                @if (shown.imageUrl; as imageUrl) {
+                  <img class="popular-image" [src]="imageUrl" [alt]="shown.name" loading="lazy" />
+                }
+              }
+              @if (!card.imageUrl) {
                 <div class="popular-placeholder">{{ card.name }}</div>
               }
               <p class="popular-name">{{ card.name }}</p>
@@ -71,9 +76,12 @@
               <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
               <h2>{{ 'dashboard.saltiestCards' | translate }}</h2>
               <p class="panel-caption">{{ 'dashboard.saltiestCardsSubtitle' | translate }}</p>
-              @if (entry.card.imageUrl; as imageUrl) {
-                <img class="popular-image" [src]="imageUrl" [alt]="entry.card.name" loading="lazy" />
-              } @else {
+              @for (shown of [entry.card]; track shown.id) {
+                @if (shown.imageUrl; as imageUrl) {
+                  <img class="popular-image" [src]="imageUrl" [alt]="shown.name" loading="lazy" />
+                }
+              }
+              @if (!entry.card.imageUrl) {
                 <div class="popular-placeholder">{{ entry.card.name }}</div>
               }
               <p class="popular-name">{{ entry.card.name }}</p>

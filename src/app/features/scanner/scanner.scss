@@ -133,6 +133,16 @@
   border-radius: 50%;
   background: var(--color-accent);
   animation: pulse 1.5s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation-name: pulse-fade;
+  }
+}
+
+@keyframes pulse-fade {
+  50% {
+    opacity: 0.4;
+  }
 }
 
 @keyframes pulse {
@@ -240,8 +250,12 @@
   display: flex;
   gap: var(--spacing-lg);
   align-items: flex-start;
-  animation: slide-up 0.25s ease-out;
+  animation: slide-up 280ms var(--ease-sheet);
   overflow: hidden;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: panel-fade 150ms ease;
+  }
 
   app-card-tile {
     width: 120px;
@@ -261,17 +275,22 @@
   position: absolute;
   left: 0;
   bottom: 0;
+  width: 100%;
   height: 3px;
   background: var(--color-accent);
+  // scaleX on the compositor - animating width ran on the main thread
+  // while OCR was busy there too, so it stuttered right when it mattered.
+  // Functional (it shows the time left), so it stays under reduced motion.
+  transform-origin: left;
   animation: auto-add-countdown 3s linear forwards;
 }
 
 @keyframes auto-add-countdown {
   from {
-    width: 100%;
+    transform: scaleX(1);
   }
   to {
-    width: 0%;
+    transform: scaleX(0);
   }
 }
 
@@ -366,6 +385,12 @@
   }
   to {
     transform: translateY(0);
+  }
+}
+
+@keyframes panel-fade {
+  from {
+    opacity: 0;
   }
 }
 
