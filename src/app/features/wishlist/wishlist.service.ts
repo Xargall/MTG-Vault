@@ -107,7 +107,7 @@ export class WishlistService {
         card_id: cardId,
         priority,
         notes,
-        // A priority/notes-only update (see Wishlist.updatePriority/updateNotes)
+        // A priority/notes-only update (see Wishlist.updatePriority/saveNotes)
         // omits quantity entirely so the upsert's generated UPDATE SET clause
         // never touches the column - only a fresh add or a deck-derived
         // "missing to wishlist" call sets it explicitly.

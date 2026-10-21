@@ -1,10 +1,13 @@
 .wishlist {
+  max-width: 720px;
+  margin: 0 auto;
   padding: var(--spacing-lg);
 }
 
 .page-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--spacing-md);
   margin: 0 0 var(--spacing-lg);
 
@@ -21,100 +24,324 @@
   }
 }
 
-.total-value {
-  margin: 0 0 var(--spacing-lg);
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.entry-grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: var(--spacing-lg);
-}
-
-.entry-card {
-  position: relative;
+.empty-state {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+}
+
+// The merchant's ledger header: the sum is what you check before paying.
+.ledger-summary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 2px var(--spacing-md);
+  margin: 0 0 var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 0 14px var(--glow-accent);
+}
+
+.ledger-total {
+  display: flex;
+  flex-direction: column;
+}
+
+.ledger-total-label {
+  color: var(--color-text-muted);
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+}
+
+.ledger-total-value {
+  color: var(--color-accent-hover);
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1.15;
+}
+
+.ledger-total-meta {
+  grid-column: 1;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.sort-toggle {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  display: flex;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+
+  button {
+    min-height: 2.25rem;
+    padding: 0 0.75rem;
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+
+    @media (pointer: coarse) {
+      min-height: var(--tap-min);
+    }
+
+    & + button {
+      border-left: 1px solid var(--color-border);
+    }
+
+    &.is-active {
+      background: var(--color-accent);
+      color: var(--color-on-accent);
+      font-weight: 600;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+  }
+}
+
+// One row per wanted card, ruled like a ledger page.
+.ledger {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+
+  li {
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+.ledger-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  min-height: 4.75rem;
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur-state) ease;
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-color: color-mix(in oklab, var(--color-surface-alt) 45%, transparent);
+    }
+  }
+
+  &:active {
+    background-color: color-mix(in oklab, var(--color-surface-alt) 70%, transparent);
+  }
+}
+
+.ledger-thumb {
+  display: block;
+  flex-shrink: 0;
+  width: 46px;
+  height: 64px;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  object-fit: cover;
+}
+
+.ledger-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ledger-name {
+  overflow: hidden;
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-meta,
+.ledger-note {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-note {
+  font-style: italic;
+}
+
+.ledger-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
 }
 
-.remove-button {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 1;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: none;
-  background: var(--scrim);
+// The loudest thing on the row - what you compare against the shop's tag.
+.ledger-price {
   color: var(--color-text);
-  font-size: 0.7rem;
-  line-height: 1;
-  cursor: pointer;
+  font-size: 1.15rem;
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+
+  &.is-unknown {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    font-weight: 400;
+    font-style: italic;
+  }
+}
+
+// Priority as 1-3 struck diamonds (the vault seal's own motif) - count and
+// shape carry the level, so it never depends on color alone.
+.priority-seals {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.priority-seal {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--color-border-strong);
+  transform: rotate(45deg);
+
+  &.is-set {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+  }
+}
+
+// --- Detail sheet ---------------------------------------------------------
+
+.entry-detail {
   display: flex;
+  gap: var(--spacing-lg);
+  align-items: flex-start;
+}
+
+.entry-detail-card {
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.entry-detail-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.entry-detail-price {
+  margin: 0;
+  color: var(--color-accent-hover);
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+
+  &.is-unknown {
+    color: var(--color-text-muted);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: 400;
+    font-style: italic;
+  }
+}
+
+.entry-detail-set {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.field-caption {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.priority-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+}
+
+.priority-option {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-
-  &:hover {
-    background: var(--color-danger);
-  }
-}
-
-.entry-price {
-  margin: 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text);
-  text-align: center;
-}
-
-.cardmarket-link {
-  font-size: 0.75rem;
-  color: var(--color-accent);
-  text-decoration: none;
-  text-align: center;
-
-  &:hover {
-    text-decoration: underline;
-  }
-}
-
-.priority-select {
-  width: 100%;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: var(--color-surface-alt);
+  gap: 6px;
+  min-height: 3.25rem;
+  padding: 6px 4px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
   color: var(--color-text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-align: center;
-  text-align-last: center;
+  font-size: 0.875rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color var(--dur-state) ease,
+    color var(--dur-state) ease;
 
-  &.priority-1 {
-    background: var(--color-surface-alt);
-    color: var(--color-text-muted);
-  }
-
-  &.priority-2 {
-    background: var(--color-accent);
-    color: var(--color-on-accent);
-  }
-
-  &.priority-3 {
-    background: var(--color-danger);
-    color: var(--color-on-accent);
+  &.is-active {
+    border-color: var(--color-accent);
+    color: var(--color-accent-hover);
+    font-weight: 600;
   }
 }
 
+.entry-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
 
-.notes-input {
-  width: 100%;
+.remove-link {
+  color: var(--color-danger);
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled) {
+      color: var(--color-danger);
+      text-decoration: underline;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .wishlist {
+    padding: var(--spacing-md);
+  }
+
+  .ledger-summary {
+    padding: var(--spacing-md);
+  }
+
+  .entry-detail-card {
+    width: 110px;
+  }
 }

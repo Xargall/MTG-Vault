@@ -514,9 +514,10 @@ export function getDeckCardCount(deckEntry: DeckEntry): number {
   return deckEntry.cards.reduce((sum, { row }) => sum + row.quantity, 0);
 }
 
+/** EUR value of the cards with a known EUR price - shown with a € sign, so a USD price must not fall in. */
 export function getDeckTotalValue(deckEntry: DeckEntry): number {
   return deckEntry.cards.reduce((sum, { row, card }) => {
-    const price = card.prices.eur ?? card.prices.usd ?? 0;
+    const price = card.prices.eur ?? card.prices.eurFoil ?? 0;
     return sum + price * row.quantity;
   }, 0);
 }

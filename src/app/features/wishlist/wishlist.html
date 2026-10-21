@@ -16,72 +16,153 @@
   } @else if (errorMessage()) {
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else if (!hasEntries()) {
-    <p class="state-message">{{ 'wishlist.empty' | translate }}</p>
+    <div class="empty-state">
+      <p class="state-message">{{ 'wishlist.empty' | translate }}</p>
+      <button type="button" class="btn btn--primary" (click)="showAddDialog.set(true)">
+        <svg aria-hidden="true"><use href="#icon-plus" /></svg>
+        {{ 'wishlist.addAria' | translate }}
+      </button>
+    </div>
   } @else {
-    <p class="total-value">
-      {{ 'wishlist.totalValue' | translate: { value: (totalValue() | number: '1.2-2') + ' €' } }}
-    </p>
+    <section class="ledger-summary">
+      <div class="ledger-total">
+        <span class="ledger-total-label">{{ 'wishlist.totalLabel' | translate }}</span>
+        <span class="ledger-total-value">{{ totals().value | price }}</span>
+      </div>
+      <p class="ledger-total-meta">
+        {{ (cardCount() === 1 ? 'wishlist.cardCountOne' : 'wishlist.cardCountOther') | translate: { count: cardCount() } }}
+        @if (totals().unpricedCount > 0) {
+          · {{ 'wishlist.unpricedNote' | translate: { count: totals().unpricedCount } }}
+        }
+      </p>
+
+      <div class="sort-toggle" role="group" [attr.aria-label]="'wishlist.sortLabel' | translate">
+        <button type="button" [class.is-active]="sort() === 'priority'" [attr.aria-pressed]="sort() === 'priority'" (click)="sort.set('priority')">
+          {{ 'wishlist.sortPriority' | translate }}
+        </button>
+        <button type="button" [class.is-active]="sort() === 'price'" [attr.aria-pressed]="sort() === 'price'" (click)="sort.set('price')">
+          {{ 'wishlist.sortPrice' | translate }}
+        </button>
+      </div>
+    </section>
 
     @if (actionError()) {
       <p class="state-message error">{{ actionError() }}</p>
     }
 
-    <ul class="entry-grid">
-      @for (entry of entries(); track entry.row.id) {
-        <li class="entry-card">
-          <button
-            type="button"
-            class="remove-button"
-            (click)="remove(entry)"
-            [attr.aria-label]="'wishlist.removeAria' | translate"
-          >
-            ✕
+    <ol class="ledger">
+      @for (entry of sortedEntries(); track entry.row.id) {
+        <li>
+          <button type="button" class="ledger-row" (click)="openEntry(entry)">
+            @if (entry.card.imageUrlSmall ?? entry.card.imageUrl; as thumb) {
+              <img class="ledger-thumb" [src]="thumb" alt="" width="46" height="64" loading="lazy" />
+            } @else {
+              <span class="ledger-thumb" aria-hidden="true"></span>
+            }
+            <span class="ledger-main">
+              <span class="ledger-name">{{ entry.card.name }}</span>
+              <span class="ledger-meta">
+                {{ entry.card.setName }}
+                @if (entry.row.quantity > 1) {
+                  · ×{{ entry.row.quantity }}
+                }
+              </span>
+              @if (entry.row.notes) {
+                <span class="ledger-note">{{ entry.row.notes }}</span>
+              }
+            </span>
+            <span class="ledger-side">
+              <span class="ledger-price" [class.is-unknown]="getEntryPrice(entry) === null">
+                {{ getEntryPrice(entry) | price }}
+              </span>
+              <span
+                class="priority-seals"
+                role="img"
+                [attr.aria-label]="'wishlist.priorityAria' | translate: { level: (priorityLabelKey(entry.row.priority) | translate) }"
+              >
+                @for (level of priorityLevels; track level.value) {
+                  <span class="priority-seal" [class.is-set]="level.value <= entry.row.priority"></span>
+                }
+              </span>
+            </span>
           </button>
-
-          <app-card-tile [card]="entry.card" [quantity]="entry.row.quantity" />
-
-          <button
-            type="button"
-            class="btn btn--secondary btn--sm btn--block"
-            [disabled]="movingToCollection().has(entry.row.id)"
-            (click)="addToCollection(entry)"
-          >
-            {{ 'wishlist.addToCollection' | translate }}
-          </button>
-
-          <p class="entry-price">{{ getEntryPrice(entry) | number: '1.2-2' }} €</p>
-          @if (entry.card.game === 'mtg' && entry.card.cardmarketUrl; as url) {
-            <a class="cardmarket-link" [href]="url" target="_blank" rel="noopener">
-              {{ 'wishlist.cardmarketLink' | translate }}
-            </a>
-          }
-
-          <select
-            class="priority-select"
-            [class.priority-1]="entry.row.priority === 1"
-            [class.priority-2]="entry.row.priority === 2"
-            [class.priority-3]="entry.row.priority === 3"
-            [ngModel]="entry.row.priority"
-            (ngModelChange)="updatePriority(entry, $event)"
-          >
-            <option [ngValue]="1">{{ 'wishlist.priorityLow' | translate }}</option>
-            <option [ngValue]="2">{{ 'wishlist.priorityMid' | translate }}</option>
-            <option [ngValue]="3">{{ 'wishlist.priorityHigh' | translate }}</option>
-          </select>
-
-          <input
-            #notesInput
-            type="text"
-            class="notes-input"
-            [placeholder]="'wishlist.notesPlaceholder' | translate"
-            [value]="entry.row.notes ?? ''"
-            (blur)="updateNotes(entry, notesInput.value)"
-          />
         </li>
       }
-    </ul>
+    </ol>
   }
 </div>
+
+@if (selected(); as entry) {
+  <app-dialog [heading]="entry.card.name" maxWidth="480px" (closeRequest)="closeEntry()">
+    <div class="entry-detail">
+      <app-card-tile class="entry-detail-card" [card]="entry.card" [quantity]="entry.row.quantity" />
+      <div class="entry-detail-info">
+        <p class="entry-detail-price" [class.is-unknown]="getEntryPrice(entry) === null">
+          {{ getEntryPrice(entry) | price }}
+        </p>
+        @if (entry.card.setName) {
+          <p class="entry-detail-set">{{ entry.card.setName }}</p>
+        }
+        @if (entry.card.game === 'mtg' && entry.card.cardmarketUrl; as url) {
+          <a class="btn btn--secondary btn--sm" [href]="url" target="_blank" rel="noopener">
+            {{ 'wishlist.cardmarketLink' | translate }}
+          </a>
+        }
+      </div>
+    </div>
+
+    <div class="priority-field" role="radiogroup" [attr.aria-label]="'wishlist.priorityLabel' | translate">
+      <span class="field-caption" aria-hidden="true">{{ 'wishlist.priorityLabel' | translate }}</span>
+      <div class="priority-options">
+        @for (level of priorityLevels; track level.value) {
+          <button
+            type="button"
+            role="radio"
+            class="priority-option"
+            [class.is-active]="entry.row.priority === level.value"
+            [attr.aria-checked]="entry.row.priority === level.value"
+            (click)="updatePriority(entry, level.value)"
+          >
+            <span class="priority-seals" aria-hidden="true">
+              @for (mark of priorityLevels; track mark.value) {
+                <span class="priority-seal" [class.is-set]="mark.value <= level.value"></span>
+              }
+            </span>
+            {{ level.labelKey | translate }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <label class="field-caption" for="wishlist-notes">{{ 'wishlist.notesLabel' | translate }}</label>
+    <textarea
+      id="wishlist-notes"
+      rows="2"
+      [placeholder]="'wishlist.notesPlaceholder' | translate"
+      [value]="notesDraft()"
+      (input)="notesDraft.set($any($event.target).value)"
+      (blur)="saveNotes(entry)"
+    ></textarea>
+
+    @if (actionError()) {
+      <p class="state-message error">{{ actionError() }}</p>
+    }
+
+    <div class="entry-actions">
+      <button type="button" class="btn btn--ghost btn--flush remove-link" (click)="remove(entry)">
+        {{ 'wishlist.removeButton' | translate }}
+      </button>
+      <button
+        type="button"
+        class="btn btn--primary"
+        [disabled]="movingToCollection().has(entry.row.id)"
+        (click)="addToCollection(entry)"
+      >
+        {{ 'wishlist.addToCollection' | translate }}
+      </button>
+    </div>
+  </app-dialog>
+}
 
 @if (showAddDialog()) {
   <app-add-wishlist-dialog (close)="showAddDialog.set(false)" (added)="onAdded()" />

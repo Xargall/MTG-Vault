@@ -1,5 +1,13 @@
 @if (toastService.current(); as toast) {
   <div class="global-toast" [class.global-toast--warning]="toast.variant === 'warning'">
-    {{ toast.message }}
+    <span class="global-toast-message">{{ toast.message }}</span>
+    @if (toast.action; as action) {
+      <button type="button" class="global-toast-action" (click)="toastService.runAction()">
+        {{ action.label }}
+      </button>
+    }
   </div>
 }
+<!-- Kept outside the @if so screen readers already have the live region
+     registered when the first message arrives. -->
+<div class="visually-hidden" role="status" aria-live="polite">{{ toastService.current()?.message }}</div>
