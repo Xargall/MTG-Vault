@@ -111,6 +111,8 @@ export const en: typeof de = {
     typeDistribution: 'Type Distribution',
     typeCategories: 'Type Categories',
     noCards: 'No cards',
+    treasuryLabel: 'Treasury',
+    emptyCategories: 'No cards yet:',
   },
   collection: {
     title: 'Collection',

@@ -14,6 +14,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { BarChart } from '../../shared/charts/bar-chart/bar-chart';
 import { DonutChart } from '../../shared/charts/donut-chart/donut-chart';
+import { PricePipe } from '../../shared/pipes/price.pipe';
 import { Card } from '../../core/models/card.model';
 import { EdhrecService } from '../../core/services/edhrec.service';
 import { GameService } from '../../core/services/game.service';
@@ -21,6 +22,8 @@ import { MtgApiService } from '../../core/services/mtg-api.service';
 import { getCategoryDistribution, getCategorySummaries } from '../collection/card-category-stats';
 import { getPriceDistribution, getTotalValue } from '../collection/card-price-stats';
 import { CollectionEntry, CollectionService } from '../collection/collection.service';
+import { getWishlistTotals } from '../wishlist/wishlist-stats';
+import { WishlistService } from '../wishlist/wishlist.service';
 
 const POPULAR_CARD_COUNT = 12;
 const POPULAR_CARD_ROTATION_MS = 15000;
@@ -45,12 +48,13 @@ export function saltLevel(salt: number): SaltLevel {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-dashboard',
-  imports: [DonutChart, BarChart, RouterLink, DecimalPipe, TranslatePipe],
+  imports: [DonutChart, BarChart, RouterLink, DecimalPipe, PricePipe, TranslatePipe],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
 export class Dashboard {
   private readonly collectionService = inject(CollectionService);
+  private readonly wishlistService = inject(WishlistService);
   private readonly mtgApi = inject(MtgApiService);
   private readonly edhrec = inject(EdhrecService);
   protected readonly gameService = inject(GameService);
@@ -60,7 +64,7 @@ export class Dashboard {
   protected readonly loading = signal(true);
   protected readonly errorMessage = signal<string | null>(null);
   // Placeholder count for the loading skeleton grid - purely cosmetic, not tied to real data.
-  protected readonly skeletonPlaceholders = Array.from({ length: 7 });
+  protected readonly skeletonPlaceholders = Array.from({ length: 4 });
   private readonly entries = signal<CollectionEntry[]>([]);
 
   protected readonly hasCards = computed(() => this.entries().length > 0);
@@ -72,6 +76,21 @@ export class Dashboard {
   );
   protected readonly priceDistribution = computed(() => getPriceDistribution(this.entries()));
   protected readonly totalValue = computed(() => getTotalValue(this.entries()));
+  protected readonly cardCount = computed(() =>
+    this.entries().reduce((sum, entry) => sum + entry.row.quantity, 0),
+  );
+  // Categories with no cards collapse into one muted line instead of a
+  // card-sized empty tile each.
+  protected readonly filledCategories = computed(() =>
+    this.colorCategories().filter((category) => category.count > 0),
+  );
+  protected readonly emptyCategoryLabels = computed(() =>
+    this.colorCategories()
+      .filter((category) => category.count === 0)
+      .map((category) => category.label),
+  );
+  /** Null while unknown (not loaded or failed) - the treasury shows a dash rather than a misleading 0. */
+  protected readonly wishlistTotals = signal<{ value: number; count: number } | null>(null);
 
   protected readonly categoryHeading = computed(() => {
     const slug = this.gameService.currentSlug();
@@ -116,6 +135,7 @@ export class Dashboard {
   private async load() {
     this.loading.set(true);
     this.errorMessage.set(null);
+    void this.loadWishlistTotals();
     try {
       this.entries.set(await this.collectionService.getCollectionWithCardData());
     } catch (error) {
@@ -124,6 +144,19 @@ export class Dashboard {
       );
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  private async loadWishlistTotals() {
+    this.wishlistTotals.set(null);
+    try {
+      const entries = await this.wishlistService.getWishlist();
+      this.wishlistTotals.set({
+        value: getWishlistTotals(entries).value,
+        count: entries.reduce((sum, entry) => sum + entry.row.quantity, 0),
+      });
+    } catch {
+      // Secondary to the collection itself - the treasury just shows a dash.
     }
   }
 

@@ -1,10 +1,13 @@
+// One container for every dashboard row, so the panels and the category
+// grid share the same edges instead of four independent widths.
 .dashboard {
+  max-width: 1100px;
+  margin: 0 auto;
   padding: var(--spacing-lg);
 }
 
 h1 {
   margin: 0 0 var(--spacing-lg);
-  text-align: center;
 }
 
 .state-message {
@@ -15,23 +18,217 @@ h1 {
   }
 }
 
+.skeleton-ledger {
+  height: 5.5rem;
+  margin-bottom: var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
 .skeleton-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: var(--spacing-lg);
-  max-width: 900px;
-  margin: 0 auto;
 }
 
 .skeleton-card {
-  aspect-ratio: 0.72;
+  aspect-ratio: 1;
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
 }
 
-// Sits at the bottom, centered, below the card name - a normal flow child of
-// .popular-card (same box/size as the Popular Cards widget this is styled to
-// match - see dashboard.html), which already centers its children.
+// The treasury: two ledger entries side by side - the hoard and what is
+// still to buy. Text-led (label, value, count), each a link to its page.
+.treasury {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 0 var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 0 14px var(--glow-accent);
+}
+
+.treasury-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--spacing-md) var(--spacing-lg);
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur-state) ease;
+
+  & + & {
+    border-left: 1px solid var(--color-border);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-color: color-mix(in oklab, var(--color-surface-alt) 45%, transparent);
+    }
+  }
+
+  &:active {
+    background-color: color-mix(in oklab, var(--color-surface-alt) 70%, transparent);
+  }
+}
+
+.treasury-label {
+  color: var(--color-text-muted);
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+}
+
+.treasury-value {
+  overflow: hidden;
+  color: var(--color-accent-hover);
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &--muted {
+    color: var(--color-text-muted);
+  }
+}
+
+.treasury-meta {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+// Phones: stacked, the two featured cards side by side. Wide screens: the
+// distribution (wide enough for chart + legend in a row) above the prices,
+// with the featured cards as a column beside both. Without featured cards
+// (Yu-Gi-Oh!, Pokémon) distribution and prices share the row.
+.top-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--spacing-lg);
+
+  @media (min-width: 960px) {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-areas:
+      'dist pair'
+      'price pair';
+
+    .overview-card--distribution {
+      grid-area: dist;
+    }
+
+    .price-card {
+      grid-area: price;
+    }
+
+    .feature-pair {
+      grid-area: pair;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    &:not(:has(.feature-pair)) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-areas: 'dist price';
+    }
+  }
+}
+
+.overview-card {
+  position: relative;
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  // Subtle, permanent glow in the game's accent - on every top-row panel.
+  box-shadow: 0 0 14px var(--glow-accent);
+  padding: var(--spacing-lg);
+
+  h2 {
+    margin: 0 0 var(--spacing-md);
+    font-size: 1rem;
+    color: var(--color-text);
+    text-align: center;
+    // Stable height regardless of how many lines the DE/EN title wraps to,
+    // so switching languages doesn't shift the chart content below it.
+    min-height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.feature-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--spacing-lg);
+  min-width: 0;
+}
+
+.price-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.popular-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-md);
+
+  h2 {
+    min-height: 2.25rem;
+    margin-bottom: var(--spacing-sm);
+    font-size: 0.9rem;
+  }
+}
+
+// Visible subtitle (it used to live in a title tooltip, unreachable on touch).
+.panel-caption {
+  margin: -4px 0 var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.popular-image,
+.popular-placeholder {
+  width: 100%;
+  max-width: 180px;
+  aspect-ratio: 5 / 7;
+  border-radius: var(--radius-card);
+}
+
+.popular-image {
+  object-fit: cover;
+}
+
+.popular-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.popular-name {
+  margin: var(--spacing-sm) 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 .salt-badge {
   --salt-color: var(--chart-4);
   margin-top: var(--spacing-sm);
@@ -56,132 +253,6 @@ h1 {
 
   &--low {
     --salt-color: var(--chart-4); // aged gold
-  }
-}
-
-.color-categories {
-  margin-top: var(--spacing-lg);
-
-  h2 {
-    margin: 0 0 var(--spacing-md);
-    font-size: 1rem;
-    color: var(--color-text);
-    text-align: center;
-  }
-}
-
-.category-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--spacing-lg);
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-.category-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--spacing-md);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  overflow: hidden;
-  text-decoration: none;
-  color: inherit;
-  // Subtle, permanent gold glow (see .overview-card) rather than a hover-only
-  // effect - a light touch of "these are the premium panels" throughout.
-  box-shadow: 0 0 14px var(--glow-accent);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-
-  &:hover {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 18px var(--glow-accent-strong);
-  }
-}
-
-.category-bar {
-  width: 100%;
-  height: 5px;
-  border-radius: 2px;
-  margin-bottom: var(--spacing-md);
-}
-
-.showcase-image {
-  width: 100%;
-  border-radius: 8px;
-  aspect-ratio: 5 / 7;
-  object-fit: cover;
-}
-
-.showcase-placeholder {
-  width: 100%;
-  aspect-ratio: 5 / 7;
-  border-radius: 8px;
-  background: var(--color-surface-alt);
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-md);
-}
-
-.showcase-name {
-  margin: var(--spacing-sm) 0 0;
-  font-size: 0.9rem;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.category-label {
-  margin: var(--spacing-sm) 0 0;
-  font-weight: 600;
-  font-size: 1.05rem;
-}
-
-.category-count {
-  margin: 2px 0 0;
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-}
-
-.top-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: stretch;
-  gap: var(--spacing-lg);
-}
-
-.overview-card {
-  position: relative;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  // Subtle, permanent gold glow - edels touch, not a hover effect - on all
-  // three top-row panels (color chart, popular cards, price chart).
-  box-shadow: 0 0 14px var(--glow-accent);
-  padding: var(--spacing-lg);
-  margin: 0 auto;
-  width: fit-content;
-  max-width: 100%;
-
-  h2 {
-    margin: 0 0 var(--spacing-md);
-    font-size: 1rem;
-    color: var(--color-text);
-    text-align: center;
-    // Stable height regardless of how many lines the DE/EN title wraps to,
-    // so switching languages doesn't shift the chart content below it.
-    min-height: 2.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 }
 
@@ -221,57 +292,134 @@ h1 {
   }
 }
 
-.price-card {
-  width: 460px;
+.color-categories {
+  margin-top: var(--spacing-lg);
+
+  > h2 {
+    margin: var(--spacing-lg) 0 var(--spacing-md);
+    font-size: 1rem;
+    color: var(--color-text);
+  }
+}
+
+// Two columns even on phones: each category is an art-window vignette, not
+// a full card scan, so the grid stays a quick scan instead of a long scroll.
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--spacing-md);
+
+  @media (min-width: 720px) {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--spacing-lg);
+  }
+}
+
+.category-card {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 0 var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color var(--dur-state) ease,
+    transform var(--dur-release) var(--ease-out);
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: var(--color-accent);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+    transition-duration: var(--dur-press);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:active {
+      transform: none;
+    }
+  }
 }
 
-.total-value {
-  margin: 0 0 var(--spacing-md);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text);
-  text-align: center;
+.category-bar {
+  height: 4px;
 }
 
-.popular-card {
-  width: 190px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.popular-image {
-  width: 100%;
-  border-radius: 8px;
-  border: 2px solid var(--color-accent);
-  aspect-ratio: 5 / 7;
-  object-fit: cover;
-}
-
-.popular-placeholder {
-  width: 100%;
-  aspect-ratio: 5 / 7;
-  border-radius: 8px;
-  border: 2px solid var(--color-accent);
+// Crops the card scan down to its illustration in a 4:3 window, so the
+// category reads by its art rather than by a full card frame. The scan is
+// drawn 118% wide (trimming the side borders) and pulled up by the art's top
+// offset; percentage margins resolve against the window width, so for a 5:7
+// card the image is 1.652 window-widths tall and the window shows ~45% of
+// the card height.
+.showcase-window {
+  --art-top: 11%; // MTG / Pokémon: art starts ~11% down the card
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
   background: var(--color-surface-alt);
-  color: var(--color-text-muted);
-  font-size: 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+
+  .category-grid--yugioh & {
+    --art-top: 18%; // Yu-Gi-Oh!: below the name and attribute/level row
+  }
+}
+
+.showcase-image {
+  display: block;
+  width: 118%;
+  max-width: none;
+  height: auto;
+  margin: calc(-1.652 * var(--art-top)) 0 0 -9%;
+}
+
+.showcase-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 100%;
+  padding: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
   text-align: center;
-  padding: var(--spacing-md);
 }
 
-.popular-name {
-  margin: var(--spacing-sm) 0 0;
-  font-size: 0.9rem;
+.category-label {
+  margin: var(--spacing-sm) var(--spacing-md) 0;
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.category-count {
+  margin: 0 var(--spacing-md);
   color: var(--color-text-muted);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+  font-size: 0.85rem;
+}
+
+.empty-categories {
+  margin: var(--spacing-md) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: var(--spacing-md);
+  }
+
+  .treasury-entry {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .treasury-value {
+    font-size: 1.3rem;
+  }
 }

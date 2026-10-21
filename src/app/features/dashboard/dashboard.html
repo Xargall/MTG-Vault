@@ -1,7 +1,8 @@
 <div class="dashboard">
-  <h1>{{ 'dashboard.welcome' | translate }}</h1>
+  <h1>{{ 'nav.overview' | translate }}</h1>
 
   @if (loading()) {
+    <div class="skeleton-ledger skeleton-shimmer"></div>
     <div class="skeleton-grid">
       @for (item of skeletonPlaceholders; track $index) {
         <div class="skeleton-card skeleton-shimmer"></div>
@@ -10,8 +11,30 @@
   } @else if (errorMessage()) {
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else if (hasCards()) {
+    <!-- The treasury: what the hoard is worth, and what is still to buy. -->
+    <nav class="treasury" [attr.aria-label]="'dashboard.treasuryLabel' | translate">
+      <a class="treasury-entry" routerLink="/collection">
+        <span class="treasury-label">{{ 'nav.collection' | translate }}</span>
+        <span class="treasury-value">{{ totalValue() | price }}</span>
+        <span class="treasury-meta">
+          {{ (cardCount() === 1 ? 'wishlist.cardCountOne' : 'wishlist.cardCountOther') | translate: { count: cardCount() } }}
+        </span>
+      </a>
+      <a class="treasury-entry" routerLink="/wishlist">
+        <span class="treasury-label">{{ 'wishlist.title' | translate }}</span>
+        @if (wishlistTotals(); as wish) {
+          <span class="treasury-value">{{ wish.value | price }}</span>
+          <span class="treasury-meta">
+            {{ (wish.count === 1 ? 'wishlist.cardCountOne' : 'wishlist.cardCountOther') | translate: { count: wish.count } }}
+          </span>
+        } @else {
+          <span class="treasury-value treasury-value--muted">–</span>
+        }
+      </a>
+    </nav>
+
     <div class="top-row">
-      <section class="overview-card">
+      <section class="overview-card overview-card--distribution">
         <svg class="corner corner--tl" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <svg class="corner corner--tr" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
@@ -20,39 +43,44 @@
         <app-donut-chart [data]="colorDistribution()" />
       </section>
 
-      @if (gameService.currentSlug() === 'mtg' && currentPopularCard(); as card) {
-        <section class="overview-card popular-card">
-          <span class="corner corner--tl"></span>
-          <span class="corner corner--tr"></span>
-          <span class="corner corner--bl"></span>
-          <span class="corner corner--br"></span>
-          <h2>{{ 'dashboard.popularCards' | translate }}</h2>
-          @if (card.imageUrl; as imageUrl) {
-            <img class="popular-image" [src]="imageUrl" [alt]="card.name" loading="lazy" />
-          } @else {
-            <div class="popular-placeholder">{{ card.name }}</div>
+      @if (gameService.currentSlug() === 'mtg' && (currentPopularCard() || currentSaltiestCard())) {
+        <div class="feature-pair">
+          @if (currentPopularCard(); as card) {
+            <section class="overview-card popular-card">
+              <svg class="corner corner--tl" aria-hidden="true"><use href="#flourish-vine" /></svg>
+              <svg class="corner corner--tr" aria-hidden="true"><use href="#flourish-vine" /></svg>
+              <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
+              <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
+              <h2>{{ 'dashboard.popularCards' | translate }}</h2>
+              @if (card.imageUrl; as imageUrl) {
+                <img class="popular-image" [src]="imageUrl" [alt]="card.name" loading="lazy" />
+              } @else {
+                <div class="popular-placeholder">{{ card.name }}</div>
+              }
+              <p class="popular-name">{{ card.name }}</p>
+            </section>
           }
-          <p class="popular-name">{{ card.name }}</p>
-        </section>
-      }
 
-      @if (gameService.currentSlug() === 'mtg' && currentSaltiestCard(); as entry) {
-        <section class="overview-card popular-card">
-          <span class="corner corner--tl"></span>
-          <span class="corner corner--tr"></span>
-          <span class="corner corner--bl"></span>
-          <span class="corner corner--br"></span>
-          <h2 [title]="'dashboard.saltiestCardsSubtitle' | translate">{{ 'dashboard.saltiestCards' | translate }}</h2>
-          @if (entry.card.imageUrl; as imageUrl) {
-            <img class="popular-image" [src]="imageUrl" [alt]="entry.card.name" loading="lazy" />
-          } @else {
-            <div class="popular-placeholder">{{ entry.card.name }}</div>
+          @if (currentSaltiestCard(); as entry) {
+            <section class="overview-card popular-card">
+              <svg class="corner corner--tl" aria-hidden="true"><use href="#flourish-vine" /></svg>
+              <svg class="corner corner--tr" aria-hidden="true"><use href="#flourish-vine" /></svg>
+              <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
+              <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
+              <h2>{{ 'dashboard.saltiestCards' | translate }}</h2>
+              <p class="panel-caption">{{ 'dashboard.saltiestCardsSubtitle' | translate }}</p>
+              @if (entry.card.imageUrl; as imageUrl) {
+                <img class="popular-image" [src]="imageUrl" [alt]="entry.card.name" loading="lazy" />
+              } @else {
+                <div class="popular-placeholder">{{ entry.card.name }}</div>
+              }
+              <p class="popular-name">{{ entry.card.name }}</p>
+              <span class="salt-badge salt-badge--{{ saltLevel(entry.salt) }}">
+                {{ entry.salt | number: '1.1-1' }} / 4.0
+              </span>
+            </section>
           }
-          <p class="popular-name">{{ entry.card.name }}</p>
-          <span class="salt-badge salt-badge--{{ saltLevel(entry.salt) }}">
-            {{ entry.salt | number: '1.1-1' }} / 4.0
-          </span>
-        </section>
+        </div>
       }
 
       <section class="overview-card price-card">
@@ -61,34 +89,41 @@
         <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <h2>{{ 'dashboard.priceDistribution' | translate }}</h2>
-        <p class="total-value">{{ totalValue() | number: '1.2-2' }} €</p>
         <app-bar-chart [data]="priceDistribution()" />
       </section>
     </div>
 
     <section class="color-categories">
       <h2>{{ categoryListHeading() | translate }}</h2>
-      <div class="category-grid">
-        @for (category of colorCategories(); track category.label) {
+      <div class="category-grid" [class.category-grid--yugioh]="gameService.currentSlug() === 'yugioh'">
+        @for (category of filledCategories(); track category.label) {
           <a class="category-card" routerLink="/collection" [queryParams]="{ color: category.key }">
             <span class="category-bar" [style.background]="category.color"></span>
             @if (category.showcase; as entry) {
-              @if (entry.card.imageUrl; as imageUrl) {
-                <img class="showcase-image" [src]="imageUrl" [alt]="entry.card.name" loading="lazy" />
-              } @else {
-                <div class="showcase-placeholder">{{ entry.card.name }}</div>
-              }
-              <p class="showcase-name">{{ entry.card.name }}</p>
-            } @else {
-              <div class="showcase-placeholder">{{ 'dashboard.noCards' | translate }}</div>
+              <span class="showcase-window">
+                @if (entry.card.imageUrl; as imageUrl) {
+                  <img class="showcase-image" [src]="imageUrl" [alt]="entry.card.name" loading="lazy" />
+                } @else {
+                  <span class="showcase-placeholder">{{ entry.card.name }}</span>
+                }
+              </span>
             }
-            <p class="category-label">{{ category.label | translate }}</p>
-            <p class="category-count">
+            <span class="category-label">{{ category.label | translate }}</span>
+            <span class="category-count">
               {{ category.count }} {{ (category.count === 1 ? 'common.card' : 'common.cards') | translate }}
-            </p>
+            </span>
           </a>
         }
       </div>
+
+      @if (emptyCategoryLabels().length > 0) {
+        <p class="empty-categories">
+          {{ 'dashboard.emptyCategories' | translate }}
+          @for (label of emptyCategoryLabels(); track label; let last = $last) {
+            {{ label | translate }}{{ last ? '' : ', ' }}
+          }
+        </p>
+      }
     </section>
   } @else {
     <p class="state-message">{{ 'dashboard.empty' | translate }}</p>
