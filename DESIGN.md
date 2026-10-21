@@ -152,7 +152,10 @@ Eine warme, nachtdunkle Palette aus Tinte, Leder und Pergament mit einem einzige
 
 ### Semantic
 - **Ember Danger** (`ember-danger`): Fehlertext, destruktive Aktionen, „fehlt“-Status, Überschuss-Filter. Hell genug für AA (4.5:1) auf Hintergrund und Alt-Fläche.
-- **Verdigris Owned** (`verdigris-owned`): „vorhanden“-Status in Deck-Abgleichen. Ist aktuell hart codiert und **nicht** pro Spiel überschrieben.
+- **Verdigris Owned** (`verdigris-owned`, Token `--color-success` + `--color-on-success`; Textvariante `--color-success-text`): „vorhanden“, „gespeichert“, abgeschlossene Decks, Erfolgs-Toast. Pro Spiel überschrieben.
+- **Warning** (`--color-warning` + `--color-on-warning`): „teilweise vorhanden“, Warn-Toast, Tageslimits.
+- **On Accent** (`--color-on-accent`): Text und Icons auf Akzent- und Danger-Flächen.
+- **Abgeleitet** (auf `body` deklariert, damit sie dem Spiel folgen): `--glow-accent` / `--glow-accent-strong` (Glühen aus dem Akzent per `color-mix`) und `--scrim` / `--scrim-strong` (Abdunklung für Text über Kartenkunst).
 
 ### Chart Palette
 Sieben entsättigte Edelstein- und Metalltöne für kategoriale Daten (MTG-Farben, Yu-Gi-Oh!-Attribute): Steel-Blue, Ember-Rust, Bronze-Green, Aged-Gold, Weathered-Moss, Faded-Amethyst, Dried-Blood. Ihre Abstände in Farbton und Helligkeit halten die Kategorien auch bei Farbfehlsichtigkeit unterscheidbar. Pokémon erweitert die Palette um fünf Slots: `--chart-8` bis `--chart-12` (Charcoal-Plum, Cool Slate, Dusty Rose, Deep Indigo, Muted Teal).
@@ -175,7 +178,7 @@ Jedes Spiel überschreibt dieselben Tokens über `body[data-game='…']`. MTG is
 | `--color-bronze` | `#b08d3e` | `#a67c27` |
 | Textur | gekreuztes Diagonalgewebe | verstreute Blitz-Umrisse |
 
-Dazu kommen pro Spiel die Header-Verläufe (`--header-grad-top/bottom`, `--header-highlight`), der Footer-Verlauf und der hellste Stopp der Wortmarke (`--title-grad-start`).
+Dazu kommen pro Spiel die Header-Verläufe (`--header-grad-top/bottom`, `--header-highlight`), der Footer-Verlauf, der hellste Stopp der Wortmarke (`--title-grad-start`), die Statusfarben (`--color-success*`, `--color-warning*`, `--color-on-accent`) und der Edelstein im Logo-Siegel (`--color-gem`). Die Browser-`theme-color` folgt `--color-bg` des aktiven Spiels.
 
 **The One Skin Per Chapter Rule.** Jedes Spiel bekommt ein vollständiges eigenes Theme über **dieselben** Tokens. Kein Spiel erfindet eigene Token-Namen oder hart codierte Farben in Komponenten. Ein neues Spiel (One Piece) ist erst fertig, wenn es Hintergrund, Oberflächen, Rahmen, Text, Akzent, Danger, Bronze, Header-Verläufe, Textur und eine eingefärbte Variante des Siegelmusters hat.
 
@@ -205,18 +208,22 @@ Dazu kommen pro Spiel die Header-Verläufe (`--header-grad-top/bottom`, `--heade
 
 ## Layout
 
-Eine einspaltige, zentrierte App unter einer vollbreiten Header-Plakette. Die Inhaltsbreite richtet sich nach der Ansicht: Dashboard bis 900px, Collection bis 1100px, Formular-Spalten bis 520px, Dialoge bis 720px und 85vh hoch. Abstände folgen einer Dreierskala aus `sm` (0.5rem), `md` (1rem) und `lg` (1.5rem). Kleine Einzelabstände (4px, 6px) kommen nur innerhalb von Komponenten vor.
+Eine einspaltige, zentrierte App unter einer vollbreiten Header-Plakette. Die Inhaltsbreite richtet sich nach der Ansicht: Dashboard und Collection bis 1100px, Wunschliste bis 720px, Formular-Spalten bis 520px, Dialoge bis 720px und 85dvh hoch. Abstände folgen einer Dreierskala aus `sm` (0.5rem), `md` (1rem) und `lg` (1.5rem). Kleine Einzelabstände (4px, 6px) kommen nur innerhalb von Komponenten vor.
 
 Kartenraster sind `auto-fill`-Grids mit Mindestbreiten um 130px und Abstand `md`. Sie brechen dadurch ohne eigene Breakpoints um. Kartenbilder haben immer das Seitenverhältnis 5:7.
 
-Es gibt genau einen Breakpoint bei **480px**. Darunter teilen sich Brand und Controls im Header je eine eigene Zeile, und nebeneinander stehende Detail-Layouts (Kartenbild + Formular) stapeln sich. Die Navigation bricht per `flex-wrap` um, statt sich in ein Menü einzuklappen.
+Zwei Breakpoints:
+- **≤ 640px (Handy):** Die Hauptnavigation sitzt unten als Buchrücken (siehe Components), der Sprachumschalter verlässt den Header (er bleibt in den Einstellungen). Scrollt die Plakette aus dem Bild, gleitet oben eine schmale Plakette mit Wortmarke und aktivem Spiel ein. `--tabbar-offset` hält Seitenende und Toasts frei.
+- **≤ 480px:** Dialoge docken als Bottom Sheet unten an, nebeneinander stehende Detail-Layouts (Kartenbild + Formular) stapeln sich.
+
+Alles, was man antippt, hat mindestens `--tap-min` (44px) Trefferfläche auf Touch-Geräten (`pointer: coarse`). Safe Areas (`env(safe-area-inset-*)`) sind an Header, Leisten, Sheets und Scanner berücksichtigt.
 
 ## Elevation & Depth
 
 Ein hybrides System. Tiefe entsteht vor allem durch **Material**: Jede Oberfläche (`--color-surface`) trägt eine Textur aus dem Spiel-Theme über einer entsättigten Rauschschicht. Panels heben sich dadurch durch ihre Haptik vom Hintergrund ab, nicht durch Schatten. Echte Schatten sind selten und haben eine feste Rolle.
 
 ### Shadow Vocabulary
-- **Gilt Glow** (`box-shadow: 0 0 14px rgba(201, 162, 74, 0.16)`): permanentes, leises Goldglühen um Premium-Panels (Dashboard-Übersicht, Farbkategorien). Bei Hover verstärkt auf `0 0 18px rgba(201, 162, 74, 0.28)`.
+- **Gilt Glow** (`box-shadow: 0 0 14px var(--glow-accent)`): permanentes, leises Glühen im Akzent des Spiels um Premium-Panels (Schatzkammer, Dashboard-Panels, Summe der Wunschliste).
 - **Mounted Plaque** (`inset 0 1px 0 rgba(255,255,255,0.08), 0 3px 0 var(--color-bg), 0 4px 0 var(--color-accent), 0 10px 24px rgba(0,0,0,0.55)`): nur der Header. Ein doppelter Goldschnitt wie bei einem Buch plus ein echter Schlagschatten, damit der Header als montierte Plakette über der Seite sitzt.
 - **Carved Slot** (`box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45)`): eingelassene Controls, zum Beispiel die Spielauswahl, wie ein ins Leder geschnittener Schlitz.
 - **Struck Highlight** (`box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4)`): Glanzkante auf gold gefüllten aktiven Segmenten, etwa dem aktiven Sprach-Toggle.
@@ -235,14 +242,16 @@ Wiederkehrende Formen sind das Rauten-Siegel (Raute mit vier Strahlen) im Seiten
 ## Components
 
 ### Buttons
-Metallbeschläge auf Leder: klar umrissen und gold gefüllt.
-- **Shape:** leicht gerundet (6px)
-- **Primary:** Gilt Gold gefüllt, Text in Ink Night, 600er Gewicht, 0.5rem Innenabstand. Hover wechselt auf Burnished Gold.
-- **Disabled:** 60 % Deckkraft, Cursor `not-allowed`.
-- **Danger:** Umriss in Ember Danger mit transparentem Grund. Bei Hover wird er voll in Danger gefüllt, mit dunklem Text.
-- **Icon / Ghost:** transparent mit gedämpftem Text, bei Hover Fläche in Oxblood Alt.
-- **Segmented Toggle** (Sprache): Segmente in einem gemeinsamen kräftigen Rahmen. Das aktive Segment ist mit einem Goldverlauf gefüllt und hat eine Glanzkante.
-- **Aspiration „geprägt & handfest“:** Primär-Buttons haben heute keinen `:active`-Zustand. Neue und überarbeitete Buttons bekommen spürbares Druckfeedback (leichtes Eindrücken, `scale(0.97)` oder eine inset-Kante).
+Metallbeschläge auf Leder, als globale Klassen in `src/styles/_buttons.scss`. Komponenten ergänzen nur Layout.
+- **`.btn--primary`:** Gilt Gold gefüllt, Text in `--color-on-accent`, Glanzkante oben und dunkle Unterkante. Die eine Hauptaktion einer Ansicht oder eines Dialogs.
+- **`.btn--secondary`:** Gold-Umriss. Weitere Aktionen neben einer Hauptaktion, externe Links (Cardmarket).
+- **`.btn--ghost`:** Textgewicht (Abbrechen, Zurück, Bearbeiten). Mit `.btn--flush` bündig zur Inhaltskante, Zurück-Aktionen tragen ein Chevron.
+- **`.btn--danger`:** Ember-Umriss, füllt sich bei Hover. Für destruktive Bestätigungen.
+- **`.btn--round`:** runde Münze, nur Icon (Hinzufügen, Scannen) – braucht ein `aria-label`.
+- **`.btn--sm` / `.btn--block`, `.icon-btn`:** kompakt (auf Touch trotzdem 44px), volle Breite, quadratischer Icon-Button.
+- **Druck:** Jeder Button sinkt beim Drücken ein (`translateY(1px) scale(.98)`, 100ms rein / 160ms raus), die Glanzkante wird zum inneren Schatten. Hover nur bei `(hover: hover) and (pointer: fine)`.
+- **Disabled:** 55 % Deckkraft, Cursor `not-allowed`.
+- **Segmented Toggle** (Sprache, Sortierung): Segmente in einem gemeinsamen kräftigen Rahmen. Das aktive Segment ist gold gefüllt mit Glanzkante.
 
 ### Chips (Filter)
 - **Style:** Pill, transparent, kräftiger Rahmen, 0.8rem, gedämpfter Text.
@@ -256,12 +265,22 @@ Metallbeschläge auf Leder: klar umrissen und gold gefüllt.
 - **Internal Padding:** `md` für Kategorie-Kacheln, `lg` für Übersichts-Panels und Dialoge
 
 ### Inputs / Fields
-- **Style:** Grund in Ink Night (dunkler als die umgebende Fläche, also eingelassen), 1px kräftiger Rahmen, 6px, 1rem Text.
+Globale Grundlage in `src/styles/_forms.scss`, gilt für jedes `input`, `select` und `textarea`.
+- **Style:** eingelassener Schlitz (Carved Slot): Grund in Ink Night, 1px kräftiger Rahmen, 6px, mindestens 44px hoch, Schrift geerbt in 1rem (unter 16px zoomt iOS beim Fokus).
+- **Select:** eigener Chevron aus zwei Verläufen in `--color-text-muted`, folgt jedem Theme. `color-scheme: dark` für die nativen Auswahllisten.
+- **Checkbox:** geprägte Metallplatte – leer eingelassen, gesetzt gold gefüllt mit Häkchen und Glanzkante. `.checkbox-label` macht die ganze Zeile zur Trefferfläche.
 - **Focus:** globaler Fokusring 2px Gilt Gold mit 2px Abstand (`:focus-visible`).
-- **Error:** Meldung in Ember Danger unter dem Feld.
+- **Error:** Meldung in Ember Danger, bei Netzfehlern mit „Erneut versuchen“.
+
+### Dialogs (`<app-dialog>`)
+Eine gemeinsame Hülle für alle Dialoge: Scroll-Sperre, `role="dialog"`/`aria-modal`, Escape und Klick auf den Hintergrund schließen (nur der oberste Dialog), Fokus beim Öffnen, Fokusfalle, Fokus-Rückgabe, übersetztes Schließen-Label, klebende Kopfzeile. Steigt beim Öffnen kurz auf. Auf dem Handy dockt er als Bottom Sheet unten an, gleitet hoch und lässt sich am Griff nach unten wegwischen. `bare` lässt die Kopfzeile weg, für Dialoge mit eigenem Hero.
+
+### Toast
+Kleine Lederplakette mit statusfarbener Oberkante, steigt unten auf (über dem Buchrücken). Optional mit einer Aktion („Rückgängig“), der Countdown pausiert im Hintergrund-Tab, die Nachricht wird über eine Live-Region vorgelesen.
 
 ### Navigation
-Zentrierte Textlinks in der Header-Plakette, 0.9rem, Mindestbreite 80px. Bei Hover wächst eine goldene 2px-Unterstreichung von der Mitte auf 60 %. Die aktive Route bekommt die volle Unterstreichung mit Glühen und Burnished-Gold-Text mit leichtem Leuchten. Mobil bricht die Navigation einfach um.
+- **Desktop:** zentrierte Textlinks in der Header-Plakette, 0.9rem, Mindestbreite 80px. Bei Hover wächst eine goldene 2px-Unterstreichung (`scaleX`) von der Mitte auf 60 %. Die aktive Route bekommt die volle Unterstreichung mit Glühen.
+- **Handy – Buchrücken (Signature):** feste Leiste unten aus geprägtem Leder mit nach oben gespiegeltem Goldschnitt. Vier gravierte Glyphen mit Label (je mindestens 56px hoch), alle mit der Raute des Siegels. Der aktive Tab bekommt eine Goldeinlage an der Oberkante.
 
 ### Card Tile (Signature)
 Das Kartenbild ist das Juwel. Bild im Format 5:7 mit 8px Ecken, darunter der Name in Cinzel. Badges sitzen in den Ecken des Bildes: Menge oben rechts und Sprache unten rechts (beide als dunkle Pill), Status oben links als Punkt (vorhanden, teilweise, fehlt). Fehlende Karten werden graustufig mit halber Deckkraft gezeigt, teilweise vorhandene mit 80 %. Beim Laden schimmert ein Platzhalter (Skeleton Shimmer zwischen Surface und Surface-Alt).
@@ -270,7 +289,13 @@ Das Kartenbild ist das Juwel. Bild im Format 5:7 mit 8px Ecken, darunter der Nam
 Eine geprägte Lederplakette: Lichtschein von oben, feine diagonale Prägelinien, Verlauf aus den Header-Tokens des Spiels, goldene Eckverzierungen, Goldfolien-Wortmarke und ein doppelter Goldschnitt als Abschluss. Das ist die opulenteste Fläche der App, und so soll es bleiben.
 
 ### Motion
-Kurze, gezielte Bewegungen. Zustandswechsel dauern 0.15s mit `ease`. Unterstreichungen wachsen in 0.2s mit `ease-out`. Beim Laden der Seite steigen Panels, Kategorie-Kacheln und Kartenkacheln einmalig gestaffelt auf (0.4s ease-out, 40ms Versatz, gedeckelt nach 8 Elementen). Alle Keyframe-Animationen stehen hinter `prefers-reduced-motion: no-preference`.
+Schwer, bedächtig und leise: Dinge drücken sich ein, setzen sich und blättern um. Nichts federt, nichts pulsiert zur Deko. Tokens: `--ease-out`, `--ease-in-out`, `--ease-sheet`, `--dur-press` (100ms), `--dur-release` (160ms), `--dur-state` (150ms).
+- **Fokusmoment:** Der Spielwechsel ist ein „Kapitel umblättern“, eine View Transition mit 320ms Überblendung.
+- **Ankunft:** `.reveal-grid` lässt Raster einmal aufsteigen (240ms, 30ms Versatz, ab dem 6. Element gedeckelt). Filtern, Suchen und Nachladen spielen das nie erneut ab.
+- **Ebenen:** Dialoge 220ms, Sheets 300ms auf der Sheet-Kurve, Popover 160ms aus ihrem Auslöser, Toast 260ms. Ausblenden passiert sofort.
+- **Daten:** Bearbeiten aktualisiert still, ohne Neuladen der Seite. Laufende Suchen lassen die alten Treffer gedimmt stehen.
+- **Nur `transform`/`opacity`** (Fortschrittsbalken und Unterstreichungen über `scaleX`). Hover nur mit Maus.
+- **Reduzierte Bewegung:** keine Bewegung im Raum, aber Opacity-Fades, Farbwechsel, ein pulsierender Spinner und ein atmender Skeleton bleiben. Funktionale Anzeigen (Countdown) bleiben ebenfalls.
 
 ## Do's and Don'ts
 
@@ -285,7 +310,10 @@ Kurze, gezielte Bewegungen. Zustandswechsel dauern 0.15s mit `ease`. Unterstreic
 ### Don't:
 - **Don't** offizielle Marken-Optik nachbauen: keine Kartenrahmen, Logos, Mana- oder Energie-Symbole im Stil der Rechteinhaber als Dekoration und keine exakten Markenfarben von Wizards, Konami oder The Pokémon Company.
 - **Don't** Ornament (Goldfolie, Eckverzierungen, Glühen) in Listen, Formulare oder Kartengrids tragen.
-- **Don't** Farbwerte in Komponenten hart codieren. Das `#2e7d4f` des „vorhanden“-Status und das Grün/Weiß des globalen Toasts (`#3d7a3d` / `#fff`) sind bekannte Ausnahmen und kein Vorbild.
+- **Don't** Farbwerte in Komponenten hart codieren. Einzige Ausnahme ist das reine Schwarz hinter dem Kamerabild im Scanner.
+- **Don't** Emoji oder Unicode-Glyphen als Icons verwenden, auch nicht in Übersetzungen. Icons kommen als monoline Gravur aus dem Sprite in `app.html`.
+- **Don't** eigene Buttons, Felder oder Dialoghüllen pro Komponente bauen. Es gibt `.btn`, die Formular-Grundlage und `<app-dialog>`.
+- **Don't** farbige Seitenstreifen (`border-left` > 1px) an Zeilen oder Karten setzen. Status trägt ein Siegel aus Form und Farbe.
 - **Don't** ein helles Theme oder reines Grau/Weiß einführen. Neutrals sind immer warm (oder im Ton des jeweiligen Spiels) getönt.
 - **Don't** Cinzel für Fließtext, Labels oder Zahlen verwenden.
 - **Don't** den Akzent als große Füllfläche einsetzen. Seine Seltenheit ist seine Wirkung.
