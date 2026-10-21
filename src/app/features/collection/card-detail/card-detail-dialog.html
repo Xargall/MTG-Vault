@@ -1,182 +1,177 @@
-<div class="backdrop" appScrollLock (click)="close.emit()">
-  <div class="dialog" (click)="$event.stopPropagation()">
-    <header class="dialog-header">
-      <h2>{{ 'cardDetail.title' | translate }}</h2>
-      <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
-    </header>
+<app-dialog [heading]="'cardDetail.title' | translate" maxWidth="580px" (closeRequest)="close.emit()">
 
-    <div class="detail-layout">
-      <div class="image-column">
-        @if (entry().card.imageUrl; as url) {
-          <img class="card-image" [src]="url" [alt]="entry().card.name" loading="lazy" />
-        } @else {
-          <div class="card-placeholder">{{ entry().card.name }}</div>
-        }
-      </div>
+  <div class="detail-layout">
+    <div class="image-column">
+      @if (entry().card.imageUrl; as url) {
+        <img class="card-image" [src]="url" [alt]="entry().card.name" loading="lazy" />
+      } @else {
+        <div class="card-placeholder">{{ entry().card.name }}</div>
+      }
+    </div>
 
-      <div class="info-column">
-        <h1>{{ entry().card.name }}</h1>
+    <div class="info-column">
+      <h1>{{ entry().card.name }}</h1>
 
-        @if (manaSymbols().length > 0) {
+      @if (manaSymbols().length > 0) {
+        <div class="mana-cost">
+          @for (symbol of manaSymbols(); track $index) {
+            <span class="mana-symbol" [style.background]="symbol.color">{{ symbol.symbol }}</span>
+          }
+        </div>
+      }
+
+      @if (asYugiohCard(entry().card); as ygoCard) {
+        @if (ygoCard.attribute) {
           <div class="mana-cost">
-            @for (symbol of manaSymbols(); track $index) {
-              <span class="mana-symbol" [style.background]="symbol.color">{{ symbol.symbol }}</span>
+            <span class="mana-symbol attribute-symbol" [style.background]="attributeColor()">
+              {{ ygoCard.attribute }}
+            </span>
+          </div>
+        }
+      }
+
+      @if (asPokemonCard(entry().card); as pkmCard) {
+        @if (pkmCard.types.length > 0) {
+          <div class="mana-cost">
+            @for (type of pkmCard.types; track type) {
+              <span class="mana-symbol attribute-symbol" [style.background]="pokemonTypeColor()">
+                {{ type }}
+              </span>
             }
           </div>
         }
+      }
+
+      <dl class="info-list">
+        <dt>{{ 'cardDetail.quantity' | translate }}</dt>
+        <dd>{{ entry().row.quantity }}</dd>
+
+        <dt>{{ 'cardDetail.set' | translate }}</dt>
+        <dd>{{ entry().card.setName ?? ('common.unknown' | translate) }}</dd>
+
+        <dt>{{ 'cardDetail.rarity' | translate }}</dt>
+        <dd>{{ rarityLabel() ? (rarityLabel()! | translate) : ('common.unknown' | translate) }}</dd>
+
+        @if (entry().card.game === 'mtg') {
+          <dt>{{ 'cardDetail.foil' | translate }}</dt>
+          <dd>{{ (entry().row.foil ? 'common.yes' : 'common.no') | translate }}</dd>
+
+          @if (entry().row.finish && entry().row.finish !== 'nonfoil') {
+            <dt>{{ 'cardDetail.finish' | translate }}</dt>
+            <dd>{{ ('cardDetail.finish_' + entry().row.finish) | translate }}</dd>
+          }
+        }
 
         @if (asYugiohCard(entry().card); as ygoCard) {
-          @if (ygoCard.attribute) {
-            <div class="mana-cost">
-              <span class="mana-symbol attribute-symbol" [style.background]="attributeColor()">
-                {{ ygoCard.attribute }}
-              </span>
-            </div>
+          <dt>{{ 'yugioh.cardType' | translate }}</dt>
+          <dd>{{ ygoCard.cardType }}</dd>
+
+          @if (ygoCard.atk !== null || ygoCard.def !== null) {
+            <dt>{{ 'yugioh.attack' | translate }} / {{ 'yugioh.defense' | translate }}</dt>
+            <dd>{{ ygoCard.atk ?? '?' }} / {{ ygoCard.def ?? '?' }}</dd>
+          }
+
+          @if (banlistLabel(); as label) {
+            <dt>{{ 'yugioh.banlistStatus' | translate }}</dt>
+            <dd class="banlist-badge">{{ label | translate }}</dd>
           }
         }
 
         @if (asPokemonCard(entry().card); as pkmCard) {
-          @if (pkmCard.types.length > 0) {
-            <div class="mana-cost">
-              @for (type of pkmCard.types; track type) {
-                <span class="mana-symbol attribute-symbol" [style.background]="pokemonTypeColor()">
-                  {{ type }}
-                </span>
-              }
-            </div>
+          <dt>{{ 'pokemon.supertype' | translate }}</dt>
+          <dd>{{ pkmCard.supertype }}</dd>
+
+          @if (pkmCard.hp !== null) {
+            <dt>HP</dt>
+            <dd>{{ pkmCard.hp }}</dd>
           }
         }
 
-        <dl class="info-list">
-          <dt>{{ 'cardDetail.quantity' | translate }}</dt>
-          <dd>{{ entry().row.quantity }}</dd>
+        <dt>{{ 'cardDetail.language' | translate }}</dt>
+        <dd>{{ languageLabelKey() ? (languageLabelKey()! | translate) : ('common.unknown' | translate) }}</dd>
 
-          <dt>{{ 'cardDetail.set' | translate }}</dt>
-          <dd>{{ entry().card.setName ?? ('common.unknown' | translate) }}</dd>
+        <dt>{{ 'cardDetail.price' | translate }}</dt>
+        <dd>{{ price() > 0 ? (price() | number: '1.2-2') + ' €' : ('common.unknown' | translate) }}</dd>
+      </dl>
 
-          <dt>{{ 'cardDetail.rarity' | translate }}</dt>
-          <dd>{{ rarityLabel() ? (rarityLabel()! | translate) : ('common.unknown' | translate) }}</dd>
+      @if (cardmarketUrl(); as url) {
+        <a class="btn btn--secondary btn--sm cardmarket-link" [href]="url" target="_blank" rel="noopener">
+          {{ 'cardDetail.cardmarketLink' | translate }}
+        </a>
+      }
 
-          @if (entry().card.game === 'mtg') {
-            <dt>{{ 'cardDetail.foil' | translate }}</dt>
-            <dd>{{ (entry().row.foil ? 'common.yes' : 'common.no') | translate }}</dd>
-
-            @if (entry().row.finish && entry().row.finish !== 'nonfoil') {
-              <dt>{{ 'cardDetail.finish' | translate }}</dt>
-              <dd>{{ ('cardDetail.finish_' + entry().row.finish) | translate }}</dd>
-            }
-          }
-
-          @if (asYugiohCard(entry().card); as ygoCard) {
-            <dt>{{ 'yugioh.cardType' | translate }}</dt>
-            <dd>{{ ygoCard.cardType }}</dd>
-
-            @if (ygoCard.atk !== null || ygoCard.def !== null) {
-              <dt>{{ 'yugioh.attack' | translate }} / {{ 'yugioh.defense' | translate }}</dt>
-              <dd>{{ ygoCard.atk ?? '?' }} / {{ ygoCard.def ?? '?' }}</dd>
+      <div class="edit-section">
+        @if (!editing()) {
+          <button type="button" class="btn btn--primary btn--sm" (click)="startEdit()">
+            {{ 'cardDetail.editLink' | translate }}
+          </button>
+        } @else {
+          <div class="edit-form">
+            @if (saveError()) {
+              <p class="state-message error">{{ saveError() }}</p>
             }
 
-            @if (banlistLabel(); as label) {
-              <dt>{{ 'yugioh.banlistStatus' | translate }}</dt>
-              <dd class="banlist-badge">{{ label | translate }}</dd>
+            <label for="edit-quantity">{{ 'cardDetail.quantity' | translate }}</label>
+            <input
+              id="edit-quantity"
+              appFocusOnInit
+              type="number"
+              min="1"
+              [ngModel]="editQuantity()"
+              (ngModelChange)="editQuantity.set($event)"
+            />
+
+            @if (entry().card.game === 'mtg') {
+              <label class="checkbox-label">
+                <input type="checkbox" [ngModel]="editFoil()" (ngModelChange)="editFoil.set($event)" />
+                {{ 'cardDetail.foil' | translate }}
+              </label>
             }
-          }
 
-          @if (asPokemonCard(entry().card); as pkmCard) {
-            <dt>{{ 'pokemon.supertype' | translate }}</dt>
-            <dd>{{ pkmCard.supertype }}</dd>
-
-            @if (pkmCard.hp !== null) {
-              <dt>HP</dt>
-              <dd>{{ pkmCard.hp }}</dd>
-            }
-          }
-
-          <dt>{{ 'cardDetail.language' | translate }}</dt>
-          <dd>{{ languageLabelKey() ? (languageLabelKey()! | translate) : ('common.unknown' | translate) }}</dd>
-
-          <dt>{{ 'cardDetail.price' | translate }}</dt>
-          <dd>{{ price() > 0 ? (price() | number: '1.2-2') + ' €' : ('common.unknown' | translate) }}</dd>
-        </dl>
-
-        @if (cardmarketUrl(); as url) {
-          <a class="cardmarket-link" [href]="url" target="_blank" rel="noopener">
-            {{ 'cardDetail.cardmarketLink' | translate }}
-          </a>
-        }
-
-        <div class="edit-section">
-          @if (!editing()) {
-            <button type="button" class="edit-link" (click)="startEdit()">
-              {{ 'cardDetail.editLink' | translate }}
-            </button>
-          } @else {
-            <div class="edit-form">
-              @if (saveError()) {
-                <p class="state-message error">{{ saveError() }}</p>
+            <label for="edit-language">{{ 'cardDetail.language' | translate }}</label>
+            <select
+              id="edit-language"
+              [ngModel]="editLanguage()"
+              (ngModelChange)="editLanguage.set($event)"
+            >
+              @for (option of languageOptions; track option.code) {
+                <option [value]="option.code">{{ option.labelKey | translate }}</option>
               }
+            </select>
 
-              <label for="edit-quantity">{{ 'cardDetail.quantity' | translate }}</label>
-              <input
-                id="edit-quantity"
-                type="number"
-                min="1"
-                [ngModel]="editQuantity()"
-                (ngModelChange)="editQuantity.set($event)"
-              />
-
-              @if (entry().card.game === 'mtg') {
-                <label class="checkbox-label">
-                  <input type="checkbox" [ngModel]="editFoil()" (ngModelChange)="editFoil.set($event)" />
-                  {{ 'cardDetail.foil' | translate }}
-                </label>
-              }
-
-              <label for="edit-language">{{ 'cardDetail.language' | translate }}</label>
-              <select
-                id="edit-language"
-                [ngModel]="editLanguage()"
-                (ngModelChange)="editLanguage.set($event)"
-              >
-                @for (option of languageOptions; track option.code) {
-                  <option [value]="option.code">{{ option.labelKey | translate }}</option>
-                }
-              </select>
-
-              <div class="edit-actions">
-                <button type="button" class="save-button" [disabled]="saving()" (click)="saveEdit()">
-                  {{ 'cardDetail.saveButton' | translate }}
-                </button>
-                <button type="button" class="cancel-link" [disabled]="saving()" (click)="cancelEdit()">
-                  {{ 'cardDetail.cancel' | translate }}
-                </button>
-              </div>
-            </div>
-          }
-        </div>
-
-        <div class="danger-zone">
-          @if (deleteError()) {
-            <p class="state-message error">{{ deleteError() }}</p>
-          }
-
-          @if (!confirmingDelete()) {
-            <button type="button" class="delete-link" (click)="confirmingDelete.set(true)">
-              {{ 'cardDetail.deleteLink' | translate }}
-            </button>
-          } @else {
-            <div class="confirm-row">
-              <span>{{ 'cardDetail.confirmDeleteText' | translate }}</span>
-              <button type="button" class="delete-button" [disabled]="deleting()" (click)="confirmDelete()">
-                {{ 'cardDetail.confirmDeleteButton' | translate }}
+            <div class="edit-actions">
+              <button type="button" class="btn btn--primary btn--sm" [disabled]="saving()" (click)="saveEdit()">
+                {{ 'cardDetail.saveButton' | translate }}
               </button>
-              <button type="button" class="cancel-link" (click)="confirmingDelete.set(false)">
+              <button type="button" class="btn btn--ghost btn--sm" [disabled]="saving()" (click)="cancelEdit()">
                 {{ 'cardDetail.cancel' | translate }}
               </button>
             </div>
-          }
-        </div>
+          </div>
+        }
+      </div>
+
+      <div class="danger-zone">
+        @if (deleteError()) {
+          <p class="state-message error">{{ deleteError() }}</p>
+        }
+
+        @if (!confirmingDelete()) {
+          <button type="button" class="btn btn--ghost btn--sm btn--flush delete-link" (click)="startDelete()">
+            {{ 'cardDetail.deleteLink' | translate }}
+          </button>
+        } @else {
+          <div class="confirm-row">
+            <span>{{ 'cardDetail.confirmDeleteText' | translate }}</span>
+            <button type="button" class="btn btn--danger btn--sm" [disabled]="deleting()" (click)="confirmDelete()">
+              {{ 'cardDetail.confirmDeleteButton' | translate }}
+            </button>
+            <button type="button" class="btn btn--ghost btn--sm" appFocusOnInit (click)="confirmingDelete.set(false)">
+              {{ 'cardDetail.cancel' | translate }}
+            </button>
+          </div>
+        }
       </div>
     </div>
   </div>
-</div>
+</app-dialog>

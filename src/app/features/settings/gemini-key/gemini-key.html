@@ -41,12 +41,12 @@
     }
 
     <div class="button-row">
-      <button type="button" [disabled]="!geminiKeyInput().trim() || saving()" (click)="saveGeminiKey()">
+      <button type="button" class="btn btn--primary" [disabled]="!geminiKeyInput().trim() || saving()" (click)="saveGeminiKey()">
         {{ (saving() ? 'geminiKey.saving' : 'geminiKey.save') | translate }}
       </button>
       <button
         type="button"
-        class="secondary-button"
+        class="btn btn--secondary"
         [disabled]="!geminiKeyInput().trim() || testing()"
         (click)="testGeminiKey()"
       >

@@ -23,6 +23,7 @@ export const de = {
     yes: 'Ja',
     no: 'Nein',
     forDeck: 'Für {{name}}',
+    close: 'Schließen',
   },
   colors: {
     white: 'Weiß',
@@ -342,7 +343,6 @@ export const de = {
     title: 'Scanner im Demo-Modus gesperrt',
     message: 'Der Scanner ist im Demo-Modus nicht verfügbar. Bitte registriere dich für vollen Zugriff.',
     cta: 'Jetzt registrieren',
-    close: 'Schließen',
   },
   addWishlist: {
     title: 'Zur Wunschliste hinzufügen',

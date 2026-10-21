@@ -36,8 +36,8 @@
       <p class="success-message">{{ successMessage() }}</p>
     }
 
-    <button type="submit" [disabled]="isSubmitting()">{{ 'auth.inviteSubmit' | translate }}</button>
-    <button type="button" class="google-button" [disabled]="isSubmitting()" (click)="signUpWithGoogle()">
+    <button type="submit" class="btn btn--primary" [disabled]="isSubmitting()">{{ 'auth.inviteSubmit' | translate }}</button>
+    <button type="button" class="btn btn--secondary" [disabled]="isSubmitting()" (click)="signUpWithGoogle()">
       {{ 'auth.inviteGoogle' | translate }}
     </button>
 

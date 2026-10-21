@@ -3,11 +3,11 @@
     <h1>{{ 'wishlist.title' | translate }}</h1>
     <button
       type="button"
-      class="add-button"
+      class="btn btn--primary btn--round"
       (click)="showAddDialog.set(true)"
       [attr.aria-label]="'wishlist.addAria' | translate"
     >
-      +
+      <svg aria-hidden="true"><use href="#icon-plus" /></svg>
     </button>
   </header>
 
@@ -42,7 +42,7 @@
 
           <button
             type="button"
-            class="add-to-collection-button"
+            class="btn btn--secondary btn--sm btn--block"
             [disabled]="movingToCollection().has(entry.row.id)"
             (click)="addToCollection(entry)"
           >

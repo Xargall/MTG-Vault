@@ -1,96 +1,90 @@
-<div class="backdrop" appScrollLock (click)="close.emit()">
-  <div class="dialog" (click)="$event.stopPropagation()">
-    <header class="dialog-header">
-      <h2>{{ 'addWishlist.title' | translate }}</h2>
-      <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
-    </header>
+<app-dialog [heading]="'addWishlist.title' | translate" maxWidth="720px" (closeRequest)="close.emit()">
 
-    @if (!selectedName()) {
-      <input
-        type="text"
-        class="search-input"
-        [placeholder]="searchPlaceholderKey() | translate"
-        [ngModel]="query()"
-        (ngModelChange)="onQueryChange($event)"
-        autofocus
-      />
+  @if (!selectedName()) {
+    <input
+      type="text"
+      class="search-input"
+      [placeholder]="searchPlaceholderKey() | translate"
+      [ngModel]="query()"
+      (ngModelChange)="onQueryChange($event)"
+      autofocus
+    />
 
-      @if (searching()) {
-        <p class="state-message">{{ 'addCard.searching' | translate }}</p>
-      } @else if (searchError()) {
-        <p class="state-message error">{{ searchError() }}</p>
-      } @else if (query().trim() && results().length === 0) {
-        <p class="state-message">{{ 'addCard.noCardsFound' | translate }}</p>
+    @if (searching()) {
+      <p class="state-message">{{ 'addCard.searching' | translate }}</p>
+    } @else if (searchError()) {
+      <p class="state-message error">{{ searchError() }}</p>
+    } @else if (query().trim() && results().length === 0) {
+      <p class="state-message">{{ 'addCard.noCardsFound' | translate }}</p>
+    } @else {
+      <div class="results-grid">
+        @for (card of results(); track card.id) {
+          <button type="button" class="result-item" (click)="selectCard(card)">
+            <app-card-tile [card]="card" />
+            <span class="print-meta">{{ card.setName }}<!--
+              --> @if (card.rarity) { · {{ card.rarity }} }</span>
+          </button>
+        }
+      </div>
+    }
+  } @else if (!selectedCard()) {
+    <div class="prints-view">
+      <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToSearch()">
+        {{ 'addCard.backToSearch' | translate }}
+      </button>
+      <h3>{{ 'addCard.pickPrint' | translate: { name: selectedName() } }}</h3>
+
+      @if (loadingPrints()) {
+        <p class="state-message">{{ 'addCard.loadingPrints' | translate }}</p>
+      } @else if (printsError()) {
+        <p class="state-message error">{{ printsError() }}</p>
       } @else {
         <div class="results-grid">
-          @for (card of results(); track card.id) {
-            <button type="button" class="result-item" (click)="selectCard(card)">
-              <app-card-tile [card]="card" />
-              <span class="print-meta">{{ card.setName }}<!--
-                --> @if (card.rarity) { · {{ card.rarity }} }</span>
+          @for (print of prints(); track print.id) {
+            <button type="button" class="result-item" (click)="selectPrint(print)">
+              <app-card-tile [card]="print" />
+              <span class="print-meta">{{ print.setName }}<!--
+                --> @if (print.rarity) { · {{ print.rarity }} }</span>
             </button>
           }
         </div>
       }
-    } @else if (!selectedCard()) {
-      <div class="prints-view">
-        <button type="button" class="back-link" (click)="backToSearch()">
-          {{ 'addCard.backToSearch' | translate }}
-        </button>
-        <h3>{{ 'addCard.pickPrint' | translate: { name: selectedName() } }}</h3>
+    </div>
+  } @else {
+    <div class="detail-view">
+      <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToPrints()">
+        {{ 'addCard.backToPrints' | translate }}
+      </button>
 
-        @if (loadingPrints()) {
-          <p class="state-message">{{ 'addCard.loadingPrints' | translate }}</p>
-        } @else if (printsError()) {
-          <p class="state-message error">{{ printsError() }}</p>
-        } @else {
-          <div class="results-grid">
-            @for (print of prints(); track print.id) {
-              <button type="button" class="result-item" (click)="selectPrint(print)">
-                <app-card-tile [card]="print" />
-                <span class="print-meta">{{ print.setName }}<!--
-                  --> @if (print.rarity) { · {{ print.rarity }} }</span>
-              </button>
-            }
-          </div>
-        }
-      </div>
-    } @else {
-      <div class="detail-view">
-        <button type="button" class="back-link" (click)="backToPrints()">
-          {{ 'addCard.backToPrints' | translate }}
-        </button>
+      <div class="detail-body">
+        <app-card-tile [card]="selectedCard()!" />
 
-        <div class="detail-body">
-          <app-card-tile [card]="selectedCard()!" />
+        <div class="detail-form">
+          <label for="priority">{{ 'addWishlist.priorityLabel' | translate }}</label>
+          <select id="priority" [value]="priority()" (change)="priority.set(+$any($event.target).value)">
+            <option value="1">{{ 'wishlist.priorityLow' | translate }}</option>
+            <option value="2">{{ 'wishlist.priorityMid' | translate }}</option>
+            <option value="3">{{ 'wishlist.priorityHigh' | translate }}</option>
+          </select>
 
-          <div class="detail-form">
-            <label for="priority">{{ 'addWishlist.priorityLabel' | translate }}</label>
-            <select id="priority" [value]="priority()" (change)="priority.set(+$any($event.target).value)">
-              <option value="1">{{ 'wishlist.priorityLow' | translate }}</option>
-              <option value="2">{{ 'wishlist.priorityMid' | translate }}</option>
-              <option value="3">{{ 'wishlist.priorityHigh' | translate }}</option>
-            </select>
+          <label for="notes">{{ 'addWishlist.notesLabel' | translate }}</label>
+          <textarea
+            id="notes"
+            rows="3"
+            [placeholder]="'addWishlist.notesPlaceholder' | translate"
+            [ngModel]="notes()"
+            (ngModelChange)="notes.set($event)"
+          ></textarea>
 
-            <label for="notes">{{ 'addWishlist.notesLabel' | translate }}</label>
-            <textarea
-              id="notes"
-              rows="3"
-              [placeholder]="'addWishlist.notesPlaceholder' | translate"
-              [ngModel]="notes()"
-              (ngModelChange)="notes.set($event)"
-            ></textarea>
+          @if (submitError()) {
+            <p class="state-message error">{{ submitError() }}</p>
+          }
 
-            @if (submitError()) {
-              <p class="state-message error">{{ submitError() }}</p>
-            }
-
-            <button type="button" class="submit-button" [disabled]="submitting()" (click)="submit()">
-              {{ 'addWishlist.submit' | translate }}
-            </button>
-          </div>
+          <button type="button" class="btn btn--primary submit-button" [disabled]="submitting()" (click)="submit()">
+            {{ 'addWishlist.submit' | translate }}
+          </button>
         </div>
       </div>
-    }
-  </div>
-</div>
+    </div>
+  }
+</app-dialog>

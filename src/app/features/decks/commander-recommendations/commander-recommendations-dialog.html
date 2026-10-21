@@ -1,166 +1,160 @@
-<div class="backdrop" appScrollLock (click)="close.emit()">
-  <div class="dialog" (click)="$event.stopPropagation()">
-    <header class="dialog-header">
-      <h2>{{ 'commanderRecs.title' | translate }}</h2>
-      <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
-    </header>
+<app-dialog [heading]="'commanderRecs.title' | translate" maxWidth="640px" (closeRequest)="close.emit()">
 
-    @if (selectedRecommendation(); as rec) {
-      <div class="detail-view">
-        <button type="button" class="back-link" (click)="backToList()">
-          {{ 'commanderRecs.backToList' | translate }}
-        </button>
+  @if (selectedRecommendation(); as rec) {
+    <div class="detail-view">
+      <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToList()">
+        {{ 'commanderRecs.backToList' | translate }}
+      </button>
 
-        @if (rec.imageUrl; as imageUrl) {
-          <img class="commander-hero" [src]="imageUrl" [alt]="rec.name" loading="lazy" />
+      @if (rec.imageUrl; as imageUrl) {
+        <img class="commander-hero" [src]="imageUrl" [alt]="rec.name" loading="lazy" />
+      }
+      <h3>{{ rec.name }}</h3>
+
+      @if (loadingDetail()) {
+        <p class="state-message">{{ 'browseDecks.loadingDetail' | translate }}</p>
+      } @else if (detailError()) {
+        <p class="state-message error">{{ detailError() }}</p>
+      } @else {
+        <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="freeDetailMatchPercent()" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-bar-fill progress-bar-fill--free" [style.width.%]="freeDetailMatchPercent()"></div>
+          <span class="progress-bar-label">
+            {{ 'commanderRecs.freeMatchBadge' | translate: { percent: freeDetailMatchPercent() } }}
+          </span>
+        </div>
+
+        @if (ownedCards().length > 0) {
+          <h4>{{ 'commanderRecs.ownedSection' | translate: { count: freeQuantityTotal() } }}</h4>
+          <div class="results-grid">
+            @for (entry of ownedCards(); track entry.card.id) {
+              <div class="card-with-note">
+                <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
+                @if (hasNotablePrintBreakdown(entry.printBreakdown)) {
+                  <div class="binding-detail-notes">
+                    @for (print of entry.printBreakdown; track print.card.id) {
+                      <span class="binding-detail-note">{{ printBreakdownLabel(print) }}</span>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
         }
-        <h3>{{ rec.name }}</h3>
 
-        @if (loadingDetail()) {
-          <p class="state-message">{{ 'browseDecks.loadingDetail' | translate }}</p>
-        } @else if (detailError()) {
-          <p class="state-message error">{{ detailError() }}</p>
-        } @else {
-          <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="freeDetailMatchPercent()" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar-fill progress-bar-fill--free" [style.width.%]="freeDetailMatchPercent()"></div>
-            <span class="progress-bar-label">
-              {{ 'commanderRecs.freeMatchBadge' | translate: { percent: freeDetailMatchPercent() } }}
-            </span>
+        @if (missingCards().length > 0 || unresolvedCards().length > 0) {
+          <h4>{{ 'commanderRecs.missingSection' | translate: { count: missingQuantityTotal() } }}</h4>
+          <div class="results-grid">
+            @for (entry of missingCards(); track entry.card.id) {
+              <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="missing" />
+            }
           </div>
 
-          @if (ownedCards().length > 0) {
-            <h4>{{ 'commanderRecs.ownedSection' | translate: { count: freeQuantityTotal() } }}</h4>
-            <div class="results-grid">
-              @for (entry of ownedCards(); track entry.card.id) {
-                <div class="card-with-note">
-                  <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
-                  @if (hasNotablePrintBreakdown(entry.printBreakdown)) {
-                    <div class="binding-detail-notes">
-                      @for (print of entry.printBreakdown; track print.card.id) {
-                        <span class="binding-detail-note">{{ printBreakdownLabel(print) }}</span>
-                      }
-                    </div>
-                  }
-                </div>
-              }
-            </div>
+          @if (unresolvedCardsLabel(); as label) {
+            <p class="unresolved-note">
+              {{ 'deckDetail.unresolvedCards' | translate: { count: unresolvedCards().length, names: label } }}
+            </p>
           }
 
-          @if (missingCards().length > 0 || unresolvedCards().length > 0) {
-            <h4>{{ 'commanderRecs.missingSection' | translate: { count: missingQuantityTotal() } }}</h4>
-            <div class="results-grid">
-              @for (entry of missingCards(); track entry.card.id) {
-                <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="missing" />
-              }
-            </div>
-
-            @if (unresolvedCardsLabel(); as label) {
-              <p class="unresolved-note">
-                {{ 'deckDetail.unresolvedCards' | translate: { count: unresolvedCards().length, names: label } }}
-              </p>
-            }
-
-            <div class="wishlist-row">
-              <span>{{ 'deckDetail.missingCards' | translate: { count: missingQuantityTotal() } }}</span>
-              @if (wishlistError()) {
-                <span class="state-message error">{{ wishlistError() }}</span>
-              } @else if (wishlistAdded()) {
-                <span class="wishlist-confirm">{{ 'deckDetail.onWishlist' | translate }}</span>
-              } @else {
-                <button
-                  type="button"
-                  class="wishlist-button"
-                  [disabled]="addingToWishlist()"
-                  (click)="addMissingToWishlist()"
-                >
-                  {{ 'deckDetail.wishlistButton' | translate }}
-                </button>
-              }
-            </div>
-          }
-
-          @if (addDeckError()) {
-            <p class="state-message error">{{ addDeckError() }}</p>
-          }
-
-          @if (deckAdded()) {
-            <p class="wishlist-confirm">{{ 'commanderRecs.deckAdded' | translate }}</p>
-          } @else {
-            <label class="checkbox-label">
-              <input
-                type="checkbox"
-                [checked]="allCardsOwned()"
-                (change)="allCardsOwned.set($any($event.target).checked)"
-              />
-              {{ 'deckImport.allCardsOwnedOption' | translate }}
-            </label>
-            <button type="button" class="submit-button" [disabled]="addingDeck()" (click)="addDeck()">
-              {{ 'decks.addToMyDecks' | translate }}
-            </button>
-          }
-        }
-      </div>
-    } @else {
-      <p class="hint">
-        {{ 'commanderRecs.hint' | translate }}
-      </p>
-
-      <label class="include-assigned-toggle">
-        <input
-          type="checkbox"
-          [checked]="includeAssignedElsewhere()"
-          (change)="toggleIncludeAssignedElsewhere()"
-        />
-        {{ 'deckMatch.includeAssignedToggle' | translate }}
-      </label>
-
-      @if (errorMessage()) {
-        <p class="state-message error">{{ errorMessage() }}</p>
-      } @else {
-        @if (loading()) {
-          <p class="state-message">
-            @if (scanPhase() === 'cards') {
-              {{ 'commanderRecs.scanningCards' | translate: { progress: checked() + ' / ' + total() } }}
+          <div class="wishlist-row">
+            <span>{{ 'deckDetail.missingCards' | translate: { count: missingQuantityTotal() } }}</span>
+            @if (wishlistError()) {
+              <span class="state-message error">{{ wishlistError() }}</span>
+            } @else if (wishlistAdded()) {
+              <span class="wishlist-confirm">{{ 'deckDetail.onWishlist' | translate }}</span>
             } @else {
-              {{ 'commanderRecs.checkingCommanders' | translate: { progress: checked() + ' / ' + total() } }}
-            }
-          </p>
-        }
-
-        @if (hasNoResults()) {
-          <p class="state-message">{{ 'commanderRecs.noResults' | translate }}</p>
-        }
-
-        <ul class="recommendation-list">
-          @for (rec of recommendations(); track rec.name) {
-            <li>
-              <button type="button" class="recommendation-row" (click)="selectRecommendation(rec)">
-                @if (rec.imageUrl; as imageUrl) {
-                  <img class="commander-image" [src]="imageUrl" [alt]="rec.name" loading="lazy" />
-                } @else {
-                  <div class="commander-placeholder"></div>
-                }
-
-                <div class="recommendation-info">
-                  <p class="commander-name">{{ rec.name }}</p>
-                  <p class="match-detail">
-                    {{ 'commanderRecs.cardsCount' | translate: { matched: rec.freeMatchedCount, total: rec.totalCount } }}
-                  </p>
-                  @if (!rec.owned) {
-                    <span class="missing-tag">{{ 'commanderRecs.missingTag' | translate }}</span>
-                  }
-                </div>
-
-                <div class="match-badges">
-                  <span class="match-badge match-badge--free" [class.is-complete]="rec.freeMatchPercent === 100">
-                    {{ 'commanderRecs.freeMatchBadge' | translate: { percent: rec.freeMatchPercent } }}
-                  </span>
-                </div>
+              <button
+                type="button"
+                class="btn btn--secondary btn--sm"
+                [disabled]="addingToWishlist()"
+                (click)="addMissingToWishlist()"
+              >
+                {{ 'deckDetail.wishlistButton' | translate }}
               </button>
-            </li>
-          }
-        </ul>
+            }
+          </div>
+        }
+
+        @if (addDeckError()) {
+          <p class="state-message error">{{ addDeckError() }}</p>
+        }
+
+        @if (deckAdded()) {
+          <p class="wishlist-confirm">{{ 'commanderRecs.deckAdded' | translate }}</p>
+        } @else {
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              [checked]="allCardsOwned()"
+              (change)="allCardsOwned.set($any($event.target).checked)"
+            />
+            {{ 'deckImport.allCardsOwnedOption' | translate }}
+          </label>
+          <button type="button" class="btn btn--primary submit-button" [disabled]="addingDeck()" (click)="addDeck()">
+            {{ 'decks.addToMyDecks' | translate }}
+          </button>
+        }
       }
+    </div>
+  } @else {
+    <p class="hint">
+      {{ 'commanderRecs.hint' | translate }}
+    </p>
+
+    <label class="include-assigned-toggle">
+      <input
+        type="checkbox"
+        [checked]="includeAssignedElsewhere()"
+        (change)="toggleIncludeAssignedElsewhere()"
+      />
+      {{ 'deckMatch.includeAssignedToggle' | translate }}
+    </label>
+
+    @if (errorMessage()) {
+      <p class="state-message error">{{ errorMessage() }}</p>
+    } @else {
+      @if (loading()) {
+        <p class="state-message">
+          @if (scanPhase() === 'cards') {
+            {{ 'commanderRecs.scanningCards' | translate: { progress: checked() + ' / ' + total() } }}
+          } @else {
+            {{ 'commanderRecs.checkingCommanders' | translate: { progress: checked() + ' / ' + total() } }}
+          }
+        </p>
+      }
+
+      @if (hasNoResults()) {
+        <p class="state-message">{{ 'commanderRecs.noResults' | translate }}</p>
+      }
+
+      <ul class="recommendation-list">
+        @for (rec of recommendations(); track rec.name) {
+          <li>
+            <button type="button" class="recommendation-row" (click)="selectRecommendation(rec)">
+              @if (rec.imageUrl; as imageUrl) {
+                <img class="commander-image" [src]="imageUrl" [alt]="rec.name" loading="lazy" />
+              } @else {
+                <div class="commander-placeholder"></div>
+              }
+
+              <div class="recommendation-info">
+                <p class="commander-name">{{ rec.name }}</p>
+                <p class="match-detail">
+                  {{ 'commanderRecs.cardsCount' | translate: { matched: rec.freeMatchedCount, total: rec.totalCount } }}
+                </p>
+                @if (!rec.owned) {
+                  <span class="missing-tag">{{ 'commanderRecs.missingTag' | translate }}</span>
+                }
+              </div>
+
+              <div class="match-badges">
+                <span class="match-badge match-badge--free" [class.is-complete]="rec.freeMatchPercent === 100">
+                  {{ 'commanderRecs.freeMatchBadge' | translate: { percent: rec.freeMatchPercent } }}
+                </span>
+              </div>
+            </button>
+          </li>
+        }
+      </ul>
     }
-  </div>
-</div>
+  }
+</app-dialog>

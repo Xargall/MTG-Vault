@@ -1,0 +1,138 @@
+// Shared form-control baseline. Before this existed every component styled
+// its own inputs and most forgot the font, so fields fell back to the
+// browser's Arial and some selects rendered as a white OS widget inside a
+// leather dialog. Components now only add layout (width, margins) on top.
+
+// Native widgets that can't be restyled (date pickers, the open <select>
+// list, number spinners) at least render in their dark variant.
+:root {
+  color-scheme: dark;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+// Text-like fields: an inset "carved slot" in the leather - darker than the
+// surface around it, framed by the interactive border tier.
+input:not(
+  [type='checkbox'],
+  [type='radio'],
+  [type='range'],
+  [type='file'],
+  [type='color'],
+  [type='hidden']
+),
+select,
+textarea {
+  min-height: var(--tap-min);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background-color: var(--color-bg);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+  color: var(--color-text);
+  // 1rem (16px) is also the floor below which iOS Safari zooms the page
+  // when a field gets focus - don't shrink fields below it.
+  font-size: 1rem;
+  line-height: 1.3;
+  transition: border-color var(--dur-state) ease;
+
+  &::placeholder {
+    color: var(--color-text-muted);
+    opacity: 0.75;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled, :focus) {
+      border-color: var(--color-accent);
+    }
+  }
+
+  &:focus-visible {
+    border-color: var(--color-accent);
+  }
+}
+
+textarea {
+  resize: vertical;
+}
+
+// Custom chevron drawn from two gradients in currentColor, so it follows
+// every game theme without a per-theme SVG.
+select {
+  appearance: none;
+  padding-right: 2.25rem;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
+    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.125rem) 50%,
+    calc(100% - 0.8125rem) 50%;
+  background-size: 0.3125rem 0.3125rem;
+  background-repeat: no-repeat;
+  cursor: pointer;
+
+  option {
+    background-color: var(--color-surface-solid);
+    color: var(--color-text);
+  }
+}
+
+// Checkbox as a small struck-metal plate: carved slot when empty, filled
+// with the accent (plus the same top highlight as primary buttons) when set.
+input[type='checkbox'] {
+  appearance: none;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  background-color: var(--color-bg);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-state) ease,
+    border-color var(--dur-state) ease;
+
+  // The check is a fixed near-black: every theme's --color-on-accent is a
+  // near-black within a few shades of this, and a data-URI can't read vars.
+  &:checked {
+    border-color: var(--color-accent);
+    background-color: var(--color-accent);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.5l3.2 3.2L15 7' fill='none' stroke='%23150e08' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-size: 100% 100%;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not(:disabled, :checked) {
+      border-color: var(--color-accent);
+    }
+  }
+}
+
+// Label wrapping a checkbox: the whole row is the tap target.
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: var(--tap-min);
+  color: var(--color-text);
+  cursor: pointer;
+}

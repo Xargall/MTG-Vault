@@ -1,0 +1,85 @@
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.dialog-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  width: 100%;
+  max-width: var(--dialog-max-width, 560px);
+  max-height: 85vh;
+  max-height: 85dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--spacing-lg);
+  // Decorative dialog edge in the interactive tier - the dim decorative
+  // --color-border all but vanished against the 0.6 backdrop.
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.dialog-panel--bare {
+  padding: 0;
+  gap: 0;
+}
+
+// Sticky so the title and close button stay reachable while long dialog
+// content (card lists, deck lists) scrolls underneath.
+.dialog-header {
+  position: sticky;
+  top: calc(-1 * var(--spacing-lg));
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: calc(-1 * var(--spacing-lg)) calc(-1 * var(--spacing-lg)) 0;
+  padding: var(--spacing-md) var(--spacing-sm) var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.dialog-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.dialog-close {
+  margin-left: auto;
+}
+
+// Phones: dock as a bottom sheet - the thumb reaches the bottom edge, not
+// a centered box's top-right corner.
+@media (max-width: 480px) {
+  .dialog-backdrop {
+    align-items: flex-end;
+    padding: var(--spacing-lg) 0 0;
+  }
+
+  .dialog-panel {
+    max-width: none;
+    max-height: 92dvh;
+    padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom));
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .dialog-panel--bare {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

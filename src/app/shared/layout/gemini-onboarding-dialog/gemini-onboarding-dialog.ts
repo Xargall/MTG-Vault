@@ -2,12 +2,12 @@ import { ChangeDetectionStrategy, Component, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 
-import { ScrollLockDirective } from '../../directives/scroll-lock.directive';
+import { AppDialog } from '../../dialog/dialog';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-gemini-onboarding-dialog',
-  imports: [RouterLink, TranslatePipe, ScrollLockDirective],
+  imports: [RouterLink, TranslatePipe, AppDialog],
   templateUrl: './gemini-onboarding-dialog.html',
   styleUrl: './gemini-onboarding-dialog.scss',
 })

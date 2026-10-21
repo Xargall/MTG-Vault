@@ -1,12 +1,5 @@
-<div class="backdrop" appScrollLock (click)="close.emit()">
-  <div class="dialog" (click)="$event.stopPropagation()">
-    <header class="dialog-header">
-      <h2>{{ 'demoScanBlocked.title' | translate }}</h2>
-      <button type="button" class="icon-button" (click)="close.emit()" [attr.aria-label]="'demoScanBlocked.close' | translate">✕</button>
-    </header>
+<app-dialog [heading]="'demoScanBlocked.title' | translate" maxWidth="420px" (closeRequest)="close.emit()">
+  <p class="message">{{ 'demoScanBlocked.message' | translate }}</p>
 
-    <p class="message">{{ 'demoScanBlocked.message' | translate }}</p>
-
-    <a routerLink="/invite" class="cta-button">{{ 'demoScanBlocked.cta' | translate }}</a>
-  </div>
-</div>
+  <a routerLink="/invite" class="btn btn--primary btn--block">{{ 'demoScanBlocked.cta' | translate }}</a>
+</app-dialog>

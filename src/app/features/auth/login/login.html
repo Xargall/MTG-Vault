@@ -18,8 +18,8 @@
       <p class="form-error">{{ errorMessage() }}</p>
     }
 
-    <button type="submit" [disabled]="isSubmitting()">{{ 'auth.loginSubmit' | translate }}</button>
-    <button type="button" class="google-button" (click)="signInWithGoogle()">
+    <button type="submit" class="btn btn--primary" [disabled]="isSubmitting()">{{ 'auth.loginSubmit' | translate }}</button>
+    <button type="button" class="btn btn--secondary" (click)="signInWithGoogle()">
       {{ 'auth.google' | translate }}
     </button>
 
@@ -29,7 +29,7 @@
 
     <div class="divider"><span>{{ 'auth.or' | translate }}</span></div>
 
-    <button type="button" class="guest-button" [disabled]="isSubmitting()" (click)="signInAsGuest()">
+    <button type="button" class="btn btn--ghost guest-button" [disabled]="isSubmitting()" (click)="signInAsGuest()">
       @if (isSeedingDemo()) {
         <span class="loading-rune" aria-hidden="true"></span>
       }

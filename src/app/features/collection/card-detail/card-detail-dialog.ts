@@ -13,7 +13,8 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
 import { Card, MtgCard, PokemonCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
-import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
+import { AppDialog } from '../../../shared/dialog/dialog';
+import { FocusOnInitDirective } from '../../../shared/directives/focus-on-init.directive';
 import { ATTRIBUTE_CATEGORIES } from '../yugioh-collection-stats';
 import { COLOR_CATEGORIES, getEntryPrice } from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
@@ -51,7 +52,7 @@ const BANLIST_LABELS: Record<YugiohBanlistStatus, string> = {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-card-detail-dialog',
-  imports: [DecimalPipe, FormsModule, TranslatePipe, ScrollLockDirective],
+  imports: [DecimalPipe, FormsModule, TranslatePipe, AppDialog, FocusOnInitDirective],
   templateUrl: './card-detail-dialog.html',
   styleUrl: './card-detail-dialog.scss',
 })
@@ -100,12 +101,20 @@ export class CardDetailDialog {
     this.editFoil.set(this.entry().row.foil);
     this.editLanguage.set(this.entry().row.language);
     this.saveError.set(null);
+    this.confirmingDelete.set(false);
     this.editing.set(true);
   }
 
   protected cancelEdit() {
     this.editing.set(false);
     this.saveError.set(null);
+  }
+
+  // Edit and delete-confirm are mutually exclusive - with both open, "Save"
+  // and "Yes, remove" sat a few pixels apart in the same panel.
+  protected startDelete() {
+    this.cancelEdit();
+    this.confirmingDelete.set(true);
   }
 
   async saveEdit() {

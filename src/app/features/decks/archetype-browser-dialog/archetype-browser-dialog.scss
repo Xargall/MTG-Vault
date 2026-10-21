@@ -1,67 +1,7 @@
-.backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-lg);
-  z-index: 100;
-}
-
-.dialog {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--spacing-lg);
-  width: 100%;
-  max-width: 680px;
-  max-height: 85vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  h2 {
-    margin: 0;
-    font-size: 1.1rem;
-  }
-}
-
-.icon-button {
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  font-size: 1rem;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: var(--radius);
-
-  &:hover {
-    color: var(--color-text);
-    background: var(--color-surface-alt);
-  }
-}
-
 .hint {
   margin: 0;
   font-size: 0.85rem;
   color: var(--color-text-muted);
-}
-
-.search-input {
-  padding: var(--spacing-sm);
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-size: 1rem;
 }
 
 .state-message {
@@ -121,20 +61,6 @@
   color: var(--color-text);
 }
 
-.back-link {
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 0;
-  align-self: flex-start;
-
-  &:hover {
-    color: var(--color-accent);
-  }
-}
-
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -162,23 +88,7 @@
   font-weight: 700;
 }
 
+
 .submit-button {
   margin-top: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  border-radius: var(--radius);
-  border: none;
-  font-size: 1rem;
-  font-weight: 600;
-  background: var(--color-accent);
-  color: var(--color-bg);
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: var(--color-accent-hover);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
 }

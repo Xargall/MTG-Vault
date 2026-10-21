@@ -69,16 +69,6 @@
   gap: var(--spacing-sm);
 }
 
-.camera-select {
-  max-width: calc(100vw - var(--spacing-md) * 2);
-  padding: 4px 10px;
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border-strong);
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-size: 0.8rem;
-}
-
 .last-added {
   position: relative;
 }
@@ -397,36 +387,10 @@
   font-size: 0.8rem;
 }
 
-.add-button {
-  padding: var(--spacing-sm);
-  border-radius: var(--radius);
-  border: none;
-  font-size: 1rem;
-  font-weight: 600;
-  background: var(--color-accent);
-  color: var(--color-bg);
-  cursor: pointer;
 
-  &:hover:not(:disabled) {
-    background: var(--color-accent-hover);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-}
-
-.keep-scanning-button {
-  padding: var(--spacing-sm);
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border-strong);
-  background: transparent;
-  color: var(--color-text);
-  font-size: 0.9rem;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--color-surface-alt);
-  }
+// Floats over the live camera image, so it keeps a translucent plate
+// instead of the solid field background.
+.camera-select {
+  max-width: calc(100vw - var(--spacing-md) * 2);
+  background-color: rgba(0, 0, 0, 0.6);
 }

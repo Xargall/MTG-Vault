@@ -12,7 +12,7 @@ import { Card } from '../../../core/models/card.model';
 import { EDHREC_COLOR_IDENTITIES, EdhrecService } from '../../../core/services/edhrec.service';
 import { MtgApiService } from '../../../core/services/mtg-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
-import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
+import { AppDialog } from '../../../shared/dialog/dialog';
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
 import {
@@ -66,7 +66,7 @@ function dedupeByCardName(entries: CollectionEntry[]): CollectionEntry[] {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-commander-recommendations-dialog',
-  imports: [TranslatePipe, CardTile, ScrollLockDirective],
+  imports: [TranslatePipe, CardTile, AppDialog],
   templateUrl: './commander-recommendations-dialog.html',
   styleUrl: './commander-recommendations-dialog.scss',
 })

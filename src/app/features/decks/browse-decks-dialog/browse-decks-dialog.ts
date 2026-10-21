@@ -16,7 +16,7 @@ import { DeckCardIndexService } from '../../../core/services/deck-card-index.ser
 import { GameService } from '../../../core/services/game.service';
 import { YugiohPreconIndexService } from '../../../core/services/yugioh-precon-index.service';
 import { CardOwnedStatus, CardTile } from '../../../shared/cards/card-tile/card-tile';
-import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
+import { AppDialog } from '../../../shared/dialog/dialog';
 import { CollectionEntry } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
 import {
@@ -42,7 +42,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-browse-decks-dialog',
-  imports: [FormsModule, TranslatePipe, CardTile, ScrollLockDirective],
+  imports: [FormsModule, TranslatePipe, CardTile, AppDialog],
   templateUrl: './browse-decks-dialog.html',
   styleUrl: './browse-decks-dialog.scss',
 })

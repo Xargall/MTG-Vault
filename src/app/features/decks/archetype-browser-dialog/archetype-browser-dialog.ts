@@ -12,7 +12,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Card } from '../../../core/models/card.model';
 import { YugiohApiService } from '../../../core/services/yugioh-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
-import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
+import { AppDialog } from '../../../shared/dialog/dialog';
 import { CollectionService } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
 
@@ -21,7 +21,7 @@ const SUGGESTION_LIMIT = 20;
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-archetype-browser-dialog',
-  imports: [FormsModule, CardTile, TranslatePipe, ScrollLockDirective],
+  imports: [FormsModule, CardTile, TranslatePipe, AppDialog],
   templateUrl: './archetype-browser-dialog.html',
   styleUrl: './archetype-browser-dialog.scss',
 })

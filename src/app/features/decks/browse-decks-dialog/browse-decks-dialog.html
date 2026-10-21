@@ -1,150 +1,144 @@
-<div class="backdrop" appScrollLock (click)="close.emit()">
-  <div class="dialog" (click)="$event.stopPropagation()">
-    <header class="dialog-header">
-      <h2>{{ 'browseDecks.title' | translate }}</h2>
-      <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
-    </header>
+<app-dialog [heading]="'browseDecks.title' | translate" maxWidth="560px" (closeRequest)="close.emit()">
 
-    @if (!selectedDeck()) {
-      <input
-        type="text"
-        class="search-input"
-        [placeholder]="'browseDecks.searchPlaceholder' | translate"
-        [ngModel]="query()"
-        (ngModelChange)="onQueryChange($event)"
-        autofocus
-      />
+  @if (!selectedDeck()) {
+    <input
+      type="text"
+      class="search-input"
+      [placeholder]="'browseDecks.searchPlaceholder' | translate"
+      [ngModel]="query()"
+      (ngModelChange)="onQueryChange($event)"
+      autofocus
+    />
 
-      @if (loadingList()) {
-        <p class="state-message">{{ 'browseDecks.loadingList' | translate }}</p>
-      } @else if (listError()) {
-        <p class="state-message error">{{ listError() }}</p>
-      } @else if (query().trim() && results().length === 0) {
-        <p class="state-message">{{ 'browseDecks.noDecksFound' | translate }}</p>
-      } @else if (!query().trim()) {
-        <p class="state-message">
-          {{ searchHintKey() | translate }}
+    @if (loadingList()) {
+      <p class="state-message">{{ 'browseDecks.loadingList' | translate }}</p>
+    } @else if (listError()) {
+      <p class="state-message error">{{ listError() }}</p>
+    } @else if (query().trim() && results().length === 0) {
+      <p class="state-message">{{ 'browseDecks.noDecksFound' | translate }}</p>
+    } @else if (!query().trim()) {
+      <p class="state-message">
+        {{ searchHintKey() | translate }}
+      </p>
+      @if (!deckCardIndexActive().ready()) {
+        <p class="state-message index-hint">
+          {{ 'browseDecks.indexing' | translate: { progress: indexHintText() } }}
         </p>
-        @if (!deckCardIndexActive().ready()) {
-          <p class="state-message index-hint">
-            {{ 'browseDecks.indexing' | translate: { progress: indexHintText() } }}
-          </p>
-        }
-      } @else {
-        <ul class="results-list">
-          @for (deck of results(); track deck.fileName) {
-            <li>
-              <button type="button" class="result-row" (click)="selectDeck(deck)">
-                <span class="result-name">{{ deck.name }}</span>
-                <span class="result-meta">{{ deck.type }} · {{ deck.releaseDate.slice(0, 4) }}</span>
-              </button>
-            </li>
-          }
-        </ul>
       }
     } @else {
-      <div class="detail-view">
-        <button type="button" class="back-link" (click)="backToSearch()">
-          {{ 'browseDecks.backToSearch' | translate }}
-        </button>
-
-        <h3>{{ selectedDeck()!.name }}</h3>
-        <p class="deck-meta">{{ selectedDeck()!.type }} · {{ selectedDeck()!.releaseDate.slice(0, 4) }}</p>
-
-        @if (loadingDetail()) {
-          <p class="state-message">{{ 'browseDecks.loadingDetail' | translate }}</p>
-        } @else if (detailError()) {
-          <p class="state-message error">{{ detailError() }}</p>
-        } @else if (detail(); as d) {
-          <p class="card-count">{{ 'browseDecks.cardsCount' | translate: { count: totalCardCount() } }}</p>
-          <span class="match-badge" [class.is-complete]="matchPercent() === 100">
-            {{ 'decks.matchInCollection' | translate: { percent: matchPercent() } }}
-            @if (availabilityMatch().plannedElsewherePercent > 0) {
-              {{ 'deckDetail.plannedElsewhereHint' | translate: { percent: availabilityMatch().plannedElsewherePercent } }}
-            }
-          </span>
-
-          <label class="include-assigned-toggle">
-            <input
-              type="checkbox"
-              [checked]="includeAssignedElsewhere()"
-              (change)="includeAssignedElsewhere.set(!includeAssignedElsewhere())"
-            />
-            {{ 'deckMatch.includeAssignedToggle' | translate }}
-          </label>
-
-          @if (!includeAssignedElsewhere()) {
-            <div class="match-mode-toggle" role="radiogroup" [attr.aria-label]="'browseDecks.matchModeLabel' | translate">
-              <button
-                type="button"
-                class="match-mode-option"
-                [class.is-selected]="matchMode() === 'strict'"
-                role="radio"
-                [attr.aria-checked]="matchMode() === 'strict'"
-                (click)="matchMode.set('strict')"
-              >
-                {{ 'browseDecks.matchModeStrict' | translate }}
-              </button>
-              <button
-                type="button"
-                class="match-mode-option"
-                [class.is-selected]="matchMode() === 'flexible'"
-                role="radio"
-                [attr.aria-checked]="matchMode() === 'flexible'"
-                (click)="matchMode.set('flexible')"
-              >
-                {{ 'browseDecks.matchModeFlexible' | translate }}
-              </button>
-            </div>
-          }
-          @if (d.skippedCount > 0) {
-            <p class="state-message">
-              {{
-                (d.skippedCount === 1 ? 'browseDecks.skippedOne' : 'browseDecks.skippedOther')
-                  | translate: { count: d.skippedCount }
-              }}
-            </p>
-          }
-
-          @if (loadingDetailCards()) {
-            <p class="state-message">{{ 'browseDecks.loadingDetail' | translate }}</p>
-          } @else if (detailCards(); as cards) {
-            <div class="results-grid">
-              @for (entry of cards; track entry.card.id) {
-                <app-card-tile [card]="entry.card" [quantity]="entry.quantity" [status]="entry.status" />
-              }
-            </div>
-          }
-
-          @if (missingCards().length > 0) {
-            <div class="wishlist-row">
-              <span>{{ 'deckDetail.missingCards' | translate: { count: missingQuantityTotal() } }}</span>
-              @if (wishlistError()) {
-                <span class="state-message error">{{ wishlistError() }}</span>
-              } @else if (wishlistAdded()) {
-                <span class="wishlist-confirm">{{ 'deckDetail.onWishlist' | translate }}</span>
-              } @else {
-                <button
-                  type="button"
-                  class="wishlist-button"
-                  [disabled]="addingToWishlist()"
-                  (click)="addMissingToWishlist()"
-                >
-                  {{ 'deckDetail.wishlistButton' | translate }}
-                </button>
-              }
-            </div>
-          }
-
-          @if (submitError()) {
-            <p class="state-message error">{{ submitError() }}</p>
-          }
-
-          <button type="button" class="submit-button" [disabled]="submitting()" (click)="submit()">
-            {{ 'browseDecks.submit' | translate }}
-          </button>
+      <ul class="results-list">
+        @for (deck of results(); track deck.fileName) {
+          <li>
+            <button type="button" class="result-row" (click)="selectDeck(deck)">
+              <span class="result-name">{{ deck.name }}</span>
+              <span class="result-meta">{{ deck.type }} · {{ deck.releaseDate.slice(0, 4) }}</span>
+            </button>
+          </li>
         }
-      </div>
+      </ul>
     }
-  </div>
-</div>
+  } @else {
+    <div class="detail-view">
+      <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToSearch()">
+        {{ 'browseDecks.backToSearch' | translate }}
+      </button>
+
+      <h3>{{ selectedDeck()!.name }}</h3>
+      <p class="deck-meta">{{ selectedDeck()!.type }} · {{ selectedDeck()!.releaseDate.slice(0, 4) }}</p>
+
+      @if (loadingDetail()) {
+        <p class="state-message">{{ 'browseDecks.loadingDetail' | translate }}</p>
+      } @else if (detailError()) {
+        <p class="state-message error">{{ detailError() }}</p>
+      } @else if (detail(); as d) {
+        <p class="card-count">{{ 'browseDecks.cardsCount' | translate: { count: totalCardCount() } }}</p>
+        <span class="match-badge" [class.is-complete]="matchPercent() === 100">
+          {{ 'decks.matchInCollection' | translate: { percent: matchPercent() } }}
+          @if (availabilityMatch().plannedElsewherePercent > 0) {
+            {{ 'deckDetail.plannedElsewhereHint' | translate: { percent: availabilityMatch().plannedElsewherePercent } }}
+          }
+        </span>
+
+        <label class="include-assigned-toggle">
+          <input
+            type="checkbox"
+            [checked]="includeAssignedElsewhere()"
+            (change)="includeAssignedElsewhere.set(!includeAssignedElsewhere())"
+          />
+          {{ 'deckMatch.includeAssignedToggle' | translate }}
+        </label>
+
+        @if (!includeAssignedElsewhere()) {
+          <div class="match-mode-toggle" role="radiogroup" [attr.aria-label]="'browseDecks.matchModeLabel' | translate">
+            <button
+              type="button"
+              class="match-mode-option"
+              [class.is-selected]="matchMode() === 'strict'"
+              role="radio"
+              [attr.aria-checked]="matchMode() === 'strict'"
+              (click)="matchMode.set('strict')"
+            >
+              {{ 'browseDecks.matchModeStrict' | translate }}
+            </button>
+            <button
+              type="button"
+              class="match-mode-option"
+              [class.is-selected]="matchMode() === 'flexible'"
+              role="radio"
+              [attr.aria-checked]="matchMode() === 'flexible'"
+              (click)="matchMode.set('flexible')"
+            >
+              {{ 'browseDecks.matchModeFlexible' | translate }}
+            </button>
+          </div>
+        }
+        @if (d.skippedCount > 0) {
+          <p class="state-message">
+            {{
+              (d.skippedCount === 1 ? 'browseDecks.skippedOne' : 'browseDecks.skippedOther')
+                | translate: { count: d.skippedCount }
+            }}
+          </p>
+        }
+
+        @if (loadingDetailCards()) {
+          <p class="state-message">{{ 'browseDecks.loadingDetail' | translate }}</p>
+        } @else if (detailCards(); as cards) {
+          <div class="results-grid">
+            @for (entry of cards; track entry.card.id) {
+              <app-card-tile [card]="entry.card" [quantity]="entry.quantity" [status]="entry.status" />
+            }
+          </div>
+        }
+
+        @if (missingCards().length > 0) {
+          <div class="wishlist-row">
+            <span>{{ 'deckDetail.missingCards' | translate: { count: missingQuantityTotal() } }}</span>
+            @if (wishlistError()) {
+              <span class="state-message error">{{ wishlistError() }}</span>
+            } @else if (wishlistAdded()) {
+              <span class="wishlist-confirm">{{ 'deckDetail.onWishlist' | translate }}</span>
+            } @else {
+              <button
+                type="button"
+                class="btn btn--secondary btn--sm"
+                [disabled]="addingToWishlist()"
+                (click)="addMissingToWishlist()"
+              >
+                {{ 'deckDetail.wishlistButton' | translate }}
+              </button>
+            }
+          </div>
+        }
+
+        @if (submitError()) {
+          <p class="state-message error">{{ submitError() }}</p>
+        }
+
+        <button type="button" class="btn btn--primary submit-button" [disabled]="submitting()" (click)="submit()">
+          {{ 'browseDecks.submit' | translate }}
+        </button>
+      }
+    </div>
+  }
+</app-dialog>

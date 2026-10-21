@@ -6,7 +6,7 @@ import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/cons
 import { Card } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
-import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
+import { AppDialog } from '../../../shared/dialog/dialog';
 import { CollectionService } from '../collection.service';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -15,7 +15,7 @@ const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-add-card-dialog',
-  imports: [FormsModule, CardTile, TranslatePipe, ScrollLockDirective],
+  imports: [FormsModule, CardTile, TranslatePipe, AppDialog],
   templateUrl: './add-card-dialog.html',
   styleUrl: './add-card-dialog.scss',
 })

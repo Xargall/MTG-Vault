@@ -12,7 +12,8 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../../core/models/card.model';
 import { CardOwnedStatus, CardTile } from '../../../shared/cards/card-tile/card-tile';
-import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
+import { AppDialog } from '../../../shared/dialog/dialog';
+import { FocusOnInitDirective } from '../../../shared/directives/focus-on-init.directive';
 import { CollectionEntry } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
 import {
@@ -51,7 +52,7 @@ export interface DeckCardBindingDetail {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-deck-detail-dialog',
-  imports: [CardTile, DecimalPipe, TranslatePipe, ScrollLockDirective],
+  imports: [CardTile, DecimalPipe, TranslatePipe, AppDialog, FocusOnInitDirective],
   templateUrl: './deck-detail-dialog.html',
   styleUrl: './deck-detail-dialog.scss',
 })
@@ -59,6 +60,9 @@ export class DeckDetailDialog {
   private readonly deckService = inject(DeckService);
   private readonly wishlistService = inject(WishlistService);
   private readonly translate = inject(TranslateService);
+
+  /** The hero's own <h2> names the dialog (it runs `bare`, without the shared header). */
+  protected readonly headingId = 'deck-detail-heading';
 
   readonly entry = input.required<DeckEntry>();
   readonly collectionEntries = input.required<CollectionEntry[]>();

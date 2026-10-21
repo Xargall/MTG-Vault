@@ -1,0 +1,33 @@
+<div class="dialog-backdrop" appScrollLock (click)="requestClose()">
+  <div
+    #panel
+    class="dialog-panel"
+    [class.dialog-panel--bare]="bare()"
+    [style.--dialog-max-width]="maxWidth()"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-labelledby]="bare() ? labelledBy() : headingId"
+    tabindex="-1"
+    (click)="$event.stopPropagation()"
+    (keydown)="onKeydown($event)"
+  >
+    @if (!bare()) {
+      <header class="dialog-header">
+        <h2 class="dialog-title" [id]="headingId">{{ heading() }}</h2>
+        <ng-content select="[dialogHeaderActions]" />
+        @if (closable()) {
+          <button
+            type="button"
+            class="icon-btn dialog-close"
+            (click)="requestClose()"
+            [attr.aria-label]="'common.close' | translate"
+          >
+            <svg aria-hidden="true"><use href="#icon-close" /></svg>
+          </button>
+        }
+      </header>
+    }
+
+    <ng-content />
+  </div>
+</div>

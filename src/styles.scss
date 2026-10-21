@@ -1,4 +1,5 @@
-/* You can add global styles to this file, and also import other style files */
+@use 'styles/forms';
+@use 'styles/buttons';
 
 // Shared turbulence-noise layer under every panel's surface texture -
 // desaturated so it stays a neutral fine grain regardless of theme color.
@@ -121,12 +122,31 @@ $pokemon-surface-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.or
   --footer-grad-top: #2a0f0b;
   --title-grad-start: #f6e2a8;
 
+  // Text/icon color on an accent fill (primary buttons, active toggles).
+  // Declared per theme rather than as var(--color-bg) here - see the
+  // $noise-layer comment above for why a var()-of-a-var() declared on :root
+  // wouldn't follow a body[data-game] override.
+  --color-on-accent: #17110b;
+
   --font-body: 'EB Garamond', serif;
   --font-heading: 'Cinzel', serif;
   --radius: 6px;
+  --radius-card: 8px;
+  --radius-pill: 999px;
   --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
+
+  // Smallest comfortable touch target (WCAG 2.5.5 / Apple HIG 44pt).
+  --tap-min: 2.75rem;
+
+  // Motion - strong custom curves instead of the weak built-in keywords.
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 100ms;
+  --dur-release: 160ms;
+  --dur-state: 150ms;
 }
 
 // Per-game color theme. Applied via [data-game] on <body> (set from
@@ -148,6 +168,7 @@ body[data-game='yugioh'] {
   --color-accent-hover: #5fd9cd;
   --color-danger: #e0687a;
   --color-bronze: #b08d3e;
+  --color-on-accent: #140b1f;
 
   --header-grad-top: #5b2f96;
   --header-grad-bottom: #241640;
@@ -174,6 +195,7 @@ body[data-game='pokemon'] {
   --color-accent-hover: #ffe873;
   --color-danger: #e0483f;
   --color-bronze: #a67c27;
+  --color-on-accent: #170f05;
 
   --header-grad-top: #8a5a12;
   --header-grad-bottom: #2a1f0c;

@@ -14,7 +14,7 @@ import { MoxfieldService, MOXFIELD_FORMATS } from '../../../core/services/moxfie
 import { MtgoService } from '../../../core/services/mtgo.service';
 import { MtgApiService } from '../../../core/services/mtg-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
-import { ScrollLockDirective } from '../../../shared/directives/scroll-lock.directive';
+import { AppDialog } from '../../../shared/dialog/dialog';
 import { CollectionEntry, CollectionService } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
 import {
@@ -57,7 +57,7 @@ interface DeckRecommendation extends SourceTopDeck {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-format-deck-recommendations-dialog',
-  imports: [TranslatePipe, CardTile, ScrollLockDirective],
+  imports: [TranslatePipe, CardTile, AppDialog],
   templateUrl: './format-deck-recommendations-dialog.html',
   // Reuses CommanderRecommendationsDialog's stylesheet (same dialog shell,
   // recommendation-list/match-badge/progress-bar classes) rather than

@@ -78,12 +78,6 @@ h1 {
 .search-input {
   flex: 1;
   min-width: 0;
-  padding: var(--spacing-sm);
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-size: 0.95rem;
 }
 
 .filter-buttons {
@@ -236,48 +230,34 @@ h1 {
   text-overflow: ellipsis;
 }
 
-.add-button,
 .scan-button {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: none;
-  background: var(--color-accent);
-  color: var(--color-bg);
-  font-size: 1.2rem;
-  line-height: 1;
-  cursor: pointer;
-  flex-shrink: 0;
-
-  &:hover {
-    background: var(--color-accent-hover);
-  }
-}
-
-.scan-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
   position: relative;
 
+  // Guests can see the scanner exists but not use it - muted plate instead
+  // of the gold fill, plus a small lock seal on its edge.
   &--demo-locked {
-    background: var(--color-surface-alt);
+    background-color: var(--color-surface-alt);
     color: var(--color-text-muted);
-    cursor: pointer;
 
-    &:hover {
-      background: var(--color-surface-alt);
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        background-color: var(--color-surface-alt);
+      }
     }
   }
 }
 
 .scan-button-lock {
   position: absolute;
-  bottom: -4px;
-  right: -4px;
-  font-size: 0.7rem;
-  line-height: 1;
+  right: -3px;
+  bottom: -3px;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 2px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
 }
 
 .card-grid {

@@ -1,198 +1,198 @@
-<div class="backdrop" appScrollLock (click)="close.emit()">
-  <div class="dialog" (click)="$event.stopPropagation()">
-    <div class="hero" [style.background-image]="showcaseImageUrl() ? 'url(' + showcaseImageUrl() + ')' : null">
-      <div class="hero-overlay">
-        <button type="button" class="icon-button" (click)="close.emit()" aria-label="Schließen">✕</button>
+<app-dialog bare [labelledBy]="headingId" maxWidth="760px" (closeRequest)="close.emit()">
+  <div class="hero" [style.background-image]="showcaseImageUrl() ? 'url(' + showcaseImageUrl() + ')' : null">
+    <div class="hero-overlay">
+      <button type="button" class="icon-btn hero-close" (click)="close.emit()" [attr.aria-label]="'common.close' | translate">
+        <svg aria-hidden="true"><use href="#icon-close" /></svg>
+      </button>
 
-        <div class="hero-info">
-          <h2>{{ entry().deck.name }}</h2>
-          <div class="hero-meta">
-            @if (entry().deck.format) {
-              <span class="meta-badge">{{ entry().deck.format }}</span>
-            }
-            @if (year(); as y) {
-              <span class="meta-badge">{{ y }}</span>
-            }
-            <span class="meta-badge">{{ 'decks.cardsCount' | translate: { count: cardCount() } }}</span>
-            @if (totalValue() > 0) {
-              <span class="meta-badge">{{ totalValue() | number: '1.2-2' }} €</span>
-            }
-            <span class="meta-badge" [class.is-complete]="availabilityMatch().percent === 100">
-              {{ 'decks.matchInCollection' | translate: { percent: availabilityMatch().percent } }}
-              @if (availabilityMatch().plannedElsewherePercent > 0) {
-                {{ 'deckDetail.plannedElsewhereHint' | translate: { percent: availabilityMatch().plannedElsewherePercent } }}
-              }
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card-list">
-      @if (!treatAsComplete()) {
-        <label class="checkbox-label">
-          <input
-            type="checkbox"
-            [checked]="searchSubstitutes()"
-            (change)="searchSubstitutes.set($any($event.target).checked)"
-          />
-          {{ 'deckDetail.searchSubstitutesOption' | translate }}
-        </label>
-      }
-
-      @if (missingCards().length > 0) {
-        <div class="wishlist-row">
-          <span>{{ 'deckDetail.missingCards' | translate: { count: missingQuantityTotal() } }}</span>
-          @if (wishlistError()) {
-            <span class="state-message error">{{ wishlistError() }}</span>
-          } @else if (wishlistAdded()) {
-            <span class="wishlist-confirm">{{ 'deckDetail.onWishlist' | translate }}</span>
-          } @else {
-            <button
-              type="button"
-              class="wishlist-button"
-              [disabled]="addingToWishlist()"
-              (click)="addMissingToWishlist()"
-            >
-              {{ 'deckDetail.wishlistButton' | translate }}
-            </button>
+      <div class="hero-info">
+        <h2 [id]="headingId">{{ entry().deck.name }}</h2>
+        <div class="hero-meta">
+          @if (entry().deck.format) {
+            <span class="meta-badge">{{ entry().deck.format }}</span>
           }
-        </div>
-      }
-
-      <h3>{{ 'deckDetail.containedCards' | translate }}</h3>
-      <div class="results-grid">
-        @for (item of mainCards(); track item.entry.row.id) {
-          <app-card-tile [card]="item.entry.card" [quantity]="item.entry.row.quantity" [status]="item.status" />
-        }
-      </div>
-
-      @if (tokenCards().length > 0) {
-        <h3>{{ 'deckDetail.containedTokens' | translate }}</h3>
-        <div class="results-grid">
-          @for (item of tokenCards(); track item.entry.row.id) {
-            <app-card-tile [card]="item.entry.card" [quantity]="item.entry.row.quantity" [status]="item.status" />
+          @if (year(); as y) {
+            <span class="meta-badge">{{ y }}</span>
           }
-        </div>
-      }
-
-      @if (cardBindingDetails().length > 0) {
-        <h3>{{ 'deckDetail.bindingDetailsTitle' | translate }}</h3>
-        <ul class="binding-details-list">
-          @for (detail of cardBindingDetails(); track detail.entry.row.id) {
-            <li class="binding-detail-row binding-detail-row--{{ detail.status }}">
-              <span class="binding-detail-icon" aria-hidden="true">
-                @if (detail.status === 'available') {
-                  ✅
-                } @else if (detail.status === 'partial') {
-                  🟡
-                } @else {
-                  ❌
-                }
-              </span>
-              <div class="binding-detail-body">
-                <span class="binding-detail-name">{{ detail.entry.card.name }} ×{{ detail.entry.row.quantity }}</span>
-
-                @if (detail.substitute; as substitute) {
-                  <span class="binding-detail-note">
-                    {{
-                      'deckDetail.substituteNote'
-                        | translate
-                          : {
-                              name: detail.entry.card.name,
-                              print: printLabel(detail.entry.card),
-                            }
-                    }}
-                  </span>
-                  <span class="binding-detail-subnote">
-                    {{
-                      'deckDetail.substituteOwnedNote'
-                        | translate
-                          : {
-                              name: substitute.card.name,
-                              print: printLabel(substitute.card),
-                            }
-                    }}
-                  </span>
-                }
-
-                @for (assigned of detail.assignedElsewhere; track assigned.deckId) {
-                  @if (confirmingRelease()?.key === releaseKey(detail.entry.row.id, assigned)) {
-                    <div class="release-confirm">
-                      <span class="binding-detail-note">
-                        {{
-                          'deckDetail.confirmReleaseText'
-                            | translate: { cardName: detail.entry.card.name, deckName: assigned.deckName }
-                        }}
-                      </span>
-                      @if (releaseError()) {
-                        <span class="state-message error">{{ releaseError() }}</span>
-                      }
-                      <div class="release-confirm-actions">
-                        <button type="button" class="cancel-link" [disabled]="releasing()" (click)="cancelRelease()">
-                          {{ 'deckDetail.cancel' | translate }}
-                        </button>
-                        <button
-                          type="button"
-                          class="release-button"
-                          [disabled]="releasing()"
-                          (click)="confirmRelease()"
-                        >
-                          {{ 'deckDetail.confirmReleaseButton' | translate }}
-                        </button>
-                      </div>
-                    </div>
-                  } @else {
-                    <span class="binding-detail-note binding-detail-note--with-action">
-                      {{ 'deckDetail.assignedElsewhereNote' | translate: { deckName: assigned.deckName } }}
-                      <button type="button" class="release-link" (click)="requestRelease(detail, assigned)">
-                        {{ 'deckDetail.releaseButton' | translate }}
-                      </button>
-                    </span>
-                  }
-                }
-
-                <span class="binding-detail-note">
-                  {{
-                    'deckDetail.availableNote'
-                      | translate: { available: detail.available, needed: detail.entry.row.quantity }
-                  }}
-                </span>
-              </div>
-            </li>
+          <span class="meta-badge">{{ 'decks.cardsCount' | translate: { count: cardCount() } }}</span>
+          @if (totalValue() > 0) {
+            <span class="meta-badge">{{ totalValue() | number: '1.2-2' }} €</span>
           }
-        </ul>
-      }
-
-      <div class="danger-zone">
-        @if (deleteError()) {
-          <p class="state-message error">{{ deleteError() }}</p>
-        }
-
-        @if (!confirmingDelete()) {
-          <button type="button" class="delete-link" (click)="confirmingDelete.set(true)">
-            {{ 'deckDetail.deleteLink' | translate }}
-          </button>
-        } @else {
-          <div class="confirm-row">
-            <span>{{ 'deckDetail.confirmDeleteText' | translate }}</span>
-            <label class="remove-cards-option">
-              <input
-                type="checkbox"
-                [checked]="removeCardsOnDelete()"
-                (change)="removeCardsOnDelete.set($any($event.target).checked)"
-              />
-              {{ 'deckDetail.removeCardsOption' | translate }}
-            </label>
-            <button type="button" class="delete-button" [disabled]="deleting()" (click)="confirmDelete()">
-              {{ 'deckDetail.confirmDeleteButton' | translate }}
-            </button>
-            <button type="button" class="cancel-link" (click)="confirmingDelete.set(false)">
-              {{ 'deckDetail.cancel' | translate }}
-            </button>
-          </div>
-        }
+          <span class="meta-badge" [class.is-complete]="availabilityMatch().percent === 100">
+            {{ 'decks.matchInCollection' | translate: { percent: availabilityMatch().percent } }}
+            @if (availabilityMatch().plannedElsewherePercent > 0) {
+              {{ 'deckDetail.plannedElsewhereHint' | translate: { percent: availabilityMatch().plannedElsewherePercent } }}
+            }
+          </span>
+        </div>
       </div>
     </div>
   </div>
-</div>
+
+  <div class="card-list">
+    @if (!treatAsComplete()) {
+      <label class="checkbox-label">
+        <input
+          type="checkbox"
+          [checked]="searchSubstitutes()"
+          (change)="searchSubstitutes.set($any($event.target).checked)"
+        />
+        {{ 'deckDetail.searchSubstitutesOption' | translate }}
+      </label>
+    }
+
+    @if (missingCards().length > 0) {
+      <div class="wishlist-row">
+        <span>{{ 'deckDetail.missingCards' | translate: { count: missingQuantityTotal() } }}</span>
+        @if (wishlistError()) {
+          <span class="state-message error">{{ wishlistError() }}</span>
+        } @else if (wishlistAdded()) {
+          <span class="wishlist-confirm">{{ 'deckDetail.onWishlist' | translate }}</span>
+        } @else {
+          <button
+            type="button"
+            class="btn btn--secondary btn--sm"
+            [disabled]="addingToWishlist()"
+            (click)="addMissingToWishlist()"
+          >
+            {{ 'deckDetail.wishlistButton' | translate }}
+          </button>
+        }
+      </div>
+    }
+
+    <h3>{{ 'deckDetail.containedCards' | translate }}</h3>
+    <div class="results-grid">
+      @for (item of mainCards(); track item.entry.row.id) {
+        <app-card-tile [card]="item.entry.card" [quantity]="item.entry.row.quantity" [status]="item.status" />
+      }
+    </div>
+
+    @if (tokenCards().length > 0) {
+      <h3>{{ 'deckDetail.containedTokens' | translate }}</h3>
+      <div class="results-grid">
+        @for (item of tokenCards(); track item.entry.row.id) {
+          <app-card-tile [card]="item.entry.card" [quantity]="item.entry.row.quantity" [status]="item.status" />
+        }
+      </div>
+    }
+
+    @if (cardBindingDetails().length > 0) {
+      <h3>{{ 'deckDetail.bindingDetailsTitle' | translate }}</h3>
+      <ul class="binding-details-list">
+        @for (detail of cardBindingDetails(); track detail.entry.row.id) {
+          <li class="binding-detail-row binding-detail-row--{{ detail.status }}">
+            <span class="binding-detail-icon" aria-hidden="true">
+              @if (detail.status === 'available') {
+                ✅
+              } @else if (detail.status === 'partial') {
+                🟡
+              } @else {
+                ❌
+              }
+            </span>
+            <div class="binding-detail-body">
+              <span class="binding-detail-name">{{ detail.entry.card.name }} ×{{ detail.entry.row.quantity }}</span>
+
+              @if (detail.substitute; as substitute) {
+                <span class="binding-detail-note">
+                  {{
+                    'deckDetail.substituteNote'
+                      | translate
+                        : {
+                            name: detail.entry.card.name,
+                            print: printLabel(detail.entry.card),
+                          }
+                  }}
+                </span>
+                <span class="binding-detail-subnote">
+                  {{
+                    'deckDetail.substituteOwnedNote'
+                      | translate
+                        : {
+                            name: substitute.card.name,
+                            print: printLabel(substitute.card),
+                          }
+                  }}
+                </span>
+              }
+
+              @for (assigned of detail.assignedElsewhere; track assigned.deckId) {
+                @if (confirmingRelease()?.key === releaseKey(detail.entry.row.id, assigned)) {
+                  <div class="release-confirm">
+                    <span class="binding-detail-note">
+                      {{
+                        'deckDetail.confirmReleaseText'
+                          | translate: { cardName: detail.entry.card.name, deckName: assigned.deckName }
+                      }}
+                    </span>
+                    @if (releaseError()) {
+                      <span class="state-message error">{{ releaseError() }}</span>
+                    }
+                    <div class="release-confirm-actions">
+                      <button type="button" class="btn btn--ghost btn--sm" appFocusOnInit [disabled]="releasing()" (click)="cancelRelease()">
+                        {{ 'deckDetail.cancel' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn--danger btn--sm"
+                        [disabled]="releasing()"
+                        (click)="confirmRelease()"
+                      >
+                        {{ 'deckDetail.confirmReleaseButton' | translate }}
+                      </button>
+                    </div>
+                  </div>
+                } @else {
+                  <span class="binding-detail-note binding-detail-note--with-action">
+                    {{ 'deckDetail.assignedElsewhereNote' | translate: { deckName: assigned.deckName } }}
+                    <button type="button" class="release-link" (click)="requestRelease(detail, assigned)">
+                      {{ 'deckDetail.releaseButton' | translate }}
+                    </button>
+                  </span>
+                }
+              }
+
+              <span class="binding-detail-note">
+                {{
+                  'deckDetail.availableNote'
+                    | translate: { available: detail.available, needed: detail.entry.row.quantity }
+                }}
+              </span>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+
+    <div class="danger-zone">
+      @if (deleteError()) {
+        <p class="state-message error">{{ deleteError() }}</p>
+      }
+
+      @if (!confirmingDelete()) {
+        <button type="button" class="btn btn--ghost btn--sm btn--flush delete-link" (click)="confirmingDelete.set(true)">
+          {{ 'deckDetail.deleteLink' | translate }}
+        </button>
+      } @else {
+        <div class="confirm-row">
+          <span>{{ 'deckDetail.confirmDeleteText' | translate }}</span>
+          <label class="remove-cards-option">
+            <input
+              type="checkbox"
+              [checked]="removeCardsOnDelete()"
+              (change)="removeCardsOnDelete.set($any($event.target).checked)"
+            />
+            {{ 'deckDetail.removeCardsOption' | translate }}
+          </label>
+          <button type="button" class="btn btn--danger btn--sm" [disabled]="deleting()" (click)="confirmDelete()">
+            {{ 'deckDetail.confirmDeleteButton' | translate }}
+          </button>
+          <button type="button" class="btn btn--ghost btn--sm" appFocusOnInit (click)="confirmingDelete.set(false)">
+            {{ 'deckDetail.cancel' | translate }}
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+</app-dialog>

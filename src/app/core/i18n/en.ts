@@ -25,6 +25,7 @@ export const en: typeof de = {
     yes: 'Yes',
     no: 'No',
     forDeck: 'For {{name}}',
+    close: 'Close',
   },
   colors: {
     white: 'White',
@@ -342,7 +343,6 @@ export const en: typeof de = {
     title: 'Scanner locked in demo mode',
     message: 'The scanner isn\'t available in demo mode. Please sign up for full access.',
     cta: 'Sign up now',
-    close: 'Close',
   },
   addWishlist: {
     title: 'Add to Wishlist',

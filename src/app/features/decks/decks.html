@@ -7,18 +7,18 @@
 
   <div class="deck-action-row">
     @if (gameService.currentSlug() === 'mtg') {
-      <button type="button" class="commander-recs-button" (click)="showCommanderRecs.set(true)">
+      <button type="button" class="btn btn--secondary" (click)="showCommanderRecs.set(true)">
         {{ 'decks.commanderRecsButton' | translate }}
       </button>
-      <button type="button" class="commander-recs-button" (click)="showFormatRecs.set(true)">
+      <button type="button" class="btn btn--secondary" (click)="showFormatRecs.set(true)">
         {{ 'decks.formatRecsButton' | translate }}
       </button>
     } @else if (gameService.currentSlug() === 'yugioh') {
-      <button type="button" class="commander-recs-button" (click)="showArchetypeBrowser.set(true)">
+      <button type="button" class="btn btn--secondary" (click)="showArchetypeBrowser.set(true)">
         {{ 'archetypeBrowser.openButton' | translate }}
       </button>
     }
-    <button type="button" class="commander-recs-button" (click)="showDeckImport.set(true)">
+    <button type="button" class="btn btn--secondary" (click)="showDeckImport.set(true)">
       {{ 'deckImport.openButton' | translate }}
     </button>
   </div>
@@ -51,7 +51,7 @@
             <div class="recommendation-actions">
               <button
                 type="button"
-                class="add-recommendation-button"
+                class="btn btn--primary btn--sm"
                 [disabled]="addingFileName() === rec.deck.fileName"
                 (click)="addRecommendation(rec)"
               >
