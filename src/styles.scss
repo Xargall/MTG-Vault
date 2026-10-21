@@ -128,6 +128,18 @@ $pokemon-surface-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.or
   // wouldn't follow a body[data-game] override.
   --color-on-accent: #17110b;
 
+  // Semantic status colors, themed like everything else. Success = owned /
+  // complete / saved; warning = partial / caution. *-text variants are for
+  // copy on the dark surfaces, the plain ones for fills with on-* text.
+  --color-success: #2e7d4f;
+  --color-on-success: #e6f5ea;
+  --color-success-text: #6cc08e;
+  --color-warning: #d9893a;
+  --color-on-warning: #1c1206;
+
+  // Logo seal gem (header + game-select screen).
+  --color-gem: #3d6f96;
+
   --font-body: 'EB Garamond', serif;
   --font-heading: 'Cinzel', serif;
   --radius: 6px;
@@ -169,6 +181,12 @@ body[data-game='yugioh'] {
   --color-danger: #e0687a;
   --color-bronze: #b08d3e;
   --color-on-accent: #140b1f;
+  --color-success: #2f8a5b;
+  --color-on-success: #e3f6ea;
+  --color-success-text: #6ccf98;
+  --color-warning: #e0a43c;
+  --color-on-warning: #1f1405;
+  --color-gem: #23847c;
 
   --header-grad-top: #5b2f96;
   --header-grad-bottom: #241640;
@@ -196,6 +214,12 @@ body[data-game='pokemon'] {
   --color-danger: #e0483f;
   --color-bronze: #a67c27;
   --color-on-accent: #170f05;
+  --color-success: #3f8f45;
+  --color-on-success: #e8f6e0;
+  --color-success-text: #7cc96f;
+  --color-warning: #e88a2e;
+  --color-on-warning: #1f1203;
+  --color-gem: #b23a2e;
 
   --header-grad-top: #8a5a12;
   --header-grad-bottom: #2a1f0c;
@@ -205,6 +229,17 @@ body[data-game='pokemon'] {
 
   // Same seal motif again, recolored to electric yellow.
   --pattern-seal-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(247,213,29,0.07)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+// Tokens derived from the theme colors. Declared on body - the element that
+// carries [data-game] - so color-mix() resolves against that game's accent
+// and background (a :root declaration would freeze the MTG values).
+body {
+  --glow-accent: color-mix(in oklab, var(--color-accent) 16%, transparent);
+  --glow-accent-strong: color-mix(in oklab, var(--color-accent) 30%, transparent);
+  // Darkening layer for text over card art (deck heroes, banners).
+  --scrim: color-mix(in oklab, var(--color-bg) 65%, transparent);
+  --scrim-strong: color-mix(in oklab, var(--color-bg) 92%, transparent);
 }
 
 * {

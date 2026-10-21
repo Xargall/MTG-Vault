@@ -114,7 +114,7 @@ h1 {
   &.is-active {
     background: var(--filter-color);
     border-color: var(--filter-color);
-    color: var(--color-bg);
+    color: var(--color-on-accent);
     font-weight: 600;
   }
 }
@@ -219,7 +219,7 @@ h1 {
   right: 6px;
   z-index: 1;
   background: var(--color-danger);
-  color: var(--color-bg);
+  color: var(--color-on-accent);
   border-radius: var(--radius);
   padding: 1px 6px;
   font-size: 0.7rem;

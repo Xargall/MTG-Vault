@@ -20,8 +20,8 @@
   top: var(--spacing-md);
   right: var(--spacing-md);
   z-index: 1;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
+  background: var(--scrim);
+  color: var(--color-text);
   border: none;
   border-radius: 50%;
   width: 36px;
@@ -35,8 +35,8 @@
   top: var(--spacing-md);
   left: 50%;
   transform: translateX(-50%);
-  color: #fff;
-  background: rgba(0, 0, 0, 0.5);
+  color: var(--color-text);
+  background: var(--scrim);
   padding: 4px 12px;
   border-radius: var(--radius);
   font-size: 0.85rem;
@@ -47,8 +47,8 @@
   top: var(--spacing-md);
   left: 50%;
   transform: translateX(-50%);
-  color: #fff;
-  background: rgba(0, 0, 0, 0.5);
+  color: var(--color-text);
+  background: var(--scrim);
   padding: 4px 12px;
   border-radius: var(--radius);
   font-size: 0.75rem;
@@ -95,8 +95,8 @@
   height: 20px;
   border-radius: 50%;
   border: none;
-  background: var(--color-danger, #dc2626);
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-on-accent);
   font-size: 0.65rem;
   line-height: 1;
   display: flex;
@@ -151,17 +151,18 @@
   position: absolute;
   top: var(--spacing-md);
   right: var(--spacing-md);
-  color: #fff;
   padding: 4px 10px;
   border-radius: var(--radius);
   font-size: 0.8rem;
 
   &--gemini {
-    background: #16a34a;
+    background: var(--color-success);
+    color: var(--color-on-success);
   }
 
   &--limit {
-    background: #dc2626;
+    background: var(--color-danger);
+    color: var(--color-on-accent);
   }
 }
 
@@ -173,8 +174,8 @@
   max-width: 280px;
   padding: 10px 18px;
   border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
+  background: var(--scrim);
+  color: var(--color-text);
   text-align: center;
   font-size: 0.85rem;
 
@@ -214,15 +215,16 @@
   max-width: 85%;
   padding: var(--spacing-sm) var(--spacing-md);
   border-radius: var(--radius);
-  background: #3d7a3d;
-  color: #fff;
+  background: var(--color-success);
+  color: var(--color-on-success);
   font-size: 0.9rem;
   font-weight: 600;
   text-align: center;
   z-index: 9999;
 
   &--warning {
-    background: #b8722f;
+    background: var(--color-warning);
+    color: var(--color-on-warning);
   }
 }
 

@@ -53,8 +53,8 @@
   height: 22px;
   border-radius: 50%;
   border: none;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
+  background: var(--scrim);
+  color: var(--color-text);
   font-size: 0.7rem;
   line-height: 1;
   cursor: pointer;
@@ -105,12 +105,12 @@
 
   &.priority-2 {
     background: var(--color-accent);
-    color: var(--color-bg);
+    color: var(--color-on-accent);
   }
 
   &.priority-3 {
     background: var(--color-danger);
-    color: var(--color-bg);
+    color: var(--color-on-accent);
   }
 }
 

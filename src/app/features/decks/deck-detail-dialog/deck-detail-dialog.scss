@@ -15,7 +15,7 @@
   flex-direction: column;
   justify-content: space-between;
   padding: var(--spacing-md) var(--spacing-lg);
-  background: linear-gradient(180deg, rgba(20, 20, 28, 0.5) 0%, rgba(20, 20, 28, 0.3) 40%, rgba(20, 20, 28, 0.95) 100%);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--color-bg) 50%, transparent) 0%, color-mix(in oklab, var(--color-bg) 30%, transparent) 40%, var(--scrim-strong) 100%);
 }
 
 // Sits on top of card art, so it keeps its own dark plate instead of the
@@ -23,12 +23,12 @@
 .hero-close {
   align-self: flex-end;
   margin: calc(-1 * var(--spacing-sm)) calc(-1 * var(--spacing-md)) 0 0;
-  background: rgba(20, 20, 28, 0.6);
+  background: var(--scrim);
   color: var(--color-text);
 
   @media (hover: hover) and (pointer: fine) {
     &:hover {
-      background: rgba(20, 20, 28, 0.85);
+      background: var(--scrim-strong);
     }
   }
 }
@@ -51,13 +51,13 @@
 .meta-badge {
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(20, 20, 28, 0.65);
+  background: var(--scrim);
   color: var(--color-text);
   font-size: 0.8rem;
 
   &.is-complete {
-    background: #1f7a4d;
-    color: #eafff3;
+    background: var(--color-success);
+    color: var(--color-on-success);
   }
 }
 
@@ -91,7 +91,7 @@
 }
 
 .wishlist-confirm {
-  color: #4caf7d;
+  color: var(--color-success-text);
   font-weight: 600;
 }
 
@@ -114,11 +114,11 @@
   border-left: 3px solid transparent;
 
   &--available {
-    border-left-color: #4caf7d;
+    border-left-color: var(--color-success-text);
   }
 
   &--partial {
-    border-left-color: #d9a83c;
+    border-left-color: var(--color-warning);
   }
 
   &--unavailable {

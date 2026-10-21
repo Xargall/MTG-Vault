@@ -20,7 +20,7 @@
 
     &.is-active {
       background: linear-gradient(180deg, var(--color-accent-hover) 0%, var(--color-accent) 100%);
-      color: var(--color-bg);
+      color: var(--color-on-accent);
       border-color: var(--color-accent);
       font-weight: 600;
     }
@@ -32,7 +32,7 @@
   font-size: 0.85rem;
 
   &--set {
-    color: #4caf7d;
+    color: var(--color-success-text);
   }
 
   &--unset {

@@ -156,7 +156,7 @@ app-deck-banner {
   color: var(--color-text-muted);
 
   &.is-complete {
-    background: #1f7a4d;
-    color: #eafff3;
+    background: var(--color-success);
+    color: var(--color-on-success);
   }
 }

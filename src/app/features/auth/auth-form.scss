@@ -24,7 +24,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
-    box-shadow: 0 0 18px rgba(201, 162, 74, 0.22);
+    box-shadow: 0 0 18px var(--glow-accent);
   }
 
   h1 {
@@ -128,9 +128,9 @@
 @keyframes auth-card-glow {
   0%,
   100% {
-    box-shadow: 0 0 14px rgba(201, 162, 74, 0.16);
+    box-shadow: 0 0 14px var(--glow-accent);
   }
   50% {
-    box-shadow: 0 0 28px rgba(201, 162, 74, 0.4);
+    box-shadow: 0 0 28px var(--glow-accent-strong);
   }
 }

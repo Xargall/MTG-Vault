@@ -33,23 +33,29 @@ h1 {
 // .popular-card (same box/size as the Popular Cards widget this is styled to
 // match - see dashboard.html), which already centers its children.
 .salt-badge {
+  --salt-color: var(--chart-4);
   margin-top: var(--spacing-sm);
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: 2px 10px;
+  border: 1px solid var(--salt-color);
+  border-radius: var(--radius-pill);
+  // Tinted seal instead of a solid fill: white-on-gold (the old low tier)
+  // only reached ~2.8:1.
+  background: color-mix(in oklab, var(--salt-color) 22%, transparent);
+  color: var(--color-text);
   font-size: 0.75rem;
   font-weight: 600;
-  color: #fff;
+  font-variant-numeric: tabular-nums;
 
   &--high {
-    background: var(--chart-7); // dried-blood red
+    --salt-color: var(--chart-7); // dried-blood red
   }
 
   &--medium {
-    background: var(--chart-2); // ember rust
+    --salt-color: var(--chart-2); // ember rust
   }
 
   &--low {
-    background: var(--chart-4); // aged gold
+    --salt-color: var(--chart-4); // aged gold
   }
 }
 
@@ -86,12 +92,12 @@ h1 {
   color: inherit;
   // Subtle, permanent gold glow (see .overview-card) rather than a hover-only
   // effect - a light touch of "these are the premium panels" throughout.
-  box-shadow: 0 0 14px rgba(201, 162, 74, 0.16);
+  box-shadow: 0 0 14px var(--glow-accent);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
   &:hover {
     border-color: var(--color-accent);
-    box-shadow: 0 0 18px rgba(201, 162, 74, 0.28);
+    box-shadow: 0 0 18px var(--glow-accent-strong);
   }
 }
 
@@ -159,7 +165,7 @@ h1 {
   border-radius: var(--radius);
   // Subtle, permanent gold glow - edels touch, not a hover effect - on all
   // three top-row panels (color chart, popular cards, price chart).
-  box-shadow: 0 0 14px rgba(201, 162, 74, 0.16);
+  box-shadow: 0 0 14px var(--glow-accent);
   padding: var(--spacing-lg);
   margin: 0 auto;
   width: fit-content;
