@@ -7,14 +7,13 @@
     <p class="state-message error">{{ errorMessage() }}</p>
   } @else {
     <div class="top-row">
-      <section class="chart-card toolbar-card">
-        <h2>{{ 'collection.searchAndFilter' | translate }}</h2>
-
+      <section class="chart-card toolbar-card" [attr.aria-label]="'collection.searchAndFilter' | translate">
         <div class="search-row">
           <input
-            type="text"
+            type="search"
             class="search-input"
             [placeholder]="(showSurplusOnly() ? 'collection.surplusSearchPlaceholder' : 'collection.searchPlaceholder') | translate"
+            [attr.aria-label]="'collection.searchPlaceholder' | translate"
             [value]="searchQuery()"
             (input)="searchQuery.set($any($event.target).value)"
           />
@@ -48,6 +47,8 @@
           </a>
         </div>
 
+        <!-- Color/attribute chips stay on the page as the quick filter; every
+             other filter lives in the sheet behind "Filter". -->
         <div class="filter-buttons">
           <button
             type="button"
@@ -69,73 +70,7 @@
               {{ category.label | translate }}
             </button>
           }
-          @if (hasSurplusCards()) {
-            <button
-              type="button"
-              class="filter-button filter-button--surplus"
-              [class.is-active]="showSurplusOnly()"
-              (click)="showSurplusOnly.set(!showSurplusOnly())"
-            >
-              {{ 'collection.surplusFilter' | translate }}
-            </button>
-          }
-
-          @if (availableSets().length > 0) {
-            <div class="set-filter">
-              <button
-                type="button"
-                class="filter-button"
-                [class.is-active]="selectedSets().size > 0"
-                (click)="showSetMenu.set(!showSetMenu())"
-              >
-                {{ 'collection.setFilter' | translate }}
-                @if (selectedSets().size > 0) {
-                  <span class="set-filter-count">{{ selectedSets().size }}</span>
-                }
-                <svg class="set-filter-chevron" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
-              </button>
-
-              @if (showSetMenu()) {
-                <div class="set-filter-menu">
-                  <div class="set-filter-menu-header">
-                    <span>{{ 'collection.setFilter' | translate }}</span>
-                    @if (selectedSets().size > 0) {
-                      <button type="button" class="set-filter-clear" (click)="clearSets()">
-                        {{ 'collection.setFilterClear' | translate }}
-                      </button>
-                    }
-                  </div>
-                  <ul class="set-filter-list">
-                    @for (set of availableSets(); track set.name) {
-                      <li>
-                        <label class="set-filter-option">
-                          <input
-                            type="checkbox"
-                            [checked]="selectedSets().has(set.name)"
-                            (change)="toggleSet(set.name)"
-                          />
-                          <span class="set-filter-name">{{ set.name }}</span>
-                          <span class="set-filter-count-badge">{{ set.count }}</span>
-                        </label>
-                      </li>
-                    }
-                  </ul>
-                </div>
-              }
-            </div>
-          }
         </div>
-
-        @if (showSurplusOnly()) {
-          <label class="hide-lands-toggle">
-            <input
-              type="checkbox"
-              [checked]="hideLands()"
-              (change)="hideLands.set($any($event.target).checked)"
-            />
-            {{ 'collection.hideLands' | translate }}
-          </label>
-        }
       </section>
 
       @if (hasAnyCards() && gameService.currentSlug() === 'mtg') {
@@ -146,10 +81,66 @@
       }
     </div>
 
+    @if (hasAnyCards()) {
+      <div class="results-bar">
+        <p class="results-summary" aria-live="polite">
+          {{ (summary().count === 1 ? 'wishlist.cardCountOne' : 'wishlist.cardCountOther') | translate: { count: summary().count } }}
+          · <span class="results-value">{{ summary().value | price }}</span>
+        </p>
+
+        <div class="results-controls">
+          <button type="button" class="btn btn--secondary btn--sm filter-toggle" (click)="showFilters.set(true)">
+            <svg aria-hidden="true"><use href="#icon-filter" /></svg>
+            {{ 'collection.filterButton' | translate }}
+            @if (sheetFilterCount() > 0) {
+              <span class="filter-count">{{ sheetFilterCount() }}</span>
+            }
+          </button>
+
+          <label class="visually-hidden" for="collection-sort">{{ 'collection.sortLabel' | translate }}</label>
+          <select id="collection-sort" class="sort-select" [value]="sort()" (change)="setSort($any($event.target).value)">
+            @for (option of sortOptions(); track option.value) {
+              <option [value]="option.value" [selected]="option.value === sort()">{{ option.labelKey | translate }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      @if (activeChips().length > 0) {
+        <ul class="active-filters" [attr.aria-label]="'collection.activeFilters' | translate">
+          @for (chip of activeChips(); track chip.id) {
+            <li>
+              <button
+                type="button"
+                class="active-chip"
+                (click)="chip.remove()"
+                [attr.aria-label]="'collection.removeFilter' | translate: { name: chip.label }"
+              >
+                {{ chip.label }}
+                <svg aria-hidden="true"><use href="#icon-close" /></svg>
+              </button>
+            </li>
+          }
+          <li>
+            <button type="button" class="btn btn--ghost btn--sm" (click)="resetFilters()">
+              {{ 'collection.resetAll' | translate }}
+            </button>
+          </li>
+        </ul>
+      }
+    }
+
     @if (!hasAnyCards()) {
       <p class="state-message">{{ 'collection.emptyCollection' | translate }}</p>
     } @else if (filteredEntries().length === 0) {
-      <p class="state-message">{{ 'collection.noResults' | translate }}</p>
+      <div class="no-results">
+        <p class="state-message">{{ 'collection.noResults' | translate }}</p>
+        @if (sheetFilterCount() > 0) {
+          <button type="button" class="btn btn--secondary btn--sm" (click)="resetFilters()">
+            {{ 'collection.resetAll' | translate }}
+          </button>
+        }
+      </div>
     } @else {
       <div class="card-grid" [class.reveal-grid]="revealing()">
         @for (entry of visibleEntries(); track entry.row.id) {
@@ -169,6 +160,123 @@
     }
   }
 </div>
+
+@if (showFilters()) {
+  <app-dialog [heading]="'collection.filterTitle' | translate" maxWidth="520px" (closeRequest)="showFilters.set(false)">
+    @if (typeOptions().length > 0) {
+      <fieldset class="filter-group">
+        <legend>{{ 'collection.filterType' | translate }}</legend>
+        <div class="filter-chips">
+          @for (option of typeOptions(); track option.key) {
+            <button
+              type="button"
+              class="filter-button"
+              style="--filter-color: var(--color-accent)"
+              [class.is-active]="selectedTypes().has(option.key)"
+              [attr.aria-pressed]="selectedTypes().has(option.key)"
+              (click)="toggleType(option.key)"
+            >
+              {{ option.labelKey | translate }} <span class="chip-count">{{ option.count }}</span>
+            </button>
+          }
+        </div>
+      </fieldset>
+    }
+
+    @if (rarityOptions().length > 0) {
+      <fieldset class="filter-group">
+        <legend>{{ 'collection.filterRarity' | translate }}</legend>
+        <div class="filter-chips">
+          @for (option of rarityOptions(); track option.key) {
+            <button
+              type="button"
+              class="filter-button"
+              style="--filter-color: var(--color-accent)"
+              [class.is-active]="selectedRarities().has(option.key)"
+              [attr.aria-pressed]="selectedRarities().has(option.key)"
+              (click)="toggleRarity(option.key)"
+            >
+              {{ option.labelKey | translate }} <span class="chip-count">{{ option.count }}</span>
+            </button>
+          }
+        </div>
+      </fieldset>
+    }
+
+    <fieldset class="filter-group">
+      <legend>{{ 'collection.filterPrice' | translate }}</legend>
+      <div class="price-range">
+        <label class="price-field">
+          <span class="field-caption">{{ 'collection.priceFrom' | translate }}</span>
+          <input
+            type="text"
+            inputmode="decimal"
+            placeholder="0"
+            [value]="priceMin() ?? ''"
+            (change)="setPriceBound('min', $any($event.target).value)"
+          />
+        </label>
+        <span class="price-dash" aria-hidden="true">–</span>
+        <label class="price-field">
+          <span class="field-caption">{{ 'collection.priceTo' | translate }}</span>
+          <input
+            type="text"
+            inputmode="decimal"
+            placeholder="∞"
+            [value]="priceMax() ?? ''"
+            (change)="setPriceBound('max', $any($event.target).value)"
+          />
+        </label>
+      </div>
+    </fieldset>
+
+    @if (availableSets().length > 0) {
+      <fieldset class="filter-group">
+        <legend>{{ 'collection.setFilter' | translate }}</legend>
+        <ul class="set-filter-list">
+          @for (set of availableSets(); track set.name) {
+            <li>
+              <label class="set-filter-option">
+                <input type="checkbox" [checked]="selectedSets().has(set.name)" (change)="toggleSet(set.name)" />
+                <span class="set-filter-name">{{ set.name }}</span>
+                <span class="set-filter-count-badge">{{ set.count }}</span>
+              </label>
+            </li>
+          }
+        </ul>
+      </fieldset>
+    }
+
+    @if (hasSurplusCards()) {
+      <fieldset class="filter-group">
+        <legend>{{ 'collection.filterDecks' | translate }}</legend>
+        <label class="checkbox-label">
+          <input
+            type="checkbox"
+            [checked]="showSurplusOnly()"
+            (change)="showSurplusOnly.set($any($event.target).checked)"
+          />
+          {{ 'collection.surplusOnly' | translate }}
+        </label>
+        @if (showSurplusOnly()) {
+          <label class="checkbox-label">
+            <input type="checkbox" [checked]="hideLands()" (change)="hideLands.set($any($event.target).checked)" />
+            {{ 'collection.hideLands' | translate }}
+          </label>
+        }
+      </fieldset>
+    }
+
+    <div class="filter-sheet-actions">
+      <button type="button" class="btn btn--ghost" [disabled]="sheetFilterCount() === 0" (click)="resetFilters()">
+        {{ 'collection.filterReset' | translate }}
+      </button>
+      <button type="button" class="btn btn--primary" (click)="showFilters.set(false)">
+        {{ (summary().count === 1 ? 'collection.showResultsOne' : 'collection.showResults') | translate: { count: summary().count } }}
+      </button>
+    </div>
+  </app-dialog>
+}
 
 @if (showAddDialog()) {
   <app-add-card-dialog (close)="showAddDialog.set(false)" (added)="load()" />

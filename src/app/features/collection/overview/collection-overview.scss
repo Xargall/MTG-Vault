@@ -1,5 +1,13 @@
+// One 1100px container for everything - toolbar, results bar and grid share
+// the same left and right edges (same principle as the dashboard).
 .overview {
+  max-width: 1100px;
+  margin: 0 auto;
   padding: var(--spacing-lg);
+
+  @media (max-width: 640px) {
+    padding: var(--spacing-md);
+  }
 }
 
 h1 {
@@ -44,30 +52,40 @@ h1 {
 }
 
 .top-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--spacing-lg);
-  max-width: 1100px;
-  margin: 0 auto;
+
+  // Without the mana curve (other games) the toolbar takes the full row.
+  &:not(:has(.mana-curve-card)) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .toolbar-card,
 .mana-curve-card {
-  flex: 1 1 460px;
-  max-width: 520px;
-  // Without this, the flex item's automatic minimum size falls back to its
-  // content's min-content width (~345px here), which is wider than many
-  // phone viewports - it can't shrink below that and overflows the row
-  // instead of wrapping to it. min-width: 0 lets it actually shrink.
   min-width: 0;
+}
+
+// Phones: the curve sat between the search and the results, so the first
+// card started a full screen down. It stays a desktop side panel.
+.mana-curve-card {
+  @media (max-width: 640px) {
+    display: none;
+  }
 }
 
 .toolbar-card {
   position: relative;
   display: flex;
   flex-direction: column;
+  // Beside the taller mana curve the controls sit centered instead of
+  // leaving an empty band at the bottom.
+  justify-content: center;
   gap: var(--spacing-md);
 }
 
@@ -85,16 +103,6 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm);
-}
-
-.hide-lands-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: var(--spacing-sm);
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  cursor: pointer;
 }
 
 .filter-button {
@@ -131,106 +139,6 @@ h1 {
 
 .filter-button--surplus {
   --filter-color: var(--color-danger);
-}
-
-.set-filter {
-  position: relative;
-
-  // Lets the menu below position against the whole toolbar panel instead.
-  @media (max-width: 640px) {
-    position: static;
-  }
-}
-
-.set-filter-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  margin-left: 4px;
-  border-radius: 999px;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.set-filter-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 10;
-  width: 260px;
-  max-height: 320px;
-  overflow-y: auto;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  padding: var(--spacing-sm);
-  // Grows out of its chip rather than popping in.
-  transform-origin: top left;
-  transition:
-    opacity 160ms var(--ease-out),
-    transform 160ms var(--ease-out);
-
-  @starting-style {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-
-  // Phones: anchor to the toolbar panel (full width) instead of the chip,
-  // which sits near the right edge and pushed a 260px menu off-screen.
-  @media (max-width: 640px) {
-    left: var(--spacing-md);
-    right: var(--spacing-md);
-    width: auto;
-  }
-}
-
-.set-filter-menu-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  margin-bottom: var(--spacing-sm);
-}
-
-.set-filter-clear {
-  background: transparent;
-  border: none;
-  color: var(--color-accent);
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-}
-
-.set-filter-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.set-filter-option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 6px;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: 0.85rem;
-
-  &:hover {
-    background: var(--color-surface-alt);
-  }
 }
 
 .set-filter-name {
@@ -297,7 +205,7 @@ h1 {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: var(--spacing-md);
-  margin-top: var(--spacing-lg);
+  margin-top: var(--spacing-md);
 }
 
 .card-link {
@@ -335,9 +243,211 @@ h1 {
   }
 }
 
-.set-filter-chevron {
-  width: 1em;
-  height: 1em;
+
+// --- Results bar: what's shown, how it's ordered, and the filter entry ------
+
+.results-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm) var(--spacing-md);
+  margin: var(--spacing-lg) 0 var(--spacing-sm);
+}
+
+.results-summary {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.results-value {
+  color: var(--color-accent-hover);
+  font-weight: 600;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.results-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sort-select {
+  min-height: 2.25rem;
+  padding-block: 0.25rem;
+  font-size: 0.9rem;
+
+  // 16px on touch so iOS doesn't zoom when the list opens.
+  @media (pointer: coarse) {
+    min-height: var(--tap-min);
+    font-size: 1rem;
+  }
+}
+
+// Active filters as removable chips - what's narrowing the grid stays
+// visible once the sheet is closed.
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: 0 0 var(--spacing-md);
+  padding: 0;
+  list-style: none;
+}
+
+.active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 2rem;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--color-accent) 14%, transparent);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  @media (pointer: coarse) {
+    min-height: 2.5rem;
+  }
+
+  svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    color: var(--color-text-muted);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover svg {
+      color: var(--color-text);
+    }
+  }
+}
+
+.no-results {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+// --- Filter sheet -----------------------------------------------------------
+
+.filter-group {
+  margin: 0;
+  padding: 0 0 var(--spacing-md);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+
+  legend {
+    margin-bottom: var(--spacing-sm);
+    padding: 0;
+    color: var(--color-text);
+    font-family: var(--font-heading);
+    font-size: 0.9rem;
+  }
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.chip-count {
   margin-left: 2px;
-  vertical-align: -0.15em;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.price-range {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-sm);
+}
+
+.price-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+
+  input {
+    width: 100%;
+  }
+}
+
+.price-dash {
+  padding-bottom: 0.65rem;
+  color: var(--color-text-muted);
+}
+
+.field-caption {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.set-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 14rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.set-filter-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 2.5rem;
+  padding: 0 6px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  cursor: pointer;
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background: var(--color-surface-alt);
+    }
+  }
+}
+
+// Stays at the bottom of the sheet while the options scroll.
+.filter-sheet-actions {
+  position: sticky;
+  bottom: calc(-1 * var(--spacing-lg));
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin: 0 calc(-1 * var(--spacing-lg)) calc(-1 * var(--spacing-lg));
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+
+  .btn--primary {
+    flex: 1;
+  }
 }

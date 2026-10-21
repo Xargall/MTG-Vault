@@ -15,6 +15,8 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
+import { AppDialog } from '../../../shared/dialog/dialog';
+import { PricePipe, formatEuro } from '../../../shared/pipes/price.pipe';
 import { AuthService } from '../../../core/services/auth.service';
 import { CardDisplayLanguageService } from '../../../core/services/card-display-language.service';
 import { GameService } from '../../../core/services/game.service';
@@ -24,6 +26,17 @@ import { CardDetailDialog } from '../card-detail/card-detail-dialog';
 import { DemoScanBlockedDialog } from '../demo-scan-blocked-dialog/demo-scan-blocked-dialog';
 import { categoryKeyFor, getCategoriesForGame } from '../card-category-stats';
 import { buildDeckNamesByCard, getEntryDeckNames, getEntrySurplus, getSurplusMap, isLandCard } from '../card-surplus-stats';
+import {
+  CollectionSort,
+  SORT_OPTIONS,
+  getRarityOptions,
+  getTypeKeys,
+  getTypeOptions,
+  getUnitPrice,
+  matchesPriceRange,
+  rarityLabelKey,
+  sortEntries,
+} from '../collection-filters';
 import { getManaCurve } from '../collection-stats';
 import { CollectionEntry, CollectionService } from '../collection.service';
 
@@ -38,6 +51,25 @@ import { CollectionEntry, CollectionService } from '../collection.service';
 const INITIAL_RENDER_LIMIT = 60;
 const RENDER_LIMIT_STEP = 60;
 
+const SORT_STORAGE_KEY = 'tcgvault.collection.sort';
+
+function readStoredSort(): CollectionSort {
+  try {
+    const stored = localStorage.getItem(SORT_STORAGE_KEY);
+    if (SORT_OPTIONS.some((option) => option.value === stored)) return stored as CollectionSort;
+  } catch {
+    // Storage blocked (private mode etc.) - fall back to the default.
+  }
+  return 'name';
+}
+
+/** One removable chip per active filter, shown above the grid. */
+export interface ActiveFilterChip {
+  id: string;
+  label: string;
+  remove: () => void;
+}
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-collection-overview',
@@ -45,7 +77,9 @@ const RENDER_LIMIT_STEP = 60;
     BarChart,
     CardTile,
     AddCardDialog,
+    AppDialog,
     CardDetailDialog,
+    PricePipe,
     DemoScanBlockedDialog,
     RouterLink,
     TranslatePipe,
@@ -78,11 +112,21 @@ export class CollectionOverview {
   protected readonly searchQuery = signal('');
   protected readonly selectedCategory = signal<string | null>(null);
   // Which set(s) (CollectionEntry.card.setName) to restrict the grid to -
-  // empty means no restriction. A small click-to-open menu (see
-  // showSetMenu/availableSets below), not a row of buttons like the color
-  // categories, since a collection can span dozens of different sets.
+  // empty means no restriction. A checkbox list in the filter sheet (see
+  // availableSets below), not a row of chips like the color categories,
+  // since a collection can span dozens of different sets.
   protected readonly selectedSets = signal<Set<string>>(new Set());
-  protected readonly showSetMenu = signal(false);
+  protected readonly selectedTypes = signal<Set<string>>(new Set());
+  protected readonly selectedRarities = signal<Set<string>>(new Set());
+  // EUR per copy; null = no bound on that side.
+  protected readonly priceMin = signal<number | null>(null);
+  protected readonly priceMax = signal<number | null>(null);
+  protected readonly showFilters = signal(false);
+  // A deliberate order instead of whatever the database returned.
+  protected readonly sort = signal<CollectionSort>(readStoredSort());
+  protected readonly sortOptions = computed(() =>
+    SORT_OPTIONS.filter((option) => !option.mtgOnly || this.gameService.currentSlug() === 'mtg'),
+  );
   protected readonly showSurplusOnly = signal(false);
   // Only meaningful (and only shown) alongside showSurplusOnly - lands
   // dominate that view with large, uninteresting counts (see isLandCard's
@@ -112,6 +156,10 @@ export class CollectionOverview {
     const hideLands = this.hideLands();
     const surplusMap = this.surplusMap();
     const deckNamesByCard = this.deckNamesByCard();
+    const types = this.selectedTypes();
+    const rarities = this.selectedRarities();
+    const priceMin = this.priceMin();
+    const priceMax = this.priceMax();
 
     return this.entries().filter((entry) => {
       // In surplus mode the search also matches a deck's name, not just the
@@ -136,7 +184,17 @@ export class CollectionOverview {
       const matchesCategory = !category || categoryKeyFor(entry) === category;
       const matchesSurplus = !surplusOnly || getEntrySurplus(entry, surplusMap) > 0;
       const matchesLandFilter = !(surplusOnly && hideLands) || !isLandCard(entry.card);
-      return matchesQuery && matchesCategory && matchesSurplus && matchesLandFilter;
+      const matchesType = types.size === 0 || getTypeKeys(entry.card).some((key) => types.has(key));
+      const matchesRarity = rarities.size === 0 || (!!entry.card.rarity && rarities.has(entry.card.rarity));
+      return (
+        matchesQuery &&
+        matchesCategory &&
+        matchesSurplus &&
+        matchesLandFilter &&
+        matchesType &&
+        matchesRarity &&
+        matchesPriceRange(entry, priceMin, priceMax)
+      );
     });
   });
 
@@ -156,8 +214,75 @@ export class CollectionOverview {
   protected readonly filteredEntries = computed(() => {
     const selectedSets = this.selectedSets();
     const entries = this.entriesBeforeSetFilter();
-    if (selectedSets.size === 0) return entries;
-    return entries.filter((entry) => entry.card.setName && selectedSets.has(entry.card.setName));
+    const filtered =
+      selectedSets.size === 0
+        ? entries
+        : entries.filter((entry) => entry.card.setName && selectedSets.has(entry.card.setName));
+    return sortEntries(filtered, this.sort());
+  });
+
+  // Facet options come from the whole collection of the active game, so a
+  // choice never disappears from the sheet just because another filter
+  // currently hides all of its cards.
+  protected readonly typeOptions = computed(() => getTypeOptions(this.entries(), this.gameService.currentSlug()));
+  protected readonly rarityOptions = computed(() =>
+    getRarityOptions(this.entries(), this.gameService.currentSlug()),
+  );
+
+  /** Copies and EUR value of what's currently shown. */
+  protected readonly summary = computed(() => {
+    let count = 0;
+    let value = 0;
+    for (const entry of this.filteredEntries()) {
+      count += entry.row.quantity;
+      value += (getUnitPrice(entry) ?? 0) * entry.row.quantity;
+    }
+    return { count, value };
+  });
+
+  /** Filters living in the sheet (the color chips stay on the page). */
+  protected readonly sheetFilterCount = computed(
+    () =>
+      this.selectedTypes().size +
+      this.selectedRarities().size +
+      this.selectedSets().size +
+      (this.priceMin() !== null || this.priceMax() !== null ? 1 : 0) +
+      (this.showSurplusOnly() ? 1 : 0),
+  );
+
+  protected readonly activeChips = computed<ActiveFilterChip[]>(() => {
+    const lang = this.translate.currentLang(); // also re-labels on a language switch
+    const t = (key: string, params?: object) => this.translate.instant(key, params);
+    const game = this.gameService.currentSlug();
+    const chips: ActiveFilterChip[] = [];
+
+    for (const option of this.typeOptions()) {
+      if (this.selectedTypes().has(option.key)) {
+        chips.push({ id: 'type:' + option.key, label: t(option.labelKey), remove: () => this.toggleType(option.key) });
+      }
+    }
+    for (const rarity of this.selectedRarities()) {
+      chips.push({ id: 'rarity:' + rarity, label: t(rarityLabelKey(game, rarity)), remove: () => this.toggleRarity(rarity) });
+    }
+    const min = this.priceMin();
+    const max = this.priceMax();
+    if (min !== null || max !== null) {
+      const format = (value: number) => formatEuro(value, lang);
+      const label =
+        min !== null && max !== null
+          ? `${format(min)} – ${format(max)}`
+          : min !== null
+            ? t('collection.priceChipMin', { value: format(min) })
+            : t('collection.priceChipMax', { value: format(max!) });
+      chips.push({ id: 'price', label, remove: () => this.clearPrice() });
+    }
+    for (const set of this.selectedSets()) {
+      chips.push({ id: 'set:' + set, label: set, remove: () => this.toggleSet(set) });
+    }
+    if (this.showSurplusOnly()) {
+      chips.push({ id: 'surplus', label: t('collection.surplusFilter'), remove: () => this.showSurplusOnly.set(false) });
+    }
+    return chips;
   });
 
   protected readonly manaCurve = computed<BarChartDatum[]>(() => getManaCurve(this.filteredEntries()));
@@ -197,6 +322,11 @@ export class CollectionOverview {
       this.selectedSets();
       this.showSurplusOnly();
       this.hideLands();
+      this.selectedTypes();
+      this.selectedRarities();
+      this.priceMin();
+      this.priceMax();
+      this.sort();
       untracked(() => this.renderLimit.set(INITIAL_RENDER_LIMIT));
     });
 
@@ -236,6 +366,46 @@ export class CollectionOverview {
 
   protected clearSets() {
     this.selectedSets.set(new Set());
+  }
+
+  protected toggleType(key: string) {
+    this.selectedTypes.update((current) => toggled(current, key));
+  }
+
+  protected toggleRarity(key: string) {
+    this.selectedRarities.update((current) => toggled(current, key));
+  }
+
+  /** Empty or unparsable input clears that bound; accepts "1,50" as well as "1.50". */
+  protected setPriceBound(bound: 'min' | 'max', raw: string) {
+    const value = parseFloat(raw.replace(',', '.'));
+    const parsed = Number.isFinite(value) && value >= 0 ? value : null;
+    (bound === 'min' ? this.priceMin : this.priceMax).set(parsed);
+  }
+
+  protected clearPrice() {
+    this.priceMin.set(null);
+    this.priceMax.set(null);
+  }
+
+  /** Clears everything in the sheet; the search and the color chips stay. */
+  protected resetFilters() {
+    this.selectedTypes.set(new Set());
+    this.selectedRarities.set(new Set());
+    this.selectedSets.set(new Set());
+    this.clearPrice();
+    this.showSurplusOnly.set(false);
+    this.hideLands.set(false);
+  }
+
+  protected setSort(value: string) {
+    const sort = value as CollectionSort;
+    this.sort.set(sort);
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, sort);
+    } catch {
+      // Not remembering the choice is fine.
+    }
   }
 
   protected onScanButtonClick(event: MouseEvent) {
@@ -291,4 +461,11 @@ export class CollectionOverview {
     clearTimeout(this.revealTimer);
     this.revealTimer = setTimeout(() => this.revealing.set(false), 600);
   }
+}
+
+function toggled(set: Set<string>, key: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  return next;
 }

@@ -14,6 +14,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { CARD_LANGUAGE_OPTIONS } from '../../../core/constants/card-languages';
 import { Card, MtgCard, PokemonCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
 import { AppDialog } from '../../../shared/dialog/dialog';
+import { rarityLabelKey } from '../collection-filters';
 import { PricePipe } from '../../../shared/pipes/price.pipe';
 import { FocusOnInitDirective } from '../../../shared/directives/focus-on-init.directive';
 import { ATTRIBUTE_CATEGORIES } from '../yugioh-collection-stats';
@@ -32,17 +33,6 @@ const ATTRIBUTE_COLORS = new Map<string, string>(
 const POKEMON_TYPE_COLORS = new Map<string, string>(
   POKEMON_CATEGORIES.map(({ key, color }) => [key, color]),
 );
-
-// Values are i18n keys, resolved via the `translate` pipe in the template -
-// same convention as COLOR_CATEGORIES' `label` field.
-const RARITY_LABELS: Record<string, string> = {
-  common: 'rarity.common',
-  uncommon: 'rarity.uncommon',
-  rare: 'rarity.rare',
-  mythic: 'rarity.mythic',
-  special: 'rarity.special',
-  bonus: 'rarity.bonus',
-};
 
 const BANLIST_LABELS: Record<YugiohBanlistStatus, string> = {
   Forbidden: 'yugioh.banlistForbidden',
@@ -156,7 +146,7 @@ export class CardDetailDialog {
   protected readonly rarityLabel = computed(() => {
     const rarity = this.entry().card.rarity;
     if (!rarity) return null;
-    return this.entry().card.game === 'mtg' ? (RARITY_LABELS[rarity] ?? rarity) : rarity;
+    return rarityLabelKey(this.entry().card.game, rarity);
   });
 
   protected readonly price = computed(() => getEntryPrice(this.entry(), 'eur'));
