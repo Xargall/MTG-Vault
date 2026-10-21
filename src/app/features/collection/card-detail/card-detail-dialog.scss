@@ -1,42 +1,52 @@
+// Image beside the facts on every width - on phones a narrower image keeps
+// the whole dialog to roughly one screen instead of a full-width card scan.
 .detail-layout {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
   gap: var(--spacing-lg);
-  align-items: flex-start;
-}
+  align-items: start;
 
-.image-column {
-  flex: 0 0 240px;
-  max-width: 100%;
+  @media (max-width: 480px) {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: var(--spacing-md);
+  }
 }
 
 .card-image {
-  width: 100%;
-  border-radius: 8px;
-  border: 2px solid var(--color-accent);
   display: block;
+  width: 100%;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-card);
 }
 
 .card-placeholder {
-  width: 100%;
-  aspect-ratio: 5 / 7;
-  border-radius: 12px;
-  background: var(--color-surface-alt);
-  color: var(--color-text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
   text-align: center;
-  padding: var(--spacing-md);
 }
 
 .info-column {
-  flex: 1 1 220px;
-  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
 
   h1 {
-    margin: 0 0 var(--spacing-md);
-    font-size: 1.5rem;
+    margin: 0 0 var(--spacing-sm);
+    font-size: 1.4rem;
+    line-height: 1.2;
+
+    @media (max-width: 480px) {
+      font-size: 1.1rem;
+    }
   }
 }
 
@@ -44,7 +54,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
 }
 
 .mana-symbol {
@@ -54,15 +64,15 @@
   min-width: 24px;
   height: 24px;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
+  color: var(--color-on-accent);
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--color-on-accent);
 }
 
 .attribute-symbol {
-  border-radius: 6px;
   padding: 0 10px;
+  border-radius: var(--radius);
   letter-spacing: 0.5px;
 }
 
@@ -72,9 +82,10 @@
 
 .info-list {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--spacing-sm) var(--spacing-lg);
-  margin: 0 0 var(--spacing-lg);
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px var(--spacing-md);
+  width: 100%;
+  margin: 0 0 var(--spacing-md);
 
   dt {
     color: var(--color-text-muted);
@@ -82,33 +93,118 @@
   }
 
   dd {
+    min-width: 0;
     margin: 0;
+    overflow-wrap: anywhere;
     color: var(--color-text);
     font-weight: 600;
   }
 }
 
-.edit-section {
-  margin-top: var(--spacing-lg);
+.info-price {
+  color: var(--color-accent-hover) !important;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+// --- Your copy ------------------------------------------------------------
+
+.copy-panel {
   padding-top: var(--spacing-md);
   border-top: 1px solid var(--color-border);
 }
 
-.edit-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  margin-top: 4px;
+.copy-heading {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--color-text);
+  font-size: 0.95rem;
 }
 
+.copy-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--spacing-sm) var(--spacing-md);
+}
+
+.copy-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &--grow {
+    flex: 1 1 9rem;
+    min-width: 0;
+  }
+}
+
+.field-caption {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+// [-] 5 [+]: one inset slot with the controls set into it.
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.stepper-button {
+  border-radius: 0;
+  color: var(--color-text);
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.stepper .stepper-value {
+  width: 3.25rem;
+  padding: 0;
+  border: none;
+  border-inline: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+}
+
+.copy-foil {
+  color: var(--color-text);
+}
+
+.copy-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+// --- Remove ---------------------------------------------------------------
+
 .danger-zone {
-  margin-top: var(--spacing-lg);
-  padding-top: var(--spacing-md);
+  padding-top: var(--spacing-sm);
   border-top: 1px solid var(--color-border);
 }
 
 .state-message {
-  margin: 0 0 var(--spacing-sm);
+  margin: var(--spacing-sm) 0 0;
 
   &.error {
     color: var(--color-danger);
@@ -120,31 +216,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-sm);
-  font-size: 0.85rem;
   color: var(--color-text-muted);
-}
-
-
-.edit-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  max-width: 260px;
-
-  label {
-    font-size: 0.85rem;
-    color: var(--color-text-muted);
-  }
-
-  input[type='number'],
-  select {
-    width: 100%;
-  }
-
-  .checkbox-label {
-    color: var(--color-text);
-    font-size: 0.9rem;
-  }
+  font-size: 0.85rem;
 }
 
 .delete-link {

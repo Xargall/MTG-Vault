@@ -4,13 +4,14 @@ import {
   computed,
   inject,
   input,
+  linkedSignal,
   output,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
+import { CARD_LANGUAGE_OPTIONS } from '../../../core/constants/card-languages';
 import { Card, MtgCard, PokemonCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
 import { AppDialog } from '../../../shared/dialog/dialog';
 import { PricePipe } from '../../../shared/pipes/price.pipe';
@@ -89,31 +90,41 @@ export class CardDetailDialog {
   }
 
   protected readonly languageOptions = CARD_LANGUAGE_OPTIONS;
-  protected readonly editing = signal(false);
-  protected readonly editQuantity = signal(1);
-  protected readonly editFoil = signal(false);
-  protected readonly editLanguage = signal(DEFAULT_CARD_LANGUAGE);
+  // "Your copy" is edited in place - no separate edit mode repeating the same
+  // fields as a tall form. Each value follows the entry (and resets to it
+  // after a save reloads it) but can be changed locally until then.
+  protected readonly editQuantity = linkedSignal(() => this.entry().row.quantity);
+  protected readonly editFoil = linkedSignal(() => this.entry().row.foil);
+  protected readonly editLanguage = linkedSignal(() => this.entry().row.language);
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
 
-  protected startEdit() {
-    this.editQuantity.set(this.entry().row.quantity);
-    this.editFoil.set(this.entry().row.foil);
-    this.editLanguage.set(this.entry().row.language);
-    this.saveError.set(null);
-    this.confirmingDelete.set(false);
-    this.editing.set(true);
+  /** Save/discard only appear once something actually differs from what's stored. */
+  protected readonly dirty = computed(() => {
+    const row = this.entry().row;
+    return (
+      this.editQuantity() !== row.quantity ||
+      this.editFoil() !== row.foil ||
+      this.editLanguage() !== (row.language)
+    );
+  });
+
+  protected stepQuantity(delta: number) {
+    this.editQuantity.set(Math.max(1, Math.trunc(Number(this.editQuantity()) || 1) + delta));
   }
 
-  protected cancelEdit() {
-    this.editing.set(false);
+  protected discardEdit() {
+    const row = this.entry().row;
+    this.editQuantity.set(row.quantity);
+    this.editFoil.set(row.foil);
+    this.editLanguage.set(row.language);
     this.saveError.set(null);
   }
 
-  // Edit and delete-confirm are mutually exclusive - with both open, "Save"
-  // and "Yes, remove" sat a few pixels apart in the same panel.
+  // Unsaved changes and delete-confirm are mutually exclusive - with both
+  // pending, "Save" and "Yes, remove" sat a few pixels apart.
   protected startDelete() {
-    this.cancelEdit();
+    this.discardEdit();
     this.confirmingDelete.set(true);
   }
 
@@ -132,7 +143,6 @@ export class CardDetailDialog {
         foil: this.entry().card.game === 'mtg' ? this.editFoil() : this.entry().row.foil,
         language: this.editLanguage(),
       });
-      this.editing.set(false);
       this.updated.emit();
     } catch (error) {
       this.saveError.set(

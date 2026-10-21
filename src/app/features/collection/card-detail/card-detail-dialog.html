@@ -1,5 +1,4 @@
 <app-dialog [heading]="'cardDetail.title' | translate" maxWidth="580px" (closeRequest)="close.emit()">
-
   <div class="detail-layout">
     <div class="image-column">
       @if (entry().card.imageUrl; as url) {
@@ -42,9 +41,11 @@
         }
       }
 
+      <!-- Facts about the card itself. What's specific to this copy (quantity,
+           foil, language) lives editable in "Your copy" below. -->
       <dl class="info-list">
-        <dt>{{ 'cardDetail.quantity' | translate }}</dt>
-        <dd>{{ entry().row.quantity }}</dd>
+        <dt>{{ 'cardDetail.price' | translate }}</dt>
+        <dd class="info-price">{{ (price() > 0 ? price() : null) | price }}</dd>
 
         <dt>{{ 'cardDetail.set' | translate }}</dt>
         <dd>{{ entry().card.setName ?? ('common.unknown' | translate) }}</dd>
@@ -52,14 +53,9 @@
         <dt>{{ 'cardDetail.rarity' | translate }}</dt>
         <dd>{{ rarityLabel() ? (rarityLabel()! | translate) : ('common.unknown' | translate) }}</dd>
 
-        @if (entry().card.game === 'mtg') {
-          <dt>{{ 'cardDetail.foil' | translate }}</dt>
-          <dd>{{ (entry().row.foil ? 'common.yes' : 'common.no') | translate }}</dd>
-
-          @if (entry().row.finish && entry().row.finish !== 'nonfoil') {
-            <dt>{{ 'cardDetail.finish' | translate }}</dt>
-            <dd>{{ ('cardDetail.finish_' + entry().row.finish) | translate }}</dd>
-          }
+        @if (entry().card.game === 'mtg' && entry().row.finish && entry().row.finish !== 'nonfoil') {
+          <dt>{{ 'cardDetail.finish' | translate }}</dt>
+          <dd>{{ ('cardDetail.finish_' + entry().row.finish) | translate }}</dd>
         }
 
         @if (asYugiohCard(entry().card); as ygoCard) {
@@ -86,12 +82,6 @@
             <dd>{{ pkmCard.hp }}</dd>
           }
         }
-
-        <dt>{{ 'cardDetail.language' | translate }}</dt>
-        <dd>{{ languageLabelKey() ? (languageLabelKey()! | translate) : ('common.unknown' | translate) }}</dd>
-
-        <dt>{{ 'cardDetail.price' | translate }}</dt>
-        <dd>{{ (price() > 0 ? price() : null) | price }}</dd>
       </dl>
 
       @if (cardmarketUrl(); as url) {
@@ -99,79 +89,99 @@
           {{ 'cardDetail.cardmarketLink' | translate }}
         </a>
       }
-
-      <div class="edit-section">
-        @if (!editing()) {
-          <button type="button" class="btn btn--primary btn--sm" (click)="startEdit()">
-            {{ 'cardDetail.editLink' | translate }}
-          </button>
-        } @else {
-          <div class="edit-form">
-            @if (saveError()) {
-              <p class="state-message error">{{ saveError() }}</p>
-            }
-
-            <label for="edit-quantity">{{ 'cardDetail.quantity' | translate }}</label>
-            <input
-              id="edit-quantity"
-              appFocusOnInit
-              type="number"
-              min="1"
-              [ngModel]="editQuantity()"
-              (ngModelChange)="editQuantity.set($event)"
-            />
-
-            @if (entry().card.game === 'mtg') {
-              <label class="checkbox-label">
-                <input type="checkbox" [ngModel]="editFoil()" (ngModelChange)="editFoil.set($event)" />
-                {{ 'cardDetail.foil' | translate }}
-              </label>
-            }
-
-            <label for="edit-language">{{ 'cardDetail.language' | translate }}</label>
-            <select
-              id="edit-language"
-              [ngModel]="editLanguage()"
-              (ngModelChange)="editLanguage.set($event)"
-            >
-              @for (option of languageOptions; track option.code) {
-                <option [value]="option.code">{{ option.labelKey | translate }}</option>
-              }
-            </select>
-
-            <div class="edit-actions">
-              <button type="button" class="btn btn--primary btn--sm" [disabled]="saving()" (click)="saveEdit()">
-                {{ 'cardDetail.saveButton' | translate }}
-              </button>
-              <button type="button" class="btn btn--ghost btn--sm" [disabled]="saving()" (click)="cancelEdit()">
-                {{ 'cardDetail.cancel' | translate }}
-              </button>
-            </div>
-          </div>
-        }
-      </div>
-
-      <div class="danger-zone">
-        @if (deleteError()) {
-          <p class="state-message error">{{ deleteError() }}</p>
-        }
-
-        @if (!confirmingDelete()) {
-          <button type="button" class="btn btn--ghost btn--sm btn--flush delete-link" (click)="startDelete()">
-            {{ 'cardDetail.deleteLink' | translate }}
-          </button>
-        } @else {
-          <div class="confirm-row">
-            <span>{{ 'cardDetail.confirmDeleteText' | translate }}</span>
-            <button type="button" class="btn btn--danger btn--sm" [disabled]="deleting()" (click)="confirmDelete()">
-              {{ 'cardDetail.confirmDeleteButton' | translate }}
-            </button>
-            <button type="button" class="btn btn--ghost btn--sm" appFocusOnInit (click)="confirmingDelete.set(false)">
-              {{ 'cardDetail.cancel' | translate }}
-            </button>
-          </div>
-        }
-      </div>
     </div>
+  </div>
+
+  <!-- This copy, edited in place: one compact row instead of a separate
+       edit mode. Save/discard appear only once something changed. -->
+  <section class="copy-panel" aria-labelledby="copy-heading">
+    <h2 id="copy-heading" class="copy-heading">{{ 'cardDetail.yourCopy' | translate }}</h2>
+
+    <div class="copy-fields">
+      <div class="copy-field">
+        <span class="field-caption" id="copy-quantity-label">{{ 'cardDetail.quantity' | translate }}</span>
+        <div class="stepper" role="group" aria-labelledby="copy-quantity-label">
+          <button
+            type="button"
+            class="icon-btn stepper-button"
+            [disabled]="editQuantity() <= 1"
+            (click)="stepQuantity(-1)"
+            [attr.aria-label]="'cardDetail.decrease' | translate"
+          >
+            <svg aria-hidden="true"><use href="#icon-minus" /></svg>
+          </button>
+          <input
+            class="stepper-value"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            aria-labelledby="copy-quantity-label"
+            [ngModel]="editQuantity()"
+            (ngModelChange)="editQuantity.set($event)"
+          />
+          <button
+            type="button"
+            class="icon-btn stepper-button"
+            (click)="stepQuantity(1)"
+            [attr.aria-label]="'cardDetail.increase' | translate"
+          >
+            <svg aria-hidden="true"><use href="#icon-plus" /></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="copy-field copy-field--grow">
+        <label class="field-caption" for="copy-language">{{ 'cardDetail.language' | translate }}</label>
+        <select id="copy-language" [ngModel]="editLanguage()" (ngModelChange)="editLanguage.set($event)">
+          @for (option of languageOptions; track option.code) {
+            <option [value]="option.code">{{ option.labelKey | translate }}</option>
+          }
+        </select>
+      </div>
+
+      @if (entry().card.game === 'mtg') {
+        <label class="checkbox-label copy-foil">
+          <input type="checkbox" [ngModel]="editFoil()" (ngModelChange)="editFoil.set($event)" />
+          {{ 'cardDetail.foil' | translate }}
+        </label>
+      }
+    </div>
+
+    @if (saveError()) {
+      <p class="state-message error">{{ saveError() }}</p>
+    }
+
+    @if (dirty()) {
+      <div class="copy-actions">
+        <button type="button" class="btn btn--ghost btn--sm" [disabled]="saving()" (click)="discardEdit()">
+          {{ 'cardDetail.discard' | translate }}
+        </button>
+        <button type="button" class="btn btn--primary btn--sm" [disabled]="saving()" (click)="saveEdit()">
+          {{ 'cardDetail.saveButton' | translate }}
+        </button>
+      </div>
+    }
+  </section>
+
+  <div class="danger-zone">
+    @if (deleteError()) {
+      <p class="state-message error">{{ deleteError() }}</p>
+    }
+
+    @if (!confirmingDelete()) {
+      <button type="button" class="btn btn--ghost btn--sm btn--flush delete-link" (click)="startDelete()">
+        {{ 'cardDetail.deleteLink' | translate }}
+      </button>
+    } @else {
+      <div class="confirm-row">
+        <span>{{ 'cardDetail.confirmDeleteText' | translate }}</span>
+        <button type="button" class="btn btn--danger btn--sm" [disabled]="deleting()" (click)="confirmDelete()">
+          {{ 'cardDetail.confirmDeleteButton' | translate }}
+        </button>
+        <button type="button" class="btn btn--ghost btn--sm" appFocusOnInit (click)="confirmingDelete.set(false)">
+          {{ 'cardDetail.cancel' | translate }}
+        </button>
+      </div>
+    }
   </div>
 </app-dialog>
