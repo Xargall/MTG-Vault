@@ -16,7 +16,7 @@
           }
           <span class="meta-badge">{{ 'decks.cardsCount' | translate: { count: cardCount() } }}</span>
           @if (totalValue() > 0) {
-            <span class="meta-badge">{{ totalValue() | number: '1.2-2' }} €</span>
+            <span class="meta-badge">{{ totalValue() | price }}</span>
           }
           <span class="meta-badge" [class.is-complete]="availabilityMatch().percent === 100">
             {{ 'decks.matchInCollection' | translate: { percent: availabilityMatch().percent } }}
@@ -84,11 +84,11 @@
           <li class="binding-detail-row binding-detail-row--{{ detail.status }}">
             <span class="binding-detail-icon" aria-hidden="true">
               @if (detail.status === 'available') {
-                ✅
+                <svg aria-hidden="true"><use href="#icon-check" /></svg>
               } @else if (detail.status === 'partial') {
-                🟡
+                <svg aria-hidden="true"><use href="#icon-minus" /></svg>
               } @else {
-                ❌
+                <svg aria-hidden="true"><use href="#icon-close" /></svg>
               }
             </span>
             <div class="binding-detail-body">

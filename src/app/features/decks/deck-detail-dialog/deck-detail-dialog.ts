@@ -1,4 +1,3 @@
-import { DecimalPipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -13,6 +12,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Card } from '../../../core/models/card.model';
 import { CardOwnedStatus, CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AppDialog } from '../../../shared/dialog/dialog';
+import { PricePipe } from '../../../shared/pipes/price.pipe';
 import { FocusOnInitDirective } from '../../../shared/directives/focus-on-init.directive';
 import { CollectionEntry } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
@@ -52,7 +52,7 @@ export interface DeckCardBindingDetail {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-deck-detail-dialog',
-  imports: [CardTile, DecimalPipe, TranslatePipe, AppDialog, FocusOnInitDirective],
+  imports: [CardTile, PricePipe, TranslatePipe, AppDialog, FocusOnInitDirective],
   templateUrl: './deck-detail-dialog.html',
   styleUrl: './deck-detail-dialog.scss',
 })

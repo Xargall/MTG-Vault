@@ -99,3 +99,10 @@
   margin-top: var(--spacing-sm);
 }
 
+
+.search-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm) var(--spacing-md);
+}

@@ -13,7 +13,12 @@
     @if (searching()) {
       <p class="state-message">{{ 'addCard.searching' | translate }}</p>
     } @else if (searchError()) {
-      <p class="state-message error">{{ searchError() }}</p>
+      <div class="search-error" role="alert">
+        <p class="state-message error">{{ searchError() }}</p>
+        <button type="button" class="btn btn--secondary btn--sm" (click)="retrySearch()">
+          {{ 'addCard.retry' | translate }}
+        </button>
+      </div>
     } @else if (query().trim() && results().length === 0) {
       <p class="state-message">{{ 'addCard.noCardsFound' | translate }}</p>
     } @else {
@@ -30,6 +35,7 @@
   } @else if (!selectedCard()) {
     <div class="prints-view">
       <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToSearch()">
+        <svg aria-hidden="true"><use href="#icon-chevron-left" /></svg>
         {{ 'addCard.backToSearch' | translate }}
       </button>
       <h3>{{ 'addCard.pickPrint' | translate: { name: selectedName() } }}</h3>
@@ -53,6 +59,7 @@
   } @else {
     <div class="detail-view">
       <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToPrints()">
+        <svg aria-hidden="true"><use href="#icon-chevron-left" /></svg>
         {{ 'addCard.backToPrints' | translate }}
       </button>
 

@@ -111,23 +111,33 @@
   padding: var(--spacing-sm) var(--spacing-md);
   border-radius: var(--radius);
   background: var(--color-surface-alt);
-  border-left: 3px solid transparent;
-
-  &--available {
-    border-left-color: var(--color-success-text);
-  }
-
-  &--partial {
-    border-left-color: var(--color-warning);
-  }
-
-  &--unavailable {
-    border-left-color: var(--color-text-muted);
-  }
 }
 
+// Status seal: icon shape (check / dash / cross) plus color, so the state
+// never rests on color alone - and no colored side stripe on the row.
 .binding-detail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--color-text-muted);
+
+  svg {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+
+  .binding-detail-row--available & {
+    color: var(--color-success-text);
+  }
+
+  .binding-detail-row--partial & {
+    color: var(--color-warning);
+  }
 }
 
 .binding-detail-body {

@@ -91,7 +91,7 @@
         <dd>{{ languageLabelKey() ? (languageLabelKey()! | translate) : ('common.unknown' | translate) }}</dd>
 
         <dt>{{ 'cardDetail.price' | translate }}</dt>
-        <dd>{{ price() > 0 ? (price() | number: '1.2-2') + ' €' : ('common.unknown' | translate) }}</dd>
+        <dd>{{ (price() > 0 ? price() : null) | price }}</dd>
       </dl>
 
       @if (cardmarketUrl(); as url) {

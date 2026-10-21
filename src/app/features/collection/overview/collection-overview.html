@@ -92,7 +92,7 @@
                 @if (selectedSets().size > 0) {
                   <span class="set-filter-count">{{ selectedSets().size }}</span>
                 }
-                ▾
+                <svg class="set-filter-chevron" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
               </button>
 
               @if (showSetMenu()) {

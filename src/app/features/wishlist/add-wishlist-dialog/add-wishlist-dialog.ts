@@ -74,6 +74,13 @@ export class AddWishlistDialog {
     this.debounceHandle = setTimeout(() => this.search(trimmed), SEARCH_DEBOUNCE_MS);
   }
 
+  protected retrySearch() {
+    const trimmed = this.query().trim();
+    if (!trimmed) return;
+    this.searching.set(true);
+    void this.search(trimmed);
+  }
+
   private async search(query: string) {
     this.abortController?.abort();
     const controller = new AbortController();
@@ -86,7 +93,10 @@ export class AddWishlistDialog {
       this.results.set(results);
     } catch (error) {
       if (controller.signal.aborted) return;
-      this.searchError.set(error instanceof Error ? error.message : this.translate.instant('addCard.searchFailed'));
+      // The raw error (often a backend message) is for the console; the user
+      // gets a plain sentence plus a retry button (see the template).
+      console.error('Card search failed', error);
+      this.searchError.set(this.translate.instant('addCard.searchFailed'));
     } finally {
       if (!controller.signal.aborted) this.searching.set(false);
     }

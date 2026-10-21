@@ -7,11 +7,11 @@
     @if (status(); as s) {
       <span class="status-badge status-badge--{{ s }}" aria-hidden="true">
         @if (s === 'owned') {
-          ✓
+          <svg aria-hidden="true"><use href="#icon-check" /></svg>
         } @else if (s === 'partial') {
-          !
+          <svg aria-hidden="true"><use href="#icon-minus" /></svg>
         } @else {
-          ✕
+          <svg aria-hidden="true"><use href="#icon-close" /></svg>
         }
       </span>
     }

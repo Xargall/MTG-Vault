@@ -1,3 +1,6 @@
 @if (remainingHours() !== null) {
-  <div class="guest-banner">{{ 'auth.demoBanner' | translate: { hours: remainingHours() } }}</div>
+  <!-- remainingHours is rounded up, so 1 means "an hour or less". -->
+  <div class="guest-banner">
+    {{ (remainingHours()! <= 1 ? 'auth.demoBannerLast' : 'auth.demoBanner') | translate: { hours: remainingHours() } }}
+  </div>
 }

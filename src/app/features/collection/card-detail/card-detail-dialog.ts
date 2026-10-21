@@ -1,4 +1,3 @@
-import { DecimalPipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -14,6 +13,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
 import { Card, MtgCard, PokemonCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
 import { AppDialog } from '../../../shared/dialog/dialog';
+import { PricePipe } from '../../../shared/pipes/price.pipe';
 import { FocusOnInitDirective } from '../../../shared/directives/focus-on-init.directive';
 import { ATTRIBUTE_CATEGORIES } from '../yugioh-collection-stats';
 import { COLOR_CATEGORIES, getEntryPrice } from '../collection-stats';
@@ -52,7 +52,7 @@ const BANLIST_LABELS: Record<YugiohBanlistStatus, string> = {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-card-detail-dialog',
-  imports: [DecimalPipe, FormsModule, TranslatePipe, AppDialog, FocusOnInitDirective],
+  imports: [PricePipe, FormsModule, TranslatePipe, AppDialog, FocusOnInitDirective],
   templateUrl: './card-detail-dialog.html',
   styleUrl: './card-detail-dialog.scss',
 })

@@ -3,6 +3,7 @@
   @if (selectedRecommendation(); as rec) {
     <div class="detail-view">
       <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToList()">
+        <svg aria-hidden="true"><use href="#icon-chevron-left" /></svg>
         {{ 'commanderRecs.backToList' | translate }}
       </button>
 

@@ -30,6 +30,7 @@
   } @else if (selectedRecommendation(); as rec) {
     <div class="detail-view">
       <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToList()">
+        <svg aria-hidden="true"><use href="#icon-chevron-left" /></svg>
         {{ 'formatRecs.backToList' | translate }}
       </button>
 
@@ -121,6 +122,7 @@
     </div>
   } @else {
     <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToFormats()">
+      <svg aria-hidden="true"><use href="#icon-chevron-left" /></svg>
       {{ 'formatRecs.backToFormats' | translate }}
     </button>
 

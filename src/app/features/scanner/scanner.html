@@ -12,7 +12,7 @@
     routerLink="/collection"
     [attr.aria-label]="'scanner.close' | translate"
   >
-    ✕
+    <svg aria-hidden="true"><use href="#icon-close" /></svg>
   </button>
 
   @if (status() === 'starting') {
@@ -21,9 +21,9 @@
 
   @if (ocrEngine(); as engine) {
     @if (engine === 'gemini') {
-      <span class="ocr-engine-badge ocr-engine-badge--gemini">🤖 Gemini</span>
+      <span class="ocr-engine-badge ocr-engine-badge--gemini"><svg aria-hidden="true"><use href="#icon-sparkles" /></svg> Gemini</span>
     } @else {
-      <span class="ocr-engine-badge ocr-engine-badge--limit">⚠️ Limit erreicht</span>
+      <span class="ocr-engine-badge ocr-engine-badge--limit"><svg aria-hidden="true"><use href="#icon-warning" /></svg> {{ 'scanner.limitBadge' | translate }}</span>
     }
   }
 
@@ -67,7 +67,7 @@
           (click)="undoLastAdd()"
           [attr.aria-label]="'scanner.undoLastAdd' | translate: { name: last.card.name }"
         >
-          ✕
+          <svg aria-hidden="true"><use href="#icon-close" /></svg>
         </button>
       </div>
     }
@@ -122,7 +122,7 @@
           </button>
         }
         <button type="button" class="choice-row choice-row--none" (click)="cancelChoices()">
-          <span class="choice-thumb choice-thumb--none" aria-hidden="true">✕</span>
+          <span class="choice-thumb choice-thumb--none" aria-hidden="true"><svg aria-hidden="true"><use href="#icon-close" /></svg></span>
           <span class="choice-info">
             <span class="choice-name">{{ 'scanner.noneOfThese' | translate }}</span>
           </span>
