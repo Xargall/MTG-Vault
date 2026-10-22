@@ -4,6 +4,12 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ToastService } from '../../core/services/toast.service';
 import { HELP_CATEGORIES, HELP_TERMS, HelpCategory, HelpLang, HelpTerm } from './help-terms';
 
+/** A step resolved to the current language, ready for the template. */
+export interface ResolvedStep {
+  text: string;
+  branches?: string[];
+}
+
 // "Trottel-Modus" ("dummy mode") is the feature's actual product name (see
 // CLAUDE.md's Hilfe/Lexikon section) - a humorous, maximally simplified
 // alternate explanation per term, toggled globally. Named after the German
@@ -90,9 +96,39 @@ export class Help {
     return (this.trottelMode() ? term.definitionTrottel : term.definitionNormal)[this.lang()];
   }
 
-  protected stepsFor(term: HelpTerm): string[] {
+  protected stepsFor(term: HelpTerm): ResolvedStep[] {
     const lang = this.lang();
-    return term.steps?.map((step) => step[lang]) ?? [];
+    return (
+      term.steps?.map((step) => ({
+        text: step[lang],
+        branches: step.branches?.map((branch) => branch[lang]),
+      })) ?? []
+    );
+  }
+
+  // Small reference thumbnails for situations (exampleCards) - Scryfall's
+  // named-card endpoint redirects straight to the current printing's image,
+  // so this needs no local id lookup or DB round-trip, just the card name
+  // (same "fetch on-demand, never store" convention as the rest of the
+  // app's card images, see CLAUDE.md § Konventionen).
+  protected exampleCardImageUrl(name: string): string {
+    return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=small`;
+  }
+
+  // Live-confirmed: a "Typische Situationen" page view can trigger a dozen
+  // of these Scryfall image requests in a short burst (several cards load
+  // near-simultaneously), which occasionally exceeds Scryfall's documented
+  // rate limit and 429s a handful of them - <img> never retries a failed
+  // load on its own. One delayed, cache-busted retry is enough; if it still
+  // fails the alt text remains as a fallback.
+  protected onExampleCardError(event: Event) {
+    const img = event.target as HTMLImageElement;
+    if (img.dataset['retried']) return;
+    img.dataset['retried'] = 'true';
+    const src = img.src;
+    setTimeout(() => {
+      img.src = `${src}&retry=${Date.now()}`;
+    }, 500 + Math.random() * 500);
   }
 
   protected relatedTermsFor(term: HelpTerm): HelpTerm[] {

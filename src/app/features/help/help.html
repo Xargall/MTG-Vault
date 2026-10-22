@@ -79,6 +79,21 @@
               >
                 <h3>{{ termText(term) }}</h3>
                 <p class="term-definition">{{ definitionFor(term) }}</p>
+                @if (term.exampleCards; as exampleCards) {
+                  @if (exampleCards.length > 0) {
+                    <div class="example-cards">
+                      @for (name of exampleCards; track name) {
+                        <img
+                          class="example-card-img"
+                          [src]="exampleCardImageUrl(name)"
+                          [alt]="name"
+                          loading="lazy"
+                          (error)="onExampleCardError($event)"
+                        />
+                      }
+                    </div>
+                  }
+                }
                 @if (stepsFor(term); as steps) {
                   @if (steps.length > 0) {
                     <p class="steps-label">{{ 'help.stepsLabel' | translate }}</p>
@@ -86,7 +101,14 @@
                       @for (step of steps; track $index) {
                         <li class="step">
                           <span class="step-marker">{{ $index + 1 }}</span>
-                          <span class="step-text">{{ step }}</span>
+                          <span class="step-text">{{ step.text }}</span>
+                          @if (step.branches; as branches) {
+                            <ul class="step-branches">
+                              @for (branch of branches; track $index) {
+                                <li>{{ branch }}</li>
+                              }
+                            </ul>
+                          }
                         </li>
                       }
                     </ol>
