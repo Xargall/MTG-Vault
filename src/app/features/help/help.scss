@@ -217,7 +217,12 @@
 }
 
 .example-card-img {
-  width: 4.5rem;
+  // Same ballpark as the Collection grid's card tiles (DESIGN.md: auto-fill
+  // grids with ~130px minimums) - the earlier 4.5rem (72px) read as a
+  // postage stamp, too small to actually recognize the art or read anything
+  // on the card.
+  width: 8.5rem;
+  max-width: 40%;
   aspect-ratio: 5 / 7;
   border-radius: var(--radius-card);
   background: var(--color-surface-alt);

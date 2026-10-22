@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { MtgApiService } from '../../core/services/mtg-api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { HELP_CATEGORIES, HELP_TERMS, HelpCategory, HelpLang, HelpTerm } from './help-terms';
 
@@ -34,12 +35,21 @@ function readStoredTrottelMode(): boolean {
 })
 export class Help {
   private readonly toast = inject(ToastService);
+  private readonly mtgApi = inject(MtgApiService);
   protected readonly translate = inject(TranslateService);
 
   protected readonly categories = HELP_CATEGORIES;
   protected readonly searchQuery = signal('');
   protected readonly selectedCategory = signal<HelpCategory | null>(null);
   protected readonly trottelMode = signal(readStoredTrottelMode());
+
+  // name -> image URL, resolved once from our own synced scryfall_cards
+  // mirror (see constructor) rather than Scryfall's live named-card API -
+  // live-confirmed that a page with this many example-card thumbnails
+  // bursts enough near-simultaneous requests to trip Scryfall's rate limit
+  // for several seconds, and a handful of thumbnails simply never recovered.
+  // A single batched DB lookup sidesteps that entirely.
+  protected readonly exampleCardImages = signal<Map<string, string>>(new Map());
 
   // Set by jumpToTerm() right before it clears the filter, so "Siehe auch"
   // can offer a way back instead of silently discarding what the user had
@@ -50,6 +60,19 @@ export class Help {
   private highlightTimer: ReturnType<typeof setTimeout> | undefined;
 
   protected readonly lang = computed<HelpLang>(() => (this.translate.currentLang() === 'en' ? 'en' : 'de'));
+
+  constructor() {
+    const names = [...new Set(HELP_TERMS.flatMap((term) => term.exampleCards ?? []))];
+    if (names.length === 0) return;
+    void this.mtgApi.getCardsByNames(names).then((cards) => {
+      const map = new Map<string, string>();
+      for (const card of cards) {
+        const url = card.imageUrl ?? card.imageUrlSmall;
+        if (url) map.set(card.oracleName, url);
+      }
+      this.exampleCardImages.set(map);
+    });
+  }
 
   protected readonly filteredTerms = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
@@ -106,29 +129,14 @@ export class Help {
     );
   }
 
-  // Small reference thumbnails for situations (exampleCards) - Scryfall's
-  // named-card endpoint redirects straight to the current printing's image,
-  // so this needs no local id lookup or DB round-trip, just the card name
-  // (same "fetch on-demand, never store" convention as the rest of the
-  // app's card images, see CLAUDE.md § Konventionen).
-  protected exampleCardImageUrl(name: string): string {
-    return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=small`;
-  }
-
-  // Live-confirmed: a "Typische Situationen" page view can trigger a dozen
-  // of these Scryfall image requests in a short burst (several cards load
-  // near-simultaneously), which occasionally exceeds Scryfall's documented
-  // rate limit and 429s a handful of them - <img> never retries a failed
-  // load on its own. One delayed, cache-busted retry is enough; if it still
-  // fails the alt text remains as a fallback.
-  protected onExampleCardError(event: Event) {
-    const img = event.target as HTMLImageElement;
-    if (img.dataset['retried']) return;
-    img.dataset['retried'] = 'true';
-    const src = img.src;
-    setTimeout(() => {
-      img.src = `${src}&retry=${Date.now()}`;
-    }, 500 + Math.random() * 500);
+  // Small reference thumbnails for situations (exampleCards) - resolved from
+  // exampleCardImages (see constructor), not Scryfall's live API. Null until
+  // the batch lookup resolves, or if a name genuinely isn't found (the
+  // template simply doesn't render an <img> for that case - no broken-image
+  // icon, no retry machinery needed since this is our own DB, not a
+  // rate-limited external endpoint).
+  protected exampleCardImageUrl(name: string): string | null {
+    return this.exampleCardImages().get(name) ?? null;
   }
 
   protected relatedTermsFor(term: HelpTerm): HelpTerm[] {

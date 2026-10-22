@@ -83,13 +83,9 @@
                   @if (exampleCards.length > 0) {
                     <div class="example-cards">
                       @for (name of exampleCards; track name) {
-                        <img
-                          class="example-card-img"
-                          [src]="exampleCardImageUrl(name)"
-                          [alt]="name"
-                          loading="lazy"
-                          (error)="onExampleCardError($event)"
-                        />
+                        @if (exampleCardImageUrl(name); as url) {
+                          <img class="example-card-img" [src]="url" [alt]="name" loading="lazy" />
+                        }
                       }
                     </div>
                   }
