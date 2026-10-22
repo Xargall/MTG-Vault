@@ -99,11 +99,11 @@
                           <span class="step-marker">{{ $index + 1 }}</span>
                           <span class="step-text">{{ step.text }}</span>
                           @if (step.branches; as branches) {
-                            <ul class="step-branches">
+                            <div class="step-flowchart" [style.--branch-count]="branches.length">
                               @for (branch of branches; track $index) {
-                                <li>{{ branch }}</li>
+                                <div class="step-flowchart-box">{{ branch }}</div>
                               }
-                            </ul>
+                            </div>
                           }
                         </li>
                       }
