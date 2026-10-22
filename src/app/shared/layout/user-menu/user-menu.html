@@ -38,6 +38,11 @@
         </a>
         <div class="dropdown-divider"></div>
       }
+      <a routerLink="/help" class="dropdown-item" (click)="close()">
+        <svg class="dropdown-icon" aria-hidden="true"><use href="#icon-book" /></svg>
+        {{ 'userMenu.help' | translate }}
+      </a>
+      <div class="dropdown-divider"></div>
       <button type="button" class="dropdown-item dropdown-item--button" (click)="logout()">
         <svg class="dropdown-icon" aria-hidden="true"><use href="#icon-exit" /></svg>
         {{ 'nav.logout' | translate }}

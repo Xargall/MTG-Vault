@@ -1,0 +1,170 @@
+// Single-column reading page, same content width as the Wunschliste (see
+// DESIGN.md Layout) - this is a list of entries to read, not a card grid.
+.help {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--spacing-lg);
+
+  @media (max-width: 640px) {
+    padding: var(--spacing-md);
+  }
+}
+
+.page-header {
+  margin: 0 0 var(--spacing-lg);
+
+  h1 {
+    margin: 0 0 var(--spacing-sm);
+  }
+}
+
+.page-subtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.help-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+// Same chip pattern as the Collection's color filter (collection-overview.scss)
+// - every category here uses the one accent rather than a per-category tint,
+// since categories aren't a color axis the way MTG's W/U/B/R/G are.
+.filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.filter-button {
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  @media (pointer: coarse) {
+    min-height: 2.5rem;
+    padding-inline: 14px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: var(--color-accent);
+      color: var(--color-text);
+    }
+  }
+
+  &.is-active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-on-accent);
+    font-weight: 600;
+  }
+}
+
+// Segmented Toggle (see DESIGN.md Components > Buttons), same visual
+// treatment as the language switch in Settings.
+.mode-toggle {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-self: flex-start;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius);
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface-alt);
+    color: var(--color-text);
+    font-size: 0.85rem;
+    cursor: pointer;
+
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        border-color: var(--color-accent);
+      }
+    }
+
+    &.is-active {
+      background: linear-gradient(180deg, var(--color-accent-hover) 0%, var(--color-accent) 100%);
+      color: var(--color-on-accent);
+      border-color: var(--color-accent);
+      font-weight: 600;
+    }
+  }
+}
+
+.mode-toggle-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.state-message {
+  color: var(--color-text-muted);
+}
+
+.help-category {
+  & + .help-category {
+    margin-top: var(--spacing-lg);
+  }
+
+  h2 {
+    margin: 0 0 var(--spacing-md);
+    font-size: 1.1rem;
+  }
+}
+
+.term-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.term-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacing-md);
+  // Jumped-to target gets a quick breath of room via scroll-margin so the
+  // sticky header (see app-shell) never covers the card it scrolled to.
+  scroll-margin-top: var(--spacing-lg);
+
+  h3 {
+    margin: 0 0 var(--spacing-sm);
+    font-size: 1rem;
+  }
+}
+
+.term-definition {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.term-related {
+  margin: var(--spacing-sm) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.related-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--color-accent);
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

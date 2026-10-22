@@ -104,6 +104,17 @@ Gemeinsame Methoden die jede API-Implementierung bereitstellt:
 - Aktueller Preis je nach API
 - Gesamtwert der Wunschliste
 
+### Hilfe / Lexikon (`/help`)
+
+MTG-Begriffs-Lexikon, falls man als Spieler mal "auf dem Schlauch steht". Verlinkt im Avatar-Dropdown-Menü, für Gäste wie eingeloggte Nutzer sichtbar.
+
+- **Kategorien:** Grundbegriffe, Kartentypen & Keywords, Formate & Regeln, Typische Situationen
+- **Darstellung:** Suche + Kategorie-Filter-Chips, Begriffe als Karten mit Querverweisen ("Siehe auch") zu verwandten Begriffen
+- **Trottel-Modus:** globaler Segmented-Toggle (Normal / Trottel-Modus) über allen Einträgen. Jeder Begriff hat zwei Erklärungen: `definitionNormal` (korrekt, kurz) und `definitionTrottel` (maximal vereinfacht, humorvoll, mit Vergleichen — z. B. "Trample = dein Monster ist so fett, dass der Rest über die Blocker drüber latscht"). Zustand wird in `localStorage` gemerkt, Aktivieren zeigt einen Toast-Spruch.
+- **Daten:** `src/app/features/help/help-terms.ts`, Einträge als TS-Array (`term`, `category`, `definitionNormal`, `definitionTrottel`, optionale `relatedTerms[]`). Begriffstexte sind bewusst nicht über ngx-translate übersetzt (reines Content-Datenfile, wie Kartentexte von Scryfall) — nur die UI-Chrome (Titel, Kategorie-Labels, Toggle) ist zweisprachig.
+- **Scope:** aktuell nur MTG. Später erweiterbar auf Yu-Gi-Oh/Pokémon/One Piece über ein zusätzliches `game`-Feld am `HelpTerm`.
+- **Offen/nicht umgesetzt:** visuelle Schritt-für-Schritt-Ablaufdiagramme für komplexe Situationen (aus dem ursprünglichen Konzept) — bewusst zurückgestellt, um keine halbfertige Visualisierung zu liefern.
+
 ## API-Referenz
 
 ### Scryfall (MTG)

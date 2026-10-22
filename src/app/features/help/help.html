@@ -1,0 +1,79 @@
+<div class="help">
+  <header class="page-header">
+    <h1>{{ 'help.title' | translate }}</h1>
+    <p class="page-subtitle">{{ 'help.subtitle' | translate }}</p>
+  </header>
+
+  <section class="help-toolbar">
+    <input
+      type="search"
+      class="search-input"
+      [placeholder]="'help.searchPlaceholder' | translate"
+      [attr.aria-label]="'help.searchPlaceholder' | translate"
+      [value]="searchQuery()"
+      (input)="searchQuery.set($any($event.target).value)"
+    />
+
+    <div class="filter-buttons">
+      <button
+        type="button"
+        class="filter-button"
+        [class.is-active]="selectedCategory() === null"
+        (click)="selectedCategory.set(null)"
+      >
+        {{ 'help.all' | translate }}
+      </button>
+      @for (category of categories; track category) {
+        <button
+          type="button"
+          class="filter-button"
+          [class.is-active]="selectedCategory() === category"
+          (click)="selectedCategory.set(selectedCategory() === category ? null : category)"
+        >
+          {{ ('help.categories.' + category) | translate }}
+        </button>
+      }
+    </div>
+
+    <div class="mode-toggle" role="group" [attr.aria-label]="'help.modeToggleAria' | translate">
+      <button type="button" [class.is-active]="!trottelMode()" (click)="setMode(false)">
+        {{ 'help.modeNormal' | translate }}
+      </button>
+      <button type="button" [class.is-active]="trottelMode()" (click)="setMode(true)">
+        <svg class="mode-toggle-icon" aria-hidden="true"><use href="#icon-jester-hat" /></svg>
+        {{ 'help.modeTrottel' | translate }}
+      </button>
+    </div>
+  </section>
+
+  @if (filteredTerms().length === 0) {
+    <p class="state-message">{{ 'help.noMatches' | translate }}</p>
+  }
+
+  @for (category of categories; track category) {
+    @if (termsByCategory().get(category); as terms) {
+      @if (terms.length > 0) {
+        <section class="help-category">
+          <h2>{{ ('help.categories.' + category) | translate }}</h2>
+          <div class="term-list">
+            @for (term of terms; track term.id) {
+              <article class="term-card" [id]="'help-term-' + term.id">
+                <h3>{{ term.term }}</h3>
+                <p class="term-definition">{{ definitionFor(term) }}</p>
+                @if (relatedTermsFor(term).length > 0) {
+                  <p class="term-related">
+                    {{ 'help.relatedTerms' | translate }}:
+                    @for (related of relatedTermsFor(term); track related.id; let last = $last) {
+                      <button type="button" class="related-link" (click)="jumpToTerm(related.id)">{{ related.term }}</button
+                      >{{ last ? '' : ', ' }}
+                    }
+                  </p>
+                }
+              </article>
+            }
+          </div>
+        </section>
+      }
+    }
+  }
+</div>
