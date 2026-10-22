@@ -1,4 +1,5 @@
 import { provideRouter } from '@angular/router';
+import { provideServiceWorker } from '@angular/service-worker';
 import { TestBed } from '@angular/core/testing';
 import { provideTranslateService } from '@ngx-translate/core';
 import { App } from './app';
@@ -11,6 +12,7 @@ describe('App', () => {
       providers: [
         provideRouter([]),
         provideTranslateService({ loader: InlineTranslateLoader, lang: 'de', fallbackLang: 'de' }),
+        provideServiceWorker('ngsw-worker.js', { enabled: false }),
       ],
     }).compileComponents();
   });
