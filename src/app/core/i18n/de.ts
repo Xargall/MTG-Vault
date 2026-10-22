@@ -569,6 +569,7 @@ export const de = {
     modeTrottelToast: 'Trottel-Modus an – ab jetzt wird maximal vereinfacht erklärt.',
     stepsLabel: 'Ablauf',
     relatedTerms: 'Siehe auch',
+    backToSearch: 'Zurück zu deiner Suche',
     noMatches: 'Keine Begriffe gefunden.',
   },
 };

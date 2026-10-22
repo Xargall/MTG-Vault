@@ -11,7 +11,7 @@
       [placeholder]="'help.searchPlaceholder' | translate"
       [attr.aria-label]="'help.searchPlaceholder' | translate"
       [value]="searchQuery()"
-      (input)="searchQuery.set($any($event.target).value)"
+      (input)="onSearchInput($any($event.target).value)"
     />
 
     <div class="filter-buttons">
@@ -19,7 +19,8 @@
         type="button"
         class="filter-button"
         [class.is-active]="selectedCategory() === null"
-        (click)="selectedCategory.set(null)"
+        [attr.aria-pressed]="selectedCategory() === null"
+        (click)="onCategoryClick(null)"
       >
         {{ 'help.all' | translate }}
       </button>
@@ -28,7 +29,8 @@
           type="button"
           class="filter-button"
           [class.is-active]="selectedCategory() === category"
-          (click)="selectedCategory.set(selectedCategory() === category ? null : category)"
+          [attr.aria-pressed]="selectedCategory() === category"
+          (click)="onCategoryClick(category)"
         >
           {{ ('help.categories.' + category) | translate }}
         </button>
@@ -36,15 +38,22 @@
     </div>
 
     <div class="mode-toggle" role="group" [attr.aria-label]="'help.modeToggleAria' | translate">
-      <button type="button" [class.is-active]="!trottelMode()" (click)="setMode(false)">
+      <button type="button" [class.is-active]="!trottelMode()" [attr.aria-pressed]="!trottelMode()" (click)="setMode(false)">
         {{ 'help.modeNormal' | translate }}
       </button>
-      <button type="button" [class.is-active]="trottelMode()" (click)="setMode(true)">
+      <button type="button" [class.is-active]="trottelMode()" [attr.aria-pressed]="trottelMode()" (click)="setMode(true)">
         <svg class="mode-toggle-icon" aria-hidden="true"><use href="#icon-jester-hat" /></svg>
         {{ 'help.modeTrottel' | translate }}
       </button>
     </div>
   </section>
+
+  @if (previousFilter(); as prev) {
+    <button type="button" class="restore-filter" (click)="restorePreviousFilter()">
+      <svg class="restore-filter-icon" aria-hidden="true"><use href="#icon-chevron-left" /></svg>
+      {{ 'help.backToSearch' | translate }}
+    </button>
+  }
 
   @if (filteredTerms().length === 0) {
     <p class="state-message">{{ 'help.noMatches' | translate }}</p>
@@ -57,7 +66,12 @@
           <h2>{{ ('help.categories.' + category) | translate }}</h2>
           <div class="term-list">
             @for (term of terms; track term.id) {
-              <article class="term-card" [id]="'help-term-' + term.id">
+              <article
+                class="term-card"
+                [id]="'help-term-' + term.id"
+                [class.is-highlighted]="highlightedTermId() === term.id"
+                tabindex="-1"
+              >
                 <h3>{{ termText(term) }}</h3>
                 <p class="term-definition">{{ definitionFor(term) }}</p>
                 @if (stepsFor(term); as steps) {

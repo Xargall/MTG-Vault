@@ -91,6 +91,10 @@ h1 {
   @media (max-width: 640px) {
     cursor: pointer;
   }
+
+  @media (pointer: coarse) {
+    min-height: var(--tap-min);
+  }
 }
 
 .toggle-chevron {

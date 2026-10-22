@@ -31,6 +31,14 @@ export class Help {
   protected readonly selectedCategory = signal<HelpCategory | null>(null);
   protected readonly trottelMode = signal(readStoredTrottelMode());
 
+  // Set by jumpToTerm() right before it clears the filter, so "Siehe auch"
+  // can offer a way back instead of silently discarding what the user had
+  // typed - the exact flow (search a term, chase a cross-reference, want to
+  // get back) this page exists for.
+  protected readonly previousFilter = signal<{ searchQuery: string; category: HelpCategory | null } | null>(null);
+  protected readonly highlightedTermId = signal<string | null>(null);
+  private highlightTimer: ReturnType<typeof setTimeout> | undefined;
+
   protected readonly lang = computed<HelpLang>(() => (this.translate.currentLang() === 'en' ? 'en' : 'de'));
 
   protected readonly filteredTerms = computed(() => {
@@ -90,13 +98,40 @@ export class Help {
       .filter((candidate): candidate is HelpTerm => !!candidate);
   }
 
+  protected onSearchInput(value: string) {
+    this.previousFilter.set(null);
+    this.searchQuery.set(value);
+  }
+
+  protected onCategoryClick(category: HelpCategory | null) {
+    this.previousFilter.set(null);
+    this.selectedCategory.set(category === this.selectedCategory() ? null : category);
+  }
+
   protected jumpToTerm(id: string) {
+    const hadFilter = this.searchQuery().trim() !== '' || this.selectedCategory() !== null;
+    this.previousFilter.set(hadFilter ? { searchQuery: this.searchQuery(), category: this.selectedCategory() } : null);
+
     this.selectedCategory.set(null);
     this.searchQuery.set('');
+    this.highlightedTermId.set(id);
+    clearTimeout(this.highlightTimer);
+    this.highlightTimer = setTimeout(() => this.highlightedTermId.set(null), 2000);
+
     // The target card may not exist yet this tick if a filter was just
     // cleared - wait for the next one so its DOM node is actually there.
     queueMicrotask(() => {
-      document.getElementById(`help-term-${id}`)?.scrollIntoView({ block: 'center' });
+      const target = document.getElementById(`help-term-${id}`);
+      target?.scrollIntoView({ block: 'center' });
+      target?.focus();
     });
+  }
+
+  protected restorePreviousFilter() {
+    const prev = this.previousFilter();
+    if (!prev) return;
+    this.searchQuery.set(prev.searchQuery);
+    this.selectedCategory.set(prev.category);
+    this.previousFilter.set(null);
   }
 }

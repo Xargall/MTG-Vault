@@ -30,6 +30,33 @@
   margin-bottom: var(--spacing-lg);
 }
 
+// Appears after "Siehe auch" jumps that cleared a search/category (see
+// restorePreviousFilter in help.ts) - same back-link language as
+// geminiKey.html's "Zurück zu den Einstellungen" (chevron + muted text,
+// per DESIGN.md's "Zurück-Aktionen tragen ein Chevron" rule).
+.restore-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--tap-min);
+  margin-bottom: var(--spacing-md);
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--color-text-muted);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-accent);
+  }
+}
+
+.restore-filter-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
 // Same chip pattern as the Collection's color filter (collection-overview.scss)
 // - every category here uses the one accent rather than a per-category tint,
 // since categories aren't a color axis the way MTG's W/U/B/R/G are.
@@ -88,6 +115,10 @@
     font-size: 0.85rem;
     cursor: pointer;
 
+    @media (pointer: coarse) {
+      min-height: var(--tap-min);
+    }
+
     @media (hover: hover) and (pointer: fine) {
       &:hover {
         border-color: var(--color-accent);
@@ -137,6 +168,20 @@
   // Jumped-to target gets a quick breath of room via scroll-margin so the
   // sticky header (see app-shell) never covers the card it scrolled to.
   scroll-margin-top: var(--spacing-lg);
+  transition: border-color var(--dur-state) var(--ease-out), box-shadow var(--dur-state) var(--ease-out);
+
+  // "Siehe auch" jump target (see jumpToTerm in help.ts) - a visible and
+  // screen-reader-reachable landmark (it also receives focus), not just a
+  // scroll position, since several cards otherwise look identical.
+  &.is-highlighted {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px var(--color-accent), 0 0 14px var(--glow-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 
   h3 {
     margin: 0 0 var(--spacing-sm);

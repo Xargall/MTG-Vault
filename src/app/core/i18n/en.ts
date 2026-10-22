@@ -568,6 +568,7 @@ export const en: typeof de = {
     modeTrottelToast: 'Dummy Mode on – explanations are now as simple as it gets.',
     stepsLabel: 'Step by step',
     relatedTerms: 'See also',
+    backToSearch: 'Back to your search',
     noMatches: 'No matching terms found.',
   },
 };
