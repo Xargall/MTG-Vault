@@ -566,6 +566,7 @@ export const en: typeof de = {
     modeNormal: 'Normal',
     modeTrottel: 'Dummy Mode',
     modeTrottelToast: 'Dummy Mode on – explanations are now as simple as it gets.',
+    stepsLabel: 'Step by step',
     relatedTerms: 'See also',
     noMatches: 'No matching terms found.',
   },

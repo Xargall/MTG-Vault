@@ -111,9 +111,9 @@ MTG-Begriffs-Lexikon, falls man als Spieler mal "auf dem Schlauch steht". Verlin
 - **Kategorien:** Grundbegriffe, Kartentypen & Keywords, Formate & Regeln, Typische Situationen
 - **Darstellung:** Suche + Kategorie-Filter-Chips, Begriffe als Karten mit Querverweisen ("Siehe auch") zu verwandten Begriffen
 - **Trottel-Modus:** globaler Segmented-Toggle (Normal / Trottel-Modus) über allen Einträgen. Jeder Begriff hat zwei Erklärungen: `definitionNormal` (korrekt, kurz) und `definitionTrottel` (maximal vereinfacht, humorvoll, mit Vergleichen — z. B. "Trample = dein Monster ist so fett, dass der Rest über die Blocker drüber latscht"). Zustand wird in `localStorage` gemerkt, Aktivieren zeigt einen Toast-Spruch.
-- **Daten:** `src/app/features/help/help-terms.ts`, Einträge als TS-Array (`term`, `category`, `definitionNormal`, `definitionTrottel`, optionale `relatedTerms[]`). Begriffstexte sind bewusst nicht über ngx-translate übersetzt (reines Content-Datenfile, wie Kartentexte von Scryfall) — nur die UI-Chrome (Titel, Kategorie-Labels, Toggle) ist zweisprachig.
+- **Daten:** `src/app/features/help/help-terms.ts`, Einträge als TS-Array (`term`, `category`, `definitionNormal`, `definitionTrottel`, optionale `relatedTerms[]`, optionale `steps[]`). Jedes Textfeld ist ein `LocalizedText` (`{ de, en }`) statt über ngx-translate zu laufen — Begriffe brauchen Querverweise per ID, das passt nicht gut in den flachen Übersetzungs-Namespace. Die Komponente wählt die Sprache über `translate.currentLang()`.
+- **Ablauf-Diagramme:** "Typische Situationen" haben zusätzlich ein `steps[]`-Array, das als kleine Timeline (nummerierte Pill-Marker, verbunden durch eine dünne Linie) unter der Definition erscheint — unabhängig vom Trottel-Modus, da der Ablauf selbst sich nicht vereinfacht, nur die Erklärung darüber.
 - **Scope:** aktuell nur MTG. Später erweiterbar auf Yu-Gi-Oh/Pokémon/One Piece über ein zusätzliches `game`-Feld am `HelpTerm`.
-- **Offen/nicht umgesetzt:** visuelle Schritt-für-Schritt-Ablaufdiagramme für komplexe Situationen (aus dem ursprünglichen Konzept) — bewusst zurückgestellt, um keine halbfertige Visualisierung zu liefern.
 
 ## API-Referenz
 

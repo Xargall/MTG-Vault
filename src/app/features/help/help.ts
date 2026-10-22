@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@a
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { ToastService } from '../../core/services/toast.service';
-import { HELP_CATEGORIES, HELP_TERMS, HelpCategory, HelpTerm } from './help-terms';
+import { HELP_CATEGORIES, HELP_TERMS, HelpCategory, HelpLang, HelpTerm } from './help-terms';
 
 const TROTTEL_STORAGE_KEY = 'tcgvault.help.trottelMode';
 
@@ -31,16 +31,19 @@ export class Help {
   protected readonly selectedCategory = signal<HelpCategory | null>(null);
   protected readonly trottelMode = signal(readStoredTrottelMode());
 
+  protected readonly lang = computed<HelpLang>(() => (this.translate.currentLang() === 'en' ? 'en' : 'de'));
+
   protected readonly filteredTerms = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
     const category = this.selectedCategory();
+    const lang = this.lang();
     return HELP_TERMS.filter((term) => {
       if (category && term.category !== category) return false;
       if (!query) return true;
       return (
-        term.term.toLowerCase().includes(query) ||
-        term.definitionNormal.toLowerCase().includes(query) ||
-        term.definitionTrottel.toLowerCase().includes(query)
+        term.term[lang].toLowerCase().includes(query) ||
+        term.definitionNormal[lang].toLowerCase().includes(query) ||
+        term.definitionTrottel[lang].toLowerCase().includes(query)
       );
     });
   });
@@ -67,8 +70,17 @@ export class Help {
     }
   }
 
+  protected termText(term: HelpTerm): string {
+    return term.term[this.lang()];
+  }
+
   protected definitionFor(term: HelpTerm): string {
-    return this.trottelMode() ? term.definitionTrottel : term.definitionNormal;
+    return (this.trottelMode() ? term.definitionTrottel : term.definitionNormal)[this.lang()];
+  }
+
+  protected stepsFor(term: HelpTerm): string[] {
+    const lang = this.lang();
+    return term.steps?.map((step) => step[lang]) ?? [];
   }
 
   protected relatedTermsFor(term: HelpTerm): HelpTerm[] {

@@ -58,13 +58,26 @@
           <div class="term-list">
             @for (term of terms; track term.id) {
               <article class="term-card" [id]="'help-term-' + term.id">
-                <h3>{{ term.term }}</h3>
+                <h3>{{ termText(term) }}</h3>
                 <p class="term-definition">{{ definitionFor(term) }}</p>
+                @if (stepsFor(term); as steps) {
+                  @if (steps.length > 0) {
+                    <p class="steps-label">{{ 'help.stepsLabel' | translate }}</p>
+                    <ol class="step-diagram">
+                      @for (step of steps; track $index) {
+                        <li class="step">
+                          <span class="step-marker">{{ $index + 1 }}</span>
+                          <span class="step-text">{{ step }}</span>
+                        </li>
+                      }
+                    </ol>
+                  }
+                }
                 @if (relatedTermsFor(term).length > 0) {
                   <p class="term-related">
                     {{ 'help.relatedTerms' | translate }}:
                     @for (related of relatedTermsFor(term); track related.id; let last = $last) {
-                      <button type="button" class="related-link" (click)="jumpToTerm(related.id)">{{ related.term }}</button
+                      <button type="button" class="related-link" (click)="jumpToTerm(related.id)">{{ termText(related) }}</button
                       >{{ last ? '' : ', ' }}
                     }
                   </p>

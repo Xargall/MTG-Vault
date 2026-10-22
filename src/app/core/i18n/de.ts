@@ -567,6 +567,7 @@ export const de = {
     modeNormal: 'Normal',
     modeTrottel: 'Trottel-Modus',
     modeTrottelToast: 'Trottel-Modus an – ab jetzt wird maximal vereinfacht erklärt.',
+    stepsLabel: 'Ablauf',
     relatedTerms: 'Siehe auch',
     noMatches: 'Keine Begriffe gefunden.',
   },
