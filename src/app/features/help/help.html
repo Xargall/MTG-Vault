@@ -37,7 +37,7 @@
       }
     </div>
 
-    <div class="mode-toggle" role="group" [attr.aria-label]="'help.modeToggleAria' | translate">
+    <div class="segmented-toggle" role="group" [attr.aria-label]="'help.modeToggleAria' | translate">
       <button type="button" [class.is-active]="!trottelMode()" [attr.aria-pressed]="!trottelMode()" (click)="setMode(false)">
         {{ 'help.modeNormal' | translate }}
       </button>
@@ -56,7 +56,12 @@
   }
 
   @if (filteredTerms().length === 0) {
-    <p class="state-message">{{ 'help.noMatches' | translate }}</p>
+    <p class="state-message">
+      {{ 'help.noMatches' | translate }}
+      @if (searchQuery() || selectedCategory()) {
+        <button type="button" class="related-link" (click)="clearFilters()">{{ 'help.clearFilters' | translate }}</button>
+      }
+    </p>
   }
 
   @for (category of categories; track category) {

@@ -192,9 +192,63 @@
   }
 }
 
+// Segmented Toggle (DESIGN.md Components > Buttons: "Segmente in einem
+// gemeinsamen kräftigen Rahmen. Das aktive Segment ist gold gefüllt mit
+// Glanzkante.") - the language switch in Settings and the Normal/Trottel-Modus
+// switch on the Hilfe page used to be two hand-copied implementations of this
+// one documented pattern; this is the single source both consume now.
+.segmented-toggle {
+  display: flex;
+  align-self: flex-start;
+  gap: var(--spacing-sm);
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius);
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface-alt);
+    color: var(--color-text);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-state) var(--ease-out),
+      border-color var(--dur-state) var(--ease-out),
+      color var(--dur-state) var(--ease-out),
+      transform var(--dur-release) var(--ease-out);
+
+    @media (pointer: coarse) {
+      min-height: var(--tap-min);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      &:hover {
+        border-color: var(--color-accent);
+      }
+    }
+
+    &:active {
+      transform: translateY(1px) scale(0.98);
+      transition-duration: var(--dur-press);
+    }
+
+    &.is-active {
+      background: linear-gradient(180deg, var(--color-accent-hover) 0%, var(--color-accent) 100%);
+      color: var(--color-on-accent);
+      border-color: var(--color-accent);
+      font-weight: 600;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn:active,
-  .icon-btn:active {
+  .icon-btn:active,
+  .segmented-toggle button:active {
     transform: none;
   }
 }

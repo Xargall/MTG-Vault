@@ -90,9 +90,15 @@ h1 {
   justify-content: center;
   gap: var(--spacing-xs);
   cursor: pointer;
+  transition: transform var(--dur-release) var(--ease-out);
 
   @media (pointer: coarse) {
     min-height: var(--tap-min);
+  }
+
+  &:active {
+    transform: scale(0.98);
+    transition-duration: var(--dur-press);
   }
 }
 
@@ -101,20 +107,42 @@ h1 {
   height: 1.1rem;
   flex-shrink: 0;
   color: var(--color-text-muted);
-  transition: transform 0.2s ease;
+  transition: transform var(--dur-state) var(--ease-in-out);
 }
 
 .mana-curve-card.is-expanded .toggle-chevron {
   transform: rotate(180deg);
 }
 
-@media (max-width: 640px) {
-  .mana-curve-body {
-    display: none;
+// Collapsed state is driven by isMobileViewport() + manaCurveExpanded() in
+// the template ([class.is-collapsed]) - the one place that decides whether
+// this is hidden at all, instead of a second, independent @media query
+// re-deciding the same thing from raw CSS. A plain grid-rows 1fr/0fr
+// transition (rather than display:none/block) animates the reveal; the
+// inner wrapper needs overflow:hidden + min-height:0 for the 0fr row to
+// actually collapse instead of being pushed open by the chart's own height.
+.mana-curve-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--dur-state) var(--ease-in-out);
+
+  &.is-collapsed {
+    grid-template-rows: 0fr;
+  }
+}
+
+.mana-curve-body-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mana-curve-toggle:active {
+    transform: none;
   }
 
-  .mana-curve-card.is-expanded .mana-curve-body {
-    display: block;
+  .mana-curve-body {
+    transition: none;
   }
 }
 

@@ -5,11 +5,21 @@
 
   <section class="settings-section">
     <h2>{{ 'settings.languageTitle' | translate }}</h2>
-    <div class="lang-buttons">
-      <button type="button" [class.is-active]="translate.currentLang() === 'de'" (click)="setLang('de')">
+    <div class="segmented-toggle">
+      <button
+        type="button"
+        [class.is-active]="translate.currentLang() === 'de'"
+        [attr.aria-pressed]="translate.currentLang() === 'de'"
+        (click)="setLang('de')"
+      >
         Deutsch
       </button>
-      <button type="button" [class.is-active]="translate.currentLang() === 'en'" (click)="setLang('en')">
+      <button
+        type="button"
+        [class.is-active]="translate.currentLang() === 'en'"
+        [attr.aria-pressed]="translate.currentLang() === 'en'"
+        (click)="setLang('en')"
+      >
         English
       </button>
     </div>

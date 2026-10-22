@@ -4,6 +4,10 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { ToastService } from '../../core/services/toast.service';
 import { HELP_CATEGORIES, HELP_TERMS, HelpCategory, HelpLang, HelpTerm } from './help-terms';
 
+// "Trottel-Modus" ("dummy mode") is the feature's actual product name (see
+// CLAUDE.md's Hilfe/Lexikon section) - a humorous, maximally simplified
+// alternate explanation per term, toggled globally. Named after the German
+// term rather than genericized (e.g. "simpleMode"), since that IS the name.
 const TROTTEL_STORAGE_KEY = 'tcgvault.help.trottelMode';
 
 function readStoredTrottelMode(): boolean {
@@ -106,6 +110,15 @@ export class Help {
   protected onCategoryClick(category: HelpCategory | null) {
     this.previousFilter.set(null);
     this.selectedCategory.set(category === this.selectedCategory() ? null : category);
+  }
+
+  // Offered on the "no matches" empty state - a search + category
+  // combination that matches nothing otherwise has no single action to
+  // recover from, only two separate controls to reset by hand.
+  protected clearFilters() {
+    this.previousFilter.set(null);
+    this.searchQuery.set('');
+    this.selectedCategory.set(null);
   }
 
   protected jumpToTerm(id: string) {

@@ -91,8 +91,14 @@
               {{ 'collection.manaCurve' | translate }}
             }
           </h2>
-          <div class="mana-curve-body" id="mana-curve-body">
-            <app-bar-chart [data]="manaCurve()" />
+          <div
+            class="mana-curve-body"
+            id="mana-curve-body"
+            [class.is-collapsed]="isMobileViewport() && !manaCurveExpanded()"
+          >
+            <div class="mana-curve-body-inner">
+              <app-bar-chart [data]="manaCurve()" />
+            </div>
           </div>
         </section>
       }

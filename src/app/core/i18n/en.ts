@@ -571,5 +571,6 @@ export const en: typeof de = {
     relatedTerms: 'See also',
     backToSearch: 'Back to your search',
     noMatches: 'No matching terms found.',
+    clearFilters: 'Clear filters',
   },
 };

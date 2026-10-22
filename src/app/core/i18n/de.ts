@@ -572,5 +572,6 @@ export const de = {
     relatedTerms: 'Siehe auch',
     backToSearch: 'Zurück zu deiner Suche',
     noMatches: 'Keine Begriffe gefunden.',
+    clearFilters: 'Filter zurücksetzen',
   },
 };

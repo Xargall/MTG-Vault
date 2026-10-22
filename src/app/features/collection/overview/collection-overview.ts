@@ -290,10 +290,16 @@ export class CollectionOverview {
   // Only matters on phones, where the chart starts collapsed behind a
   // disclosure button (desktop always shows it, see collection-overview.scss).
   protected readonly manaCurveExpanded = signal(false);
-  // The disclosure button itself only renders below this width (see the
-  // template) - above it, a focusable "expand" control that can't actually
-  // change anything visible (desktop always shows the chart) is a dead
-  // interactive element for keyboard/screen-reader users.
+  // Single source of truth for the 640px mobile cutoff used by BOTH the
+  // template's disclosure button (@if (isMobileViewport())) and the chart
+  // body's collapsed state ([class.is-collapsed]) - deliberately not a
+  // second, independent @media query in collection-overview.scss, which
+  // would let the two silently disagree (e.g. on a platform where `resize`
+  // doesn't fire reliably: chart collapsed by CSS, but JS still thinks it's
+  // desktop and never renders a button to reopen it). Below this width, a
+  // focusable "expand" control that can't actually change anything visible
+  // (desktop always shows the chart) would also be a dead interactive
+  // element for keyboard/screen-reader users.
   protected readonly isMobileViewport = signal(this.computeIsMobileViewport());
 
   private computeIsMobileViewport(): boolean {
