@@ -286,6 +286,9 @@ export class CollectionOverview {
   });
 
   protected readonly manaCurve = computed<BarChartDatum[]>(() => getManaCurve(this.filteredEntries()));
+  // Only matters on phones, where the chart starts collapsed behind a
+  // disclosure button (desktop always shows it, see collection-overview.scss).
+  protected readonly manaCurveExpanded = signal(false);
 
   // How many of filteredEntries() actually get a DOM node right now - see
   // INITIAL_RENDER_LIMIT. manaCurve above deliberately still reads

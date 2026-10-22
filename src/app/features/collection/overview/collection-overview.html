@@ -74,9 +74,22 @@
       </section>
 
       @if (hasAnyCards() && gameService.currentSlug() === 'mtg') {
-        <section class="chart-card mana-curve-card">
-          <h2>{{ 'collection.manaCurve' | translate }}</h2>
-          <app-bar-chart [data]="manaCurve()" />
+        <section class="chart-card mana-curve-card" [class.is-expanded]="manaCurveExpanded()">
+          <h2>
+            <button
+              type="button"
+              class="mana-curve-toggle"
+              (click)="manaCurveExpanded.set(!manaCurveExpanded())"
+              [attr.aria-expanded]="manaCurveExpanded()"
+              aria-controls="mana-curve-body"
+            >
+              {{ 'collection.manaCurve' | translate }}
+              <svg class="toggle-chevron" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+            </button>
+          </h2>
+          <div class="mana-curve-body" id="mana-curve-body">
+            <app-bar-chart [data]="manaCurve()" />
+          </div>
         </section>
       }
     </div>
