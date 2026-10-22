@@ -44,6 +44,10 @@
           </button>
         </div>
 
+        <a routerLink="/help" class="header-help-btn" [attr.aria-label]="'nav.help' | translate">
+          <svg aria-hidden="true"><use href="#icon-book" /></svg>
+        </a>
+
         <app-user-menu />
       </div>
     </div>

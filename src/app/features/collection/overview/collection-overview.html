@@ -76,16 +76,20 @@
       @if (hasAnyCards() && gameService.currentSlug() === 'mtg') {
         <section class="chart-card mana-curve-card" [class.is-expanded]="manaCurveExpanded()">
           <h2>
-            <button
-              type="button"
-              class="mana-curve-toggle"
-              (click)="manaCurveExpanded.set(!manaCurveExpanded())"
-              [attr.aria-expanded]="manaCurveExpanded()"
-              aria-controls="mana-curve-body"
-            >
+            @if (isMobileViewport()) {
+              <button
+                type="button"
+                class="mana-curve-toggle"
+                (click)="manaCurveExpanded.set(!manaCurveExpanded())"
+                [attr.aria-expanded]="manaCurveExpanded()"
+                aria-controls="mana-curve-body"
+              >
+                {{ 'collection.manaCurve' | translate }}
+                <svg class="toggle-chevron" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+              </button>
+            } @else {
               {{ 'collection.manaCurve' | translate }}
-              <svg class="toggle-chevron" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
-            </button>
+            }
           </h2>
           <div class="mana-curve-body" id="mana-curve-body">
             <app-bar-chart [data]="manaCurve()" />

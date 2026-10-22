@@ -5,6 +5,7 @@ import {
   DestroyRef,
   effect,
   ElementRef,
+  HostListener,
   inject,
   signal,
   untracked,
@@ -289,6 +290,20 @@ export class CollectionOverview {
   // Only matters on phones, where the chart starts collapsed behind a
   // disclosure button (desktop always shows it, see collection-overview.scss).
   protected readonly manaCurveExpanded = signal(false);
+  // The disclosure button itself only renders below this width (see the
+  // template) - above it, a focusable "expand" control that can't actually
+  // change anything visible (desktop always shows the chart) is a dead
+  // interactive element for keyboard/screen-reader users.
+  protected readonly isMobileViewport = signal(this.computeIsMobileViewport());
+
+  private computeIsMobileViewport(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
+  }
+
+  @HostListener('window:resize')
+  protected onWindowResize() {
+    this.isMobileViewport.set(this.computeIsMobileViewport());
+  }
 
   // How many of filteredEntries() actually get a DOM node right now - see
   // INITIAL_RENDER_LIMIT. manaCurve above deliberately still reads

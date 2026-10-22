@@ -9,6 +9,7 @@ export const en: typeof de = {
     logout: 'Log out',
     primary: 'Main navigation',
     gameSwitch: 'Switch game',
+    help: 'Help & Glossary',
   },
   games: {
     mtg: 'Magic: The Gathering',

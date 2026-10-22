@@ -7,6 +7,7 @@ export const de = {
     logout: 'Abmelden',
     primary: 'Hauptnavigation',
     gameSwitch: 'Spiel wechseln',
+    help: 'Hilfe & Lexikon',
   },
   games: {
     mtg: 'Magic: The Gathering',
