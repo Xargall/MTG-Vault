@@ -84,16 +84,32 @@ function applyContrastStretch(data: Uint8ClampedArray): void {
   }
 }
 
-/** Gemini's own crop for its collector-number guess - wide enough that a vision model reads it fine without needing a tight, precise frame. Contrast-stretched (see applyContrastStretch) but kept in color. */
-function cropCollectorArea(source: HTMLCanvasElement): HTMLCanvasElement {
+/**
+ * Gemini's own crop for its collector-number guess - wide enough that a
+ * vision model reads it fine without needing a tight, precise frame.
+ * Contrast-stretched (see applyContrastStretch) but kept in color.
+ *
+ * MTG's collector number/set code always sits bottom-left, so a left-aligned
+ * crop is enough. Yu-Gi-Oh's print code can sit bottom-left OR bottom-right
+ * depending on the card's exact layout/era (the YUGIOH_PROMPT in the
+ * gemini-ocr Edge Function already says so) - a left-aligned crop would
+ * silently cut it out of frame on every card where it's actually on the
+ * right, which is exactly the kind of miss that looks identical to "no card
+ * in view" from the outside. So Yu-Gi-Oh gets the full width instead of
+ * guessing a side.
+ */
+function cropCollectorArea(source: HTMLCanvasElement, game: 'mtg' | 'yugioh' | 'pokemon'): HTMLCanvasElement {
   const crop = document.createElement('canvas');
-  // 20%→25% / 60%→65%: overlay UI elements sitting low on the viewport can
-  // clip into this corner on real devices, cutting the collector number out
-  // of the captured frame before it ever reached Gemini - widened to give
-  // it room.
+  // 20%→25%: overlay UI elements sitting low on the viewport can clip into
+  // this corner on real devices, cutting the collector number out of the
+  // captured frame before it ever reached Gemini - widened to give it room.
   const h = Math.floor(source.height * 0.25);
   const y = source.height - h;
-  crop.width = Math.floor(source.width * 0.65);
+  // 60%→65% for MTG specifically - same reasoning as the height widening
+  // above, kept narrower than full width since MTG's code is reliably
+  // bottom-left.
+  const widthFraction = game === 'yugioh' ? 1 : 0.65;
+  crop.width = Math.floor(source.width * widthFraction);
   crop.height = h;
   const ctx = crop.getContext('2d');
   if (!ctx) return crop;
@@ -512,7 +528,7 @@ export class Scanner {
       // bottom corner, so both crop toward it (see cropCollectorArea).
       // Pokémon has neither - no compact code to read at all, just its
       // printed name up top - so it gets the full, uncropped frame instead.
-      const cropped = game === 'pokemon' ? rawFrame : cropCollectorArea(rawFrame);
+      const cropped = game === 'pokemon' ? rawFrame : cropCollectorArea(rawFrame, game);
       const text = await this.geminiVision.recognizeCollectorText(cropped, game);
 
       if (this.geminiVision.rateLimited()) {

@@ -8,6 +8,25 @@ import { SupabaseService } from './supabase.service';
 
 const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
 
+/**
+ * YGOPRODeck only ever tracks English print codes - confirmed live
+ * 2026-10-23: both the synced `ygoprodeck_print_codes` mirror (0 of 38,521
+ * rows have a non-"EN" language segment) and the live cardsetsinfo.php
+ * endpoint 404 on e.g. "LOB-DE001", while "LOB-EN001" resolves instantly on
+ * both. The set+number portion of a print code is identical across every
+ * language edition though, only the 2-letter language segment differs - so
+ * a German/French/Italian/etc. card is identified via its English-
+ * equivalent code. The actually-printed language is tracked separately
+ * (see extractYugiohLanguage in scanner.ts), so this substitution never
+ * loses that information.
+ */
+function toEnglishPrintCode(code: string): string | null {
+  const match = /^([A-Z0-9]+)-([A-Z]{2})(\d+)$/.exec(code);
+  if (!match) return null;
+  const [, set, lang, number] = match;
+  return lang === 'EN' ? null : `${set}-EN${number}`;
+}
+
 interface YgoCardSet {
   set_name: string;
   set_rarity: string;
@@ -173,22 +192,36 @@ export class YugiohApiService implements CardApiService {
    * fallback only on a local miss (not yet synced, or a genuinely new
    * print) - unlike identifyCard's fuzzy name search, a print code either
    * matches exactly or it doesn't, so there's no confidence score to weigh.
+   * Both lookups retry with the English-equivalent code (see
+   * toEnglishPrintCode) before giving up, since YGOPRODeck never has the
+   * literal non-English code to find in the first place.
    */
   async identifyByPrintCode(code: string): Promise<Card | null> {
-    const { data } = await this.supabase.client
-      .from('ygoprodeck_print_codes')
-      .select('card_id')
-      .eq('set_code', code)
-      .maybeSingle();
-    if (data) return this.getCard(String((data as YgoprodeckPrintCodeRow).card_id));
+    const localHit = await this.lookupPrintCodeLocally(code);
+    if (localHit) return localHit;
 
-    const response = await fetch(`${CARD_SETS_INFO_ENDPOINT}?setcode=${encodeURIComponent(code)}`);
+    const englishCode = toEnglishPrintCode(code);
+    if (englishCode) {
+      const localEnglishHit = await this.lookupPrintCodeLocally(englishCode);
+      if (localEnglishHit) return localEnglishHit;
+    }
+
+    const response = await fetch(`${CARD_SETS_INFO_ENDPOINT}?setcode=${encodeURIComponent(englishCode ?? code)}`);
     if (!response.ok) return null;
 
     const body: { id: number; name: string } | { error: string } = await response.json();
     if ('error' in body) return null;
 
     return this.getCard(String(body.id));
+  }
+
+  private async lookupPrintCodeLocally(code: string): Promise<Card | null> {
+    const { data } = await this.supabase.client
+      .from('ygoprodeck_print_codes')
+      .select('card_id')
+      .eq('set_code', code)
+      .maybeSingle();
+    return data ? this.getCard(String((data as YgoprodeckPrintCodeRow).card_id)) : null;
   }
 
   async identifyCard(rawText: string): Promise<CardIdentification | null> {
