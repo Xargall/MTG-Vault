@@ -8,6 +8,10 @@ import { HELP_TERMS_YGO_BASICS } from './data-ygo/basics';
 import { HELP_TERMS_YGO_FORMATS } from './data-ygo/formats';
 import { HELP_TERMS_YGO_KEYWORDS } from './data-ygo/keywords';
 import { HELP_TERMS_YGO_SITUATIONS } from './data-ygo/situations';
+import { HELP_TERMS_POKEMON_BASICS } from './data-pokemon/basics';
+import { HELP_TERMS_POKEMON_FORMATS } from './data-pokemon/formats';
+import { HELP_TERMS_POKEMON_KEYWORDS } from './data-pokemon/keywords';
+import { HELP_TERMS_POKEMON_SITUATIONS } from './data-pokemon/situations';
 
 export { HELP_CATEGORIES } from './data/types';
 export type { HelpCategory, HelpLang, HelpStep, HelpTerm, LocalizedText } from './data/types';
@@ -31,5 +35,11 @@ export const HELP_TERMS: HelpTerm[] = [
     ...HELP_TERMS_YGO_KEYWORDS,
     ...HELP_TERMS_YGO_FORMATS,
     ...HELP_TERMS_YGO_SITUATIONS,
+  ]),
+  ...withGame('pokemon', [
+    ...HELP_TERMS_POKEMON_BASICS,
+    ...HELP_TERMS_POKEMON_KEYWORDS,
+    ...HELP_TERMS_POKEMON_FORMATS,
+    ...HELP_TERMS_POKEMON_SITUATIONS,
   ]),
 ];
