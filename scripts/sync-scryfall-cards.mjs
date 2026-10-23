@@ -65,12 +65,22 @@ function rowFromRawCard(raw) {
   const oracleId = raw.oracle_id ?? rawFaces?.[0]?.oracle_id;
   if (!oracleId) return null;
 
+  // The card-display-language toggle (card-display-language.service.ts)
+  // only ever mirrors the DE/EN UI language, never any other Scryfall
+  // language - storing the rest (ja/fr/es/it/zhs/pt/zht/ru/ko/...) blew
+  // the free-tier DB size limit for zero display benefit. Identification
+  // paths (scanning, exact set+number lookup) stay unaffected - they
+  // already resolve to the English/canonical print, see
+  // getCardBySetAndNumber's lang='en'-first query.
+  const lang = String(raw.lang ?? 'en');
+  if (lang !== 'en' && lang !== 'de') return null;
+
   return {
     id,
     oracle_id: oracleId,
     name: String(raw.name ?? ''),
     printed_name: raw.printed_name ?? null,
-    lang: String(raw.lang ?? 'en'),
+    lang,
     image_url: raw.image_uris?.normal ?? rawFaces?.[0]?.image_uris?.normal ?? null,
     image_url_small: raw.image_uris?.small ?? rawFaces?.[0]?.image_uris?.small ?? null,
     set_code: set,
