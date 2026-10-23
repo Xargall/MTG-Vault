@@ -100,6 +100,15 @@ const CARD_SETS_INFO_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardsetsinfo.p
 const POSTGRES_BATCH_SIZE = 200;
 const SEARCH_ROW_LIMIT = 50;
 
+/**
+ * Matches a full print code as printed on a physical card (e.g. "LOB-DE001",
+ * "RA01-DE001") - used by searchCards() to recognize that the typed query is
+ * a code, not a name, and route it through identifyByPrintCode() instead
+ * (see that method's doc for the German/French/etc.-to-English rewrite this
+ * then relies on).
+ */
+export const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]+-[A-Z]{2}\d+$/i;
+
 @Injectable({ providedIn: 'root' })
 export class YugiohApiService implements CardApiService {
   private readonly supabase = inject(SupabaseService);
@@ -116,6 +125,16 @@ export class YugiohApiService implements CardApiService {
   async searchCards(query: string, signal?: AbortSignal): Promise<Card[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
+
+    // A pasted/typed print code (incl. a German one like "LOB-DE001") goes
+    // straight to the exact card via identifyByPrintCode - the same lookup
+    // the scanner uses, including its English-equivalent-code fallback - so
+    // the code printed on a non-English card actually works here. Falls
+    // through to the normal name search below if nothing matches.
+    if (YUGIOH_PRINT_CODE_PATTERN.test(trimmed)) {
+      const card = await this.identifyByPrintCode(trimmed.toUpperCase());
+      if (card) return [card];
+    }
 
     const escaped = trimmed.replace(/[%_]/g, '\\$&');
     const [prefixResult, containsResult] = await Promise.all([

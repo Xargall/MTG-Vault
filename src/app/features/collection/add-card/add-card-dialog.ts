@@ -5,6 +5,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
 import { Card } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
+import { YUGIOH_PRINT_CODE_PATTERN } from '../../../core/services/yugioh-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AppDialog } from '../../../shared/dialog/dialog';
 import { CollectionService } from '../collection.service';
@@ -30,11 +31,15 @@ export class AddCardDialog {
   protected readonly conditions = CONDITIONS;
   protected readonly languageOptions = CARD_LANGUAGE_OPTIONS;
 
-  // Only MTG search supports typing a set code (see MtgApiService.searchCards)
-  // - Yu-Gi-Oh/Pokémon still search by name only, so the hint stays accurate per game.
-  protected readonly searchPlaceholderKey = computed(() =>
-    this.gameService.currentSlug() === 'mtg' ? 'addCard.searchPlaceholderMtg' : 'addCard.searchPlaceholder',
-  );
+  // MTG and Yu-Gi-Oh! search also accept typing an exact print/set code (see
+  // MtgApiService.searchCards and YugiohApiService.searchCards) - Pokémon
+  // still searches by name only, so its hint stays the plain one.
+  protected readonly searchPlaceholderKey = computed(() => {
+    const game = this.gameService.currentSlug();
+    if (game === 'mtg') return 'addCard.searchPlaceholderMtg';
+    if (game === 'yugioh') return 'addCard.searchPlaceholderYugioh';
+    return 'addCard.searchPlaceholder';
+  });
 
   protected readonly query = signal('');
   protected readonly results = signal<Card[]>([]);
@@ -112,10 +117,13 @@ export class AddCardDialog {
     }
   }
 
-  /** Normal name search still goes through selectName()'s "pick a print" step; typing an exact set code (e.g. "emn") and clicking one of its cards already landed on one specific print, so this skips straight to it instead of making the user find that same printing again in its full reprint history. */
+  /** Normal name search still goes through selectName()'s "pick a print" step; typing an exact set code (MTG, e.g. "emn") or an exact print code (Yu-Gi-Oh!, e.g. "LOB-DE001") already landed on one specific card, so this skips straight to it instead of making the user re-pick the same (and for Yu-Gi-Oh!, only) print. */
   protected selectCard(card: Card) {
-    const trimmed = this.query().trim().toLowerCase();
-    if (card.game === 'mtg' && card.setCode.toLowerCase() === trimmed) {
+    const trimmed = this.query().trim();
+    const isDirectHit =
+      (card.game === 'mtg' && card.setCode.toLowerCase() === trimmed.toLowerCase()) ||
+      (card.game === 'yugioh' && YUGIOH_PRINT_CODE_PATTERN.test(trimmed));
+    if (isDirectHit) {
       this.directPrint.set(true);
       this.selectedName.set(card.name);
       this.selectPrint(card);
