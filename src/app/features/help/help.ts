@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, computed, effect } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { MtgApiService } from '../../core/services/mtg-api.service';
+import { GameService } from '../../core/services/game.service';
 import { ToastService } from '../../core/services/toast.service';
 import { HELP_CATEGORIES, HELP_TERMS, HelpCategory, HelpLang, HelpTerm } from './help-terms';
 
@@ -35,7 +35,7 @@ function readStoredTrottelMode(): boolean {
 })
 export class Help {
   private readonly toast = inject(ToastService);
-  private readonly mtgApi = inject(MtgApiService);
+  private readonly gameService = inject(GameService);
   protected readonly translate = inject(TranslateService);
 
   protected readonly categories = HELP_CATEGORIES;
@@ -43,12 +43,14 @@ export class Help {
   protected readonly selectedCategory = signal<HelpCategory | null>(null);
   protected readonly trottelMode = signal(readStoredTrottelMode());
 
-  // name -> image URL, resolved once from our own synced scryfall_cards
-  // mirror (see constructor) rather than Scryfall's live named-card API -
+  // name -> image URL for the active game's example cards, resolved via
+  // that game's own CardApiService.getCardsByNames (for MTG: our own
+  // synced scryfall_cards mirror, not Scryfall's live named-card API -
   // live-confirmed that a page with this many example-card thumbnails
   // bursts enough near-simultaneous requests to trip Scryfall's rate limit
-  // for several seconds, and a handful of thumbnails simply never recovered.
-  // A single batched DB lookup sidesteps that entirely.
+  // for several seconds, and a handful of thumbnails simply never
+  // recovered; a single batched DB lookup sidesteps that entirely).
+  // Re-resolved whenever the active game changes (see constructor).
   protected readonly exampleCardImages = signal<Map<string, string>>(new Map());
 
   // Set by jumpToTerm() right before it clears the filter, so "Siehe auch"
@@ -62,23 +64,34 @@ export class Help {
   protected readonly lang = computed<HelpLang>(() => (this.translate.currentLang() === 'en' ? 'en' : 'de'));
 
   constructor() {
-    const names = [...new Set(HELP_TERMS.flatMap((term) => term.exampleCards ?? []))];
-    if (names.length === 0) return;
-    void this.mtgApi.getCardsByNames(names).then((cards) => {
-      const map = new Map<string, string>();
-      for (const card of cards) {
-        const url = card.imageUrl ?? card.imageUrlSmall;
-        if (url) map.set(card.oracleName, url);
+    effect(() => {
+      const game = this.gameService.currentSlug();
+      const names = [...new Set(HELP_TERMS.filter((term) => term.game === game).flatMap((term) => term.exampleCards ?? []))];
+      if (names.length === 0) {
+        this.exampleCardImages.set(new Map());
+        return;
       }
-      this.exampleCardImages.set(map);
+      void this.gameService
+        .cardApi()
+        .getCardsByNames(names)
+        .then((cards) => {
+          const map = new Map<string, string>();
+          for (const card of cards) {
+            const url = card.imageUrl ?? card.imageUrlSmall;
+            if (url) map.set(card.oracleName, url);
+          }
+          this.exampleCardImages.set(map);
+        });
     });
   }
 
   protected readonly filteredTerms = computed(() => {
+    const game = this.gameService.currentSlug();
     const query = this.searchQuery().trim().toLowerCase();
     const category = this.selectedCategory();
     const lang = this.lang();
     return HELP_TERMS.filter((term) => {
+      if (term.game !== game) return false;
       if (category && term.category !== category) return false;
       if (!query) return true;
       return (

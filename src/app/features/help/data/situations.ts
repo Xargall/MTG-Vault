@@ -1,9 +1,9 @@
-import { HelpTerm } from './types';
+import { HelpTermInput } from './types';
 
 // "Typische Situationen" - concrete, confusing in-game moments, each with a
 // step-by-step walkthrough. Content verified against current official
 // rules text (see CLAUDE.md for the damage-assignment Foundations note).
-export const HELP_TERMS_SITUATIONS: HelpTerm[] = [
+export const HELP_TERMS_SITUATIONS: HelpTermInput[] = [
   {
     id: 'stack-resolution',
     category: 'situations',

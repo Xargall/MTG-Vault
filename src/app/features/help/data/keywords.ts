@@ -1,4 +1,4 @@
-import { HelpTerm } from './types';
+import { HelpTermInput } from './types';
 
 // Card-text keyword abilities/actions. Expanded 2026-10-22 to cover
 // essentially every keyword/ability word ever printed - evergreen, recurring
@@ -10,7 +10,7 @@ import { HelpTerm } from './types';
 // before being treated as authoritative. German term glosses in parentheses
 // are informal, for comprehension - not asserted as Wizards' official
 // localized card text.
-export const HELP_TERMS_KEYWORDS: HelpTerm[] = [
+export const HELP_TERMS_KEYWORDS: HelpTermInput[] = [
   {
     id: 'flash',
     category: 'keywords',

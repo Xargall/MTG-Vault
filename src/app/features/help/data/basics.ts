@@ -1,9 +1,9 @@
-import { HelpTerm } from './types';
+import { HelpTermInput } from './types';
 
 // Core rules concepts that everything else in the glossary assumes - stack,
 // priority, state-based actions, turn structure. Card types and mana
 // fundamentals live here too once added.
-export const HELP_TERMS_BASICS: HelpTerm[] = [
+export const HELP_TERMS_BASICS: HelpTermInput[] = [
   {
     id: 'stack',
     category: 'basics',

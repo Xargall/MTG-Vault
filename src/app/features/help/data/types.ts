@@ -1,3 +1,5 @@
+import { GameSlug } from '../../../core/models/card.model';
+
 export type HelpCategory = 'basics' | 'keywords' | 'formats' | 'situations';
 export type HelpLang = 'de' | 'en';
 
@@ -17,6 +19,14 @@ export interface HelpStep extends LocalizedText {
 
 export interface HelpTerm {
   id: string;
+  // Which game this term belongs to - the Lexikon started MTG-only (see
+  // CLAUDE.md), then grew Yu-Gi-Oh!/Pokémon term sets alongside it. Help
+  // filters the combined HELP_TERMS list down to the active game, so an
+  // id only needs to be unique within its own game's data files in
+  // practice, but every per-game data file prefixes its ids (e.g. `ygo-`)
+  // anyway to make that obvious and keep help-terms.spec.ts's
+  // whole-list uniqueness check meaningful.
+  game: GameSlug;
   category: HelpCategory;
   term: LocalizedText;
   definitionNormal: LocalizedText;
@@ -33,3 +43,8 @@ export interface HelpTerm {
 }
 
 export const HELP_CATEGORIES: HelpCategory[] = ['basics', 'keywords', 'formats', 'situations'];
+
+// What a per-game data file actually declares - `game` is filled in once,
+// in help-terms.ts, via withGame() rather than repeated on every one of
+// the (by now hundreds of) individual entries.
+export type HelpTermInput = Omit<HelpTerm, 'game'>;

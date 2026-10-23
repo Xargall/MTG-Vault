@@ -1,9 +1,9 @@
-import { HelpTerm } from './types';
+import { HelpTermInput } from './types';
 
 // Commander-specific rules the app's own decks/precons already lean on.
 // A general format-overview (Standard/Modern/Draft/etc.) is planned here too
 // - see project memory on the glossary expansion.
-export const HELP_TERMS_FORMATS: HelpTerm[] = [
+export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'command-zone',
     category: 'formats',

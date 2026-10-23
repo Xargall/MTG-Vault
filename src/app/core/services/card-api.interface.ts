@@ -30,6 +30,8 @@ export interface CardApiService {
   searchCards(query: string, signal?: AbortSignal): Promise<Card[]>;
   getCard(id: string): Promise<Card | null>;
   getCardsByIds(ids: string[]): Promise<Card[]>;
+  /** Best-effort lookup by exact display name (e.g. the Help/Lexikon's example-card thumbnails) - every implementation has one already, just not previously part of this shared interface. */
+  getCardsByNames(names: string[]): Promise<Card[]>;
   getPrints(name: string): Promise<Card[]>;
   /** Best-guess match for raw OCR text (e.g. from the camera scanner), or null if nothing is confident enough. */
   identifyCard(rawText: string): Promise<CardIdentification | null>;
