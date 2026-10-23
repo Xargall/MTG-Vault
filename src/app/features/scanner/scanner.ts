@@ -263,6 +263,12 @@ export class Scanner {
   // it's already handled gracefully (falls back silently otherwise), so
   // repeating the same explanation every subsequent hit would just be noise.
   private limitWarningShown = false;
+  // Same "once per session" treatment as limitWarningShown - a transient
+  // Gemini 503/504 (see GeminiVisionService.overloaded) already resolves
+  // itself via the gate's own retry on the next stable tick, so this is
+  // purely reassurance ("keep holding the card still") rather than
+  // something the user needs to act on every single time it happens.
+  private overloadedWarningShown = false;
   // A real Gemini/edge-function failure (bad key, 500, timeout - anything
   // other than "no card in frame") is shown once per session too - it would
   // otherwise repeat every retry (see GeminiVisionService's own pacing) and
@@ -574,6 +580,19 @@ export class Scanner {
             'warning',
             LIMIT_TOAST_DURATION_MS,
             this.translate.instant('scanner.limitTitle'),
+          );
+        }
+        return null;
+      }
+
+      if (this.geminiVision.overloaded()) {
+        if (!this.overloadedWarningShown) {
+          this.overloadedWarningShown = true;
+          this.showToast(
+            this.translate.instant('scanner.overloadedMessage'),
+            'warning',
+            LIMIT_TOAST_DURATION_MS,
+            this.translate.instant('scanner.overloadedTitle'),
           );
         }
         return null;

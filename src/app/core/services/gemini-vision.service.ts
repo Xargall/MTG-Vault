@@ -49,9 +49,17 @@ export class GeminiVisionService {
   // a caller can check it right after awaiting to tell a real 429 apart
   // from any other reason recognizeCollectorText returned null.
   readonly rateLimited = signal(false);
+  // Same pattern, for Gemini's own 503/504 (model overloaded / took too
+  // long on Google's side, confirmed live 2026-10-23 at roughly 1-in-15
+  // calls under normal use) - transient and not actionable by the user
+  // beyond "hold the card still", unlike rateLimited's "you're out of
+  // quota, stop for now". Kept as its own signal rather than folded into
+  // rateLimited since the caller's messaging to the user differs.
+  readonly overloaded = signal(false);
 
   async recognizeCollectorText(canvas: HTMLCanvasElement, game: 'mtg' | 'yugioh' | 'pokemon'): Promise<string | null> {
     this.rateLimited.set(false);
+    this.overloaded.set(false);
     await this.waitForRateLimit();
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
@@ -65,6 +73,10 @@ export class GeminiVisionService {
       if (error instanceof FunctionsHttpError && error.context?.status === 429) {
         this.lastCallAt = Date.now() + RATE_LIMIT_COOLDOWN_MS - MIN_CALL_INTERVAL_MS;
         this.rateLimited.set(true);
+        return null;
+      }
+      if (error instanceof FunctionsHttpError && (error.context?.status === 503 || error.context?.status === 504)) {
+        this.overloaded.set(true);
         return null;
       }
       // The SDK's own error.message is a generic "Edge Function returned a

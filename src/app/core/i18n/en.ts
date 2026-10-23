@@ -404,6 +404,8 @@ export const en: typeof de = {
     noGeminiKeyHint: 'For AI recognition, please add a Gemini API key in Settings',
     geminiErrorTitle: 'Gemini error',
     geminiErrorFallback: 'Gemini recognition failed. Please try again in a moment.',
+    overloadedTitle: 'Gemini briefly overloaded',
+    overloadedMessage: "AI recognition is under heavy load right now. Just hold the card still - the next attempt happens automatically.",
     limitBadge: 'Limit reached',
     goToSettings: 'Go to Settings',
   },

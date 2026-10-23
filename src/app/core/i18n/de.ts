@@ -404,6 +404,8 @@ export const de = {
     noGeminiKeyHint: 'Für KI-Erkennung bitte Gemini API Key in den Einstellungen hinterlegen',
     geminiErrorTitle: 'Gemini-Fehler',
     geminiErrorFallback: 'Gemini-Erkennung fehlgeschlagen. Bitte versuche es gleich noch einmal.',
+    overloadedTitle: 'Gemini kurz überlastet',
+    overloadedMessage: 'Die KI-Erkennung ist gerade stark ausgelastet. Karte einfach ruhig liegen lassen - der nächste Versuch läuft automatisch.',
     limitBadge: 'Limit erreicht',
     goToSettings: 'Zu den Einstellungen',
   },
