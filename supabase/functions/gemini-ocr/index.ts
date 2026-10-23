@@ -70,10 +70,16 @@ formatierter Code ist schlimmer als ehrliches "UNKNOWN".
 
 Keine weiteren Erklärungen, kein zusätzlicher Text.`;
 
-const YUGIOH_PROMPT = `Du siehst einen eng zugeschnittenen Bildausschnitt einer Yu-Gi-Oh! Karte mit dem Karten-Code unten links oder unten rechts.
-Der Code hat das Format "SETCODE-SPRACHE-NUMMER", z.B. "SDAZ-DE001" oder "LOB-EN001".
+const YUGIOH_PROMPT = `Du siehst ein Foto einer kompletten Yu-Gi-Oh! Karte (nicht zugeschnitten - die Karte kann irgendwo im Bild stehen).
 
-Lies NUR diesen Code, exakt wie aufgedruckt (Bindestrich, Sprachkürzel und führende Nullen der Nummer beibehalten).
+Gesucht ist der Karten-Code im Format "SETCODE-SPRACHE-NUMMER", z.B. "SDAZ-DE001" oder "LOB-EN001".
+Dieser Code steht in einer dünnen Zeile DIREKT UNTER dem Artwork-Bild, meist rechtsbündig neben oder über
+dem Kartentyp in eckigen Klammern (z.B. "[Cyberse/Effekt]" oder "[Cyberse/Link/Effekt]").
+
+Verwechsle ihn NICHT mit der 8-stelligen Passwort-Nummer ganz unten am Kartenrand (z.B. "63009228") -
+das ist ein anderer Code und hier nicht gesucht.
+
+Lies NUR den Karten-Code, exakt wie aufgedruckt (Bindestrich, Sprachkürzel und führende Nullen der Nummer beibehalten).
 
 Antworte NUR mit dem Code, z.B.: "SDAZ-DE001"
 

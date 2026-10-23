@@ -21,7 +21,15 @@ const RATE_LIMIT_COOLDOWN_MS = 15000;
 // scanner would silently never try Gemini again for the rest of the
 // session. The SDK's own `timeout` option (a client-side AbortController)
 // guarantees this call always settles one way or another.
-const REQUEST_TIMEOUT_MS = 15000;
+//
+// Kept above the Edge Function's own GEMINI_TIMEOUT_MS (25s, see
+// supabase/functions/gemini-ocr/index.ts) rather than below it - a shorter
+// client timeout was confirmed live (2026-10-23) to fire first on a slow
+// Gemini call, aborting the fetch before the server could return its own,
+// more informative timeout response - the client then only ever sees a
+// generic "FunctionsFetchError", which looks identical to a real network
+// failure instead of "Gemini was just slow this time".
+const REQUEST_TIMEOUT_MS = 30000;
 
 /**
  * Thin client for the `gemini-ocr` Supabase Edge Function. The Gemini API

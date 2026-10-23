@@ -89,26 +89,33 @@ function applyContrastStretch(data: Uint8ClampedArray): void {
  * vision model reads it fine without needing a tight, precise frame.
  * Contrast-stretched (see applyContrastStretch) but kept in color.
  *
- * MTG's collector number/set code always sits bottom-left, so a left-aligned
- * crop is enough. Yu-Gi-Oh's print code can sit bottom-left OR bottom-right
- * depending on the card's exact layout/era (the YUGIOH_PROMPT in the
- * gemini-ocr Edge Function already says so) - a left-aligned crop would
- * silently cut it out of frame on every card where it's actually on the
- * right, which is exactly the kind of miss that looks identical to "no card
- * in view" from the outside. So Yu-Gi-Oh gets the full width instead of
- * guessing a side.
+ * MTG only: its collector number/set code reliably sits bottom-left AND the
+ * card is framed to fill most of the camera view, so "bottom-left corner of
+ * the frame" is a safe proxy for "bottom-left corner of the card".
+ *
+ * Yu-Gi-Oh! used to get the same treatment (first widened to full width,
+ * since its print code can also sit bottom-right) but that whole premise -
+ * "the card fills the frame, so a frame-relative crop finds the right part
+ * of the card" - turned out to not hold at all: confirmed live (2026-10-23,
+ * real German cards against a desk-mounted USB camera) that the card only
+ * fills the upper ~40% of the frame, with the rest empty table - so "bottom
+ * 25% of the frame" landed entirely off the card, every time, regardless of
+ * where the code actually sits on the card itself. On top of that, the code
+ * turned out to sit right below the artwork (above the "[Type/Effekt]"
+ * line), not at the card's bottom edge at all - that's the passcode/edition
+ * footer instead. Two independent wrong position guesses is the signal that
+ * guessing a position here doesn't generalize - see stretchFullFrame below,
+ * used for Yu-Gi-Oh! instead.
  */
-function cropCollectorArea(source: HTMLCanvasElement, game: 'mtg' | 'yugioh' | 'pokemon'): HTMLCanvasElement {
+function cropCollectorArea(source: HTMLCanvasElement): HTMLCanvasElement {
   const crop = document.createElement('canvas');
   // 20%→25%: overlay UI elements sitting low on the viewport can clip into
   // this corner on real devices, cutting the collector number out of the
   // captured frame before it ever reached Gemini - widened to give it room.
   const h = Math.floor(source.height * 0.25);
   const y = source.height - h;
-  // 60%→65% for MTG specifically - same reasoning as the height widening
-  // above, kept narrower than full width since MTG's code is reliably
-  // bottom-left.
-  const widthFraction = game === 'yugioh' ? 1 : 0.65;
+  // Kept narrower than full width since MTG's code is reliably bottom-left.
+  const widthFraction = 0.65;
   crop.width = Math.floor(source.width * widthFraction);
   crop.height = h;
   const ctx = crop.getContext('2d');
@@ -119,6 +126,31 @@ function cropCollectorArea(source: HTMLCanvasElement, game: 'mtg' | 'yugioh' | '
   applyContrastStretch(imageData.data);
   ctx.putImageData(imageData, 0, 0);
   return crop;
+}
+
+/**
+ * Yu-Gi-Oh!'s Gemini input: the full frame, contrast-stretched in place but
+ * otherwise uncropped - see cropCollectorArea's doc for why a guessed crop
+ * region doesn't work here (the card's position within the frame isn't
+ * fixed, and neither is the code's position on the card). Lets Gemini
+ * itself find the card and its code anywhere in the shot instead - same
+ * reasoning Pokémon's path already relies on (full frame, no crop), just
+ * with the contrast stretch MTG's crop also gets, kept for the low-contrast
+ * dark-on-dark print code on some card frames (e.g. Link Monsters' navy
+ * border).
+ */
+function stretchFullFrame(source: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement('canvas');
+  out.width = source.width;
+  out.height = source.height;
+  const ctx = out.getContext('2d');
+  if (!ctx) return out;
+
+  ctx.drawImage(source, 0, 0);
+  const imageData = ctx.getImageData(0, 0, out.width, out.height);
+  applyContrastStretch(imageData.data);
+  ctx.putImageData(imageData, 0, 0);
+  return out;
 }
 
 const SUCCESS_TOAST_DURATION_MS = 3000;
@@ -524,11 +556,13 @@ export class Scanner {
       if (!rawFrame) return null;
 
       const game = this.gameService.currentSlug();
-      // MTG's collector number and Yu-Gi-Oh's print code both print in the
-      // bottom corner, so both crop toward it (see cropCollectorArea).
-      // Pokémon has neither - no compact code to read at all, just its
-      // printed name up top - so it gets the full, uncropped frame instead.
-      const cropped = game === 'pokemon' ? rawFrame : cropCollectorArea(rawFrame, game);
+      // MTG crops toward its collector-number corner (see
+      // cropCollectorArea). Yu-Gi-Oh! and Pokémon both send the full,
+      // uncropped frame - Pokémon because it has no compact code to read at
+      // all (just its printed name), Yu-Gi-Oh! because guessing a crop
+      // region turned out not to generalize across camera setups/card
+      // layouts (see stretchFullFrame's doc).
+      const cropped = game === 'mtg' ? cropCollectorArea(rawFrame) : game === 'yugioh' ? stretchFullFrame(rawFrame) : rawFrame;
       const text = await this.geminiVision.recognizeCollectorText(cropped, game);
 
       if (this.geminiVision.rateLimited()) {
