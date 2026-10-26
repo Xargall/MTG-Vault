@@ -102,6 +102,9 @@ function rowFromRawCard(raw) {
     edhrec_rank: raw.edhrec_rank ?? null,
     power: raw.power ?? rawFaces?.[0]?.power ?? null,
     toughness: raw.toughness ?? rawFaces?.[0]?.toughness ?? null,
+    // Scryfall's own `is:gamechanger` flag (53 cards as of writing) - top-
+    // level only, no per-face concept (see 035_scryfall_cards_game_changer.sql).
+    game_changer: raw.game_changer ?? false,
     price_eur: parsePrice(raw.prices?.eur),
     price_eur_foil: parsePrice(raw.prices?.eur_foil),
     price_usd: parsePrice(raw.prices?.usd),

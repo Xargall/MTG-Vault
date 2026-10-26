@@ -64,6 +64,15 @@ export interface MtgCard extends CardBase {
   // for every key it can carry). Null when unresolved (e.g. a card that
   // never went through rowToCard/toCard, or synced before migration 034).
   legalities: Record<string, string> | null;
+  // Scryfall's own keyword abilities (e.g. ["Flying", "Haste"]) - empty, not
+  // null, for a card with none (most vanilla creatures/instants/sorceries),
+  // since "no keywords" is itself meaningful here (deck-stats.ts's synergy
+  // aggregation), not an unresolved state the way a null legalities is.
+  keywords: string[];
+  // Scryfall's own `is:gamechanger` flag (migration 035) - one ingredient of
+  // the Commander-bracket estimate (see commander-bracket.ts), never shown
+  // as a fact on its own.
+  gameChanger: boolean;
 }
 
 export type YugiohBanlistStatus = 'Forbidden' | 'Limited' | 'Semi-Limited';

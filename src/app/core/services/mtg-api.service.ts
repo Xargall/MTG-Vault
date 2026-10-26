@@ -33,6 +33,7 @@ export interface ScryfallRawCard {
   artist?: string;
   keywords?: string[];
   legalities?: Record<string, string>;
+  game_changer?: boolean;
   cmc: number;
   color_identity: string[];
   mana_cost?: string;
@@ -94,6 +95,12 @@ interface ScryfallCardRow {
   // Added by migration 034 - null for a row synced before it, or still
   // waiting on its next daily sync. See MtgCard.legalities.
   legalities: Record<string, string> | null;
+  // Added by migration 034 - empty (its column default) for a row synced
+  // before it. See MtgCard.keywords.
+  keywords: string[];
+  // Added by migration 035 - false (its column default) for a row synced
+  // before it. See MtgCard.gameChanger.
+  game_changer: boolean;
 }
 
 // A token or halo-finish card gets its own collection bucket ("✨ Specials")
@@ -1001,6 +1008,8 @@ export class MtgApiService implements CardApiService {
       setCode: raw.set,
       collectorNumber: raw.collector_number,
       legalities: raw.legalities ?? null,
+      keywords: raw.keywords ?? [],
+      gameChanger: raw.game_changer ?? false,
     };
   }
 
@@ -1038,6 +1047,12 @@ export class MtgApiService implements CardApiService {
       setCode: row.set_code,
       collectorNumber: row.collector_number,
       legalities: row.legalities,
+      keywords: row.keywords,
+      // `?? false`, not just row.game_changer - migration 035 hasn't synced
+      // to every existing row's column yet at the moment this ships, and
+      // `select('*')` simply omits an unknown column rather than nulling it,
+      // so row.game_changer can be undefined for a brief window.
+      gameChanger: row.game_changer ?? false,
     };
   }
 
