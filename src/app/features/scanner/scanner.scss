@@ -157,10 +157,15 @@
   }
 }
 
+// Stacked directly below .scanner-close (same right edge, same safe-area
+// handling) rather than sharing its top offset - they used to sit at the
+// exact same spot, the badge rendering underneath the close button with no
+// way to see it. var(--tap-min) is the close button's own width/height, so
+// this clears it regardless of that token's value.
 .ocr-engine-badge {
   position: absolute;
-  top: var(--spacing-md);
-  right: var(--spacing-md);
+  top: calc(var(--spacing-md) + var(--tap-min) + var(--spacing-sm) + env(safe-area-inset-top));
+  right: calc(var(--spacing-md) + env(safe-area-inset-right));
   padding: 4px 10px;
   border-radius: var(--radius);
   font-size: 0.8rem;
@@ -173,6 +178,15 @@
   &--limit {
     background: var(--color-danger);
     color: var(--color-on-accent);
+  }
+
+  // Elapsed-time indicator while a Gemini call is actually in flight - an
+  // in-progress state, not a success/failure one, so neither the success nor
+  // danger token fits; the scrim plate used by the other top-center hints
+  // (.scanner-hint/.bulk-data-hint) reads as neutral/waiting instead.
+  &--waiting {
+    background: var(--scrim);
+    color: var(--color-text);
   }
 }
 

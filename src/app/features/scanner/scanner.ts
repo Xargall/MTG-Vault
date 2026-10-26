@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import {
   afterNextRender,
   ChangeDetectionStrategy,
@@ -234,7 +235,7 @@ interface FocusRange {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-scanner',
-  imports: [FormsModule, RouterLink, CardTile, TranslatePipe],
+  imports: [FormsModule, RouterLink, CardTile, TranslatePipe, DecimalPipe],
   templateUrl: './scanner.html',
   styleUrl: './scanner.scss',
 })
@@ -279,6 +280,15 @@ export class Scanner {
   // Drives the small "🤖 Gemini" / "⚠️ Limit" indicator; null while nothing
   // has read yet.
   protected readonly ocrEngine = signal<'gemini' | 'limit' | null>(null);
+  // Live elapsed time (seconds) for the *current* in-flight Gemini call -
+  // null while nothing is in flight. Live-requested (2026-10-26): a 504
+  // gateway timeout can take the edge function's full 25s budget to surface,
+  // and with no feedback at all during that wait it's indistinguishable from
+  // the scanner just being stuck. Resets on every new attempt rather than
+  // accumulating across retries - the question is "is *this* attempt taking
+  // unusually long", not a running total.
+  protected readonly geminiElapsedSeconds = signal<number | null>(null);
+  private geminiElapsedTimer: ReturnType<typeof setInterval> | null = null;
   // Gates the automatic Gemini path (see updateGeminiGate) and drives the
   // "set up your own key" hint - null (not checked yet) fails open, so a
   // flaky/unmigrated status check never silently disables a working feature.
@@ -377,6 +387,7 @@ export class Scanner {
       if (this.toastTimeout) clearTimeout(this.toastTimeout);
       if (this.autoResumeTimeout) clearTimeout(this.autoResumeTimeout);
       if (this.autoAddTimeout) clearTimeout(this.autoAddTimeout);
+      if (this.geminiElapsedTimer) clearInterval(this.geminiElapsedTimer);
       this.stream?.getTracks().forEach((track) => track.stop());
       this.bulkData.releaseNameIndex();
     });
@@ -644,7 +655,13 @@ export class Scanner {
       // region turned out not to generalize across camera setups/card
       // layouts (see stretchFullFrame's doc).
       const cropped = game === 'mtg' ? cropCollectorArea(rawFrame) : game === 'yugioh' ? stretchFullFrame(rawFrame) : rawFrame;
-      const text = await this.geminiVision.recognizeCollectorText(cropped, game);
+      this.startGeminiElapsedTimer();
+      let text: string | null;
+      try {
+        text = await this.geminiVision.recognizeCollectorText(cropped, game);
+      } finally {
+        this.stopGeminiElapsedTimer();
+      }
 
       if (this.geminiVision.rateLimited()) {
         this.ocrEngine.set('limit');
@@ -865,6 +882,22 @@ export class Scanner {
     this.pendingSetGuess.set(null);
     this.status.set('scanning');
     this.scheduleNextCapture();
+  }
+
+  private startGeminiElapsedTimer() {
+    const startedAt = Date.now();
+    this.geminiElapsedSeconds.set(0);
+    this.geminiElapsedTimer = setInterval(() => {
+      this.geminiElapsedSeconds.set((Date.now() - startedAt) / 1000);
+    }, 100);
+  }
+
+  private stopGeminiElapsedTimer() {
+    if (this.geminiElapsedTimer) {
+      clearInterval(this.geminiElapsedTimer);
+      this.geminiElapsedTimer = null;
+    }
+    this.geminiElapsedSeconds.set(null);
   }
 
   private clearAutoAddTimeout() {

@@ -419,6 +419,7 @@ export const en: typeof de = {
     setGuessHint: 'This set code wasn\'t found anywhere. Did you mean the set "{{set}}"?',
     setGuessConfirm: 'Yes, that one',
     setGuessReject: 'No',
+    geminiWaitingLabel: 'Gemini is thinking…',
     noneOfThese: 'None of these — keep scanning',
     addToCollection: 'Add to collection',
     keepScanning: 'Keep scanning',

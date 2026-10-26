@@ -419,6 +419,7 @@ export const de = {
     setGuessHint: 'Dieser Set-Code wurde nirgends gefunden. Meintest du das Set „{{set}}“?',
     setGuessConfirm: 'Ja, genau',
     setGuessReject: 'Nein',
+    geminiWaitingLabel: 'Gemini denkt nach…',
     noneOfThese: 'Keine davon — weiter scannen',
     addToCollection: 'Zur Collection hinzufügen',
     keepScanning: 'Weiter scannen',
