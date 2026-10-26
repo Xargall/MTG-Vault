@@ -61,10 +61,112 @@
       </div>
     }
 
+    @if (isMtgDeck()) {
+      <section class="analysis-section">
+        <h3>{{ 'deckDetail.manaCurveHeading' | translate }}</h3>
+        <app-bar-chart [data]="manaCurve()" />
+
+        <h3>{{ 'deckDetail.tempoHeading' | translate }}</h3>
+        <div class="tempo-chips">
+          <div class="tempo-chip">
+            <span class="tempo-chip-value">{{ tempoBreakdown().earlyCount }}</span>
+            <span class="tempo-chip-label">{{ 'deckDetail.tempoEarly' | translate: { cmc: 2 } }}</span>
+          </div>
+          <div class="tempo-chip">
+            <span class="tempo-chip-value">{{ tempoBreakdown().midCount }}</span>
+            <span class="tempo-chip-label">{{ 'deckDetail.tempoMid' | translate }}</span>
+          </div>
+          <div class="tempo-chip">
+            <span class="tempo-chip-value">{{ tempoBreakdown().lateCount }}</span>
+            <span class="tempo-chip-label">{{ 'deckDetail.tempoLate' | translate: { cmc: 6 } }}</span>
+          </div>
+        </div>
+        @if (tempoBreakdown().earlyImpactCount > 0) {
+          <p class="tempo-impact-note">
+            {{
+              'deckDetail.tempoEarlyImpact'
+                | translate
+                  : {
+                      count: tempoBreakdown().earlyImpactCount,
+                      keywords: tempoBreakdown().earlyImpactKeywords.join(', '),
+                    }
+            }}
+          </p>
+        }
+
+        @if (keywordSummary().length > 0) {
+          <h3>{{ 'deckDetail.keywordSynergyHeading' | translate }}</h3>
+          <div class="keyword-synergy-list">
+            @for (item of keywordSummary(); track item.keyword) {
+              <span class="keyword-synergy-chip">{{ item.keyword }} · {{ item.count }}</span>
+            }
+          </div>
+        }
+
+        @if (!isCommanderDeck()) {
+          <label class="checkbox-label bracket-opt-in">
+            <input type="checkbox" [checked]="manualCommanderFlag()" (change)="manualCommanderFlag.set($any($event.target).checked)" />
+            {{ 'deckDetail.bracketOptIn' | translate }}
+          </label>
+        }
+
+        @if (isCommanderDeck()) {
+          <h3>{{ 'deckDetail.bracketHeading' | translate }}</h3>
+          <p class="bracket-disclaimer">{{ 'deckDetail.bracketDisclaimer' | translate }}</p>
+
+          <div class="bracket-value">
+            {{ 'deckDetail.bracketValue' | translate: { bracket: bracketEstimate().bracket, label: bracketLabel() } }}
+          </div>
+
+          <ul class="bracket-factors">
+            <li>{{ 'deckDetail.bracketGameChangers' | translate: { count: bracketEstimate().factors.gameChangerCount } }}</li>
+            @if (bracketEstimate().combosChecked) {
+              <li>{{ 'deckDetail.bracketCombosChecked' | translate: { count: bracketEstimate().factors.twoCardComboCount } }}</li>
+              <li>{{ 'deckDetail.bracketMassLandDenial' | translate: { count: bracketEstimate().factors.massLandDenialCards.length } }}</li>
+            } @else {
+              <li class="bracket-factor-pending">{{ 'deckDetail.bracketCombosNotChecked' | translate }}</li>
+            }
+          </ul>
+
+          <div class="bracket-commander-picker">
+            <label for="commander-select">{{ 'deckDetail.bracketCommanderLabel' | translate }}</label>
+            <select id="commander-select" (change)="onCommanderPicked($any($event.target).value)">
+              <option value="" [selected]="selectedCommanderCardId() === null">
+                {{ 'deckDetail.bracketCommanderPlaceholder' | translate }}
+              </option>
+              @for (candidate of commanderCandidates(); track candidate.cardId) {
+                <option [value]="candidate.cardId" [selected]="selectedCommanderCardId() === candidate.cardId">
+                  {{ candidate.name }}
+                </option>
+              }
+            </select>
+
+            @if (comboCheckError()) {
+              <span class="state-message error">{{ comboCheckError() }}</span>
+            }
+
+            <button
+              type="button"
+              class="btn btn--secondary btn--sm"
+              [disabled]="!selectedCommanderCardId() || checkingCombos()"
+              (click)="checkBracketCombos()"
+            >
+              {{ (checkingCombos() ? 'deckDetail.bracketChecking' : 'deckDetail.bracketCheckButton') | translate }}
+            </button>
+          </div>
+        }
+      </section>
+    }
+
     <h3>{{ 'deckDetail.containedCards' | translate }}</h3>
     <div class="results-grid">
       @for (item of mainCards(); track item.entry.row.id) {
-        <app-card-tile [card]="item.entry.card" [quantity]="item.entry.row.quantity" [status]="item.status" />
+        <app-card-tile
+          [card]="item.entry.card"
+          [quantity]="item.entry.row.quantity"
+          [status]="item.status"
+          [keywords]="cardKeywords(item.entry.card)"
+        />
       }
     </div>
 
@@ -72,7 +174,12 @@
       <h3>{{ 'deckDetail.containedTokens' | translate }}</h3>
       <div class="results-grid">
         @for (item of tokenCards(); track item.entry.row.id) {
-          <app-card-tile [card]="item.entry.card" [quantity]="item.entry.row.quantity" [status]="item.status" />
+          <app-card-tile
+            [card]="item.entry.card"
+            [quantity]="item.entry.row.quantity"
+            [status]="item.status"
+            [keywords]="cardKeywords(item.entry.card)"
+          />
         }
       </div>
     }

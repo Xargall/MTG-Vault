@@ -35,4 +35,15 @@
   </div>
 
   <p class="card-name">{{ card().name }}</p>
+
+  @if (keywords().length > 0) {
+    <div class="keyword-badges">
+      @for (keyword of keywords().slice(0, 2); track keyword) {
+        <span class="keyword-badge">{{ keyword }}</span>
+      }
+      @if (keywords().length > 2) {
+        <span class="keyword-badge keyword-badge--more">+{{ keywords().length - 2 }}</span>
+      }
+    </div>
+  }
 </div>

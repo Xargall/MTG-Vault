@@ -4,18 +4,29 @@ import {
   computed,
   inject,
   input,
+  linkedSignal,
   output,
   signal,
 } from '@angular/core';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../../core/models/card.model';
+import { CommanderSpellbookService } from '../../../core/services/commander-spellbook.service';
+import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
 import { CardOwnedStatus, CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AppDialog } from '../../../shared/dialog/dialog';
 import { PricePipe } from '../../../shared/pipes/price.pipe';
 import { FocusOnInitDirective } from '../../../shared/directives/focus-on-init.directive';
 import { CollectionEntry } from '../../collection/collection.service';
 import { UpsertWishlistInput, WishlistService } from '../../wishlist/wishlist.service';
+import {
+  BracketEstimate,
+  BRACKET_LABELS,
+  CommanderSpellbookResult,
+  getBracketEstimate,
+  isCommanderFormat,
+  toDeckRequestCards,
+} from '../commander-bracket';
 import {
   AssignedElsewhereEntry,
   buildAssignedElsewhereMaps,
@@ -28,10 +39,15 @@ import {
   getAssignedElsewhereDecks,
   getCardOwnedStatus,
   getDeckCardCount,
+  getDeckKeywordSummary,
+  getDeckManaCurve,
   getDeckShowcase,
+  getDeckTempoBreakdown,
   getDeckTotalValue,
   getMissingQuantity,
   getOwnedQuantity,
+  KeywordSynergyEntry,
+  TempoBreakdown,
 } from '../deck-stats';
 import { DeckCardEntry, DeckEntry, DeckService } from '../deck.service';
 
@@ -52,7 +68,7 @@ export interface DeckCardBindingDetail {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-deck-detail-dialog',
-  imports: [CardTile, PricePipe, TranslatePipe, AppDialog, FocusOnInitDirective],
+  imports: [BarChart, CardTile, PricePipe, TranslatePipe, AppDialog, FocusOnInitDirective],
   templateUrl: './deck-detail-dialog.html',
   styleUrl: './deck-detail-dialog.scss',
 })
@@ -60,6 +76,7 @@ export class DeckDetailDialog {
   private readonly deckService = inject(DeckService);
   private readonly wishlistService = inject(WishlistService);
   private readonly translate = inject(TranslateService);
+  private readonly commanderSpellbookService = inject(CommanderSpellbookService);
 
   /** The hero's own <h2> names the dialog (it runs `bare`, without the shared header). */
   protected readonly headingId = 'deck-detail-heading';
@@ -208,6 +225,84 @@ export class DeckDetailDialog {
   protected readonly tokenCards = computed(() =>
     this.cardsWithStatus().filter((item) => item.entry.card.game === 'mtg' && item.entry.card.typeLine.startsWith('Token')),
   );
+
+  /** Gates the whole analysis section (mana curve/tempo/keyword synergy) below - all MTG-only, see deck-stats.ts's own section comment. An empty deck or a non-MTG one (Yu-Gi-Oh!/Pokémon) simply never shows it. */
+  protected readonly isMtgDeck = computed(() => this.entry().cards.some((entry) => entry.card.game === 'mtg'));
+
+  protected readonly manaCurve = computed<BarChartDatum[]>(() => getDeckManaCurve(this.entry().cards));
+  protected readonly tempoBreakdown = computed<TempoBreakdown>(() => getDeckTempoBreakdown(this.entry().cards));
+  protected readonly keywordSummary = computed<KeywordSynergyEntry[]>(() => getDeckKeywordSummary(this.entry().cards));
+
+  // --- Commander bracket estimate (Commander decks only) -------------------
+
+  /** True only for a deck built via CommanderRecommendationsDialog (deck.format is literally 'Commander' there, see DeckService.addCommanderDeck) - a manually imported deck's format is always null (see DeckService.importDeck), so this alone would miss the common case of a pasted-in Commander decklist. See manualCommanderFlag for the fallback. */
+  protected readonly commanderFormatDetected = computed(() => isCommanderFormat(this.entry().deck.format));
+  /** User-confirmed override for a deck isCommanderFormat can't recognize (manual import, or an oddly-labeled format) - same "ask, don't guess" approach as the commander-card picker below. Resets every time a fresh dialog instance opens, same as searchSubstitutes. */
+  protected readonly manualCommanderFlag = signal(false);
+  protected readonly isCommanderDeck = computed(() => this.commanderFormatDetected() || this.manualCommanderFlag());
+
+  /** Every MTG card in the deck as a commander-picker option, sorted by name. */
+  protected readonly commanderCandidates = computed(() =>
+    this.entry()
+      .cards.filter((entry) => entry.card.game === 'mtg')
+      .map((entry) => ({ cardId: entry.row.card_id, name: entry.card.name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+
+  /**
+   * Best-guess default only, never assumed correct - a deck built via
+   * CommanderRecommendationsDialog has deck.name literally set to the
+   * commander's name (see DeckService.addCommanderDeck), so that match pre-
+   * fills the picker; anything else (manual import) starts unselected. The
+   * user confirms or changes it either way (see selectedCommanderCardId)
+   * before a bracket combo check can run - there's no per-deck-card
+   * "is_commander" flag in this data model to rely on instead.
+   */
+  private readonly inferredCommanderCardId = computed(
+    () => this.commanderCandidates().find((c) => c.name === this.entry().deck.name)?.cardId ?? null,
+  );
+
+  protected readonly selectedCommanderCardId = linkedSignal(() => this.inferredCommanderCardId());
+
+  protected readonly commanderSpellbookResult = signal<CommanderSpellbookResult | null>(null);
+  protected readonly checkingCombos = signal(false);
+  protected readonly comboCheckError = signal<string | null>(null);
+
+  protected readonly bracketEstimate = computed<BracketEstimate>(() =>
+    getBracketEstimate(this.entry().cards, this.commanderSpellbookResult()),
+  );
+  protected readonly bracketLabel = computed(() => BRACKET_LABELS[this.bracketEstimate().bracket]);
+
+  protected onCommanderPicked(cardId: string) {
+    this.selectedCommanderCardId.set(cardId || null);
+    // The combo result belongs to the previously-selected commander's
+    // exclusion from the main deck - stale once the pick changes, so it's
+    // cleared rather than left showing a result for the wrong commander.
+    this.commanderSpellbookResult.set(null);
+    this.comboCheckError.set(null);
+  }
+
+  protected async checkBracketCombos() {
+    const commanderId = this.selectedCommanderCardId();
+    const commanderEntry = this.entry().cards.find((entry) => entry.row.card_id === commanderId);
+    if (!commanderEntry || commanderEntry.card.game !== 'mtg') return;
+
+    this.checkingCombos.set(true);
+    this.comboCheckError.set(null);
+    try {
+      const main = toDeckRequestCards(this.entry().cards, new Set([commanderEntry.row.card_id]));
+      const result = await this.commanderSpellbookService.estimateBracket(main, [
+        { card: commanderEntry.card.oracleName, quantity: 1 },
+      ]);
+      this.commanderSpellbookResult.set(result);
+    } catch (error) {
+      this.comboCheckError.set(
+        error instanceof Error ? error.message : this.translate.instant('deckDetail.bracketCheckFailed'),
+      );
+    } finally {
+      this.checkingCombos.set(false);
+    }
+  }
 
   /** The real, weighted "can I actually build this" match - a card that's owned but fully claimed by another deck doesn't count as free, matching the flexible (half-credit) scoring the deck-search toggle defaults to. See getAvailabilityMatch. Exact-print-only unless oracleModeActive, see matchingMaps. */
   protected readonly availabilityMatch = computed(() => {
@@ -360,6 +455,11 @@ export class DeckDetailDialog {
   /** "MSH #142" style short print label for the substitute callout - substitution is an MTG-only concept (see findSubstitute's oracle_id requirement), so every card reaching this is an MtgCard in practice, but the type is the general Card union. */
   protected printLabel(card: Card): string {
     return card.game === 'mtg' ? `${card.setCode.toUpperCase()} #${card.collectorNumber}` : card.name;
+  }
+
+  /** Per-card keyword badges in the decklist - empty (not just for non-MTG cards) for the common case of a card with no keyword abilities at all. */
+  protected cardKeywords(card: Card): string[] {
+    return card.game === 'mtg' ? card.keywords : [];
   }
 
   async addMissingToWishlist() {

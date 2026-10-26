@@ -17,6 +17,8 @@ export class CardTile {
   readonly status = input<CardOwnedStatus | null>(null);
   /** Owned-copy language code (see card-languages.ts), e.g. 'de' - null (no collection row context, e.g. search/print pickers) renders no badge; any real value always shows it, since a mixed collection needs a constant reminder of which printed language each copy actually is, not just a flag for the "unusual" ones. */
   readonly language = input<string | null>(null);
+  /** MTG keyword abilities (deck-detail only, see DeckDetailDialog.cardKeywords) - empty renders nothing, so every other call site (Collection grid, search results) stays visually unchanged without having to opt out. */
+  readonly keywords = input<string[]>([]);
 
   protected readonly imageLoaded = signal(false);
 }

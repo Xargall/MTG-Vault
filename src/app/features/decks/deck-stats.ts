@@ -1,5 +1,6 @@
 import { Card } from '../../core/models/card.model';
 import { AverageDeckCard } from '../../core/services/edhrec.service';
+import { BarChartDatum } from '../../shared/charts/bar-chart/bar-chart';
 import { CardOwnedStatus } from '../../shared/cards/card-tile/card-tile';
 import { CollectionEntry } from '../collection/collection.service';
 import { DeckCardEntry, DeckEntry } from './deck.service';
@@ -520,4 +521,139 @@ export function getDeckTotalValue(deckEntry: DeckEntry): number {
     const price = card.prices.eur ?? card.prices.eurFoil ?? 0;
     return sum + price * row.quantity;
   }, 0);
+}
+
+// --- Deck analysis (mana curve, tempo profile, keyword synergy) -----------
+// MTG-only (every function here reads MtgCard-specific fields) - a
+// non-Commander/non-MTG deck simply never renders this section, see
+// DeckDetailDialog's own game check before any of these are called.
+
+function isMtgNonTokenEntry(entry: DeckCardEntry): boolean {
+  return entry.card.game === 'mtg' && !entry.card.typeLine.startsWith('Token');
+}
+
+const MANA_CURVE_BUCKETS = ['0', '1', '2', '3', '4', '5', '6', '7+'];
+// Matches collection-stats.ts's own mana-curve color token, kept as its own
+// copy rather than imported - that file is collection-scoped (CollectionEntry
+// throughout), this one deck-scoped (DeckCardEntry), and the two were never
+// meant to share more than the visual convention.
+const MANA_CURVE_COLOR = 'var(--color-bronze)';
+
+function manaCurveBucketFor(cmc: number): string {
+  const rounded = Math.max(0, Math.floor(cmc));
+  return rounded >= 7 ? '7+' : String(rounded);
+}
+
+/**
+ * Same bucketing/color as collection-stats.ts's getManaCurve, scoped to one
+ * deck's own cards instead of the whole collection - unlike that one, lands
+ * and bonus tokens are excluded here (a land's cmc is always 0 and would
+ * otherwise dominate the "0" bucket in a 99-card Commander deck with ~37 of
+ * them, which isn't what "mana curve" means in deck-building practice; bonus
+ * tokens aren't part of the actual decklist - see DeckDetailDialog.mainCards
+ * for the same exclusion). Scryfall already resolves a double-faced/split
+ * card's cmc to its one combined top-level value during sync (see
+ * MtgApiService.rowToCard/toCard) - no card_faces handling needed here.
+ */
+export function getDeckManaCurve(cards: DeckCardEntry[]): BarChartDatum[] {
+  const counts = new Map<string, number>();
+  for (const entry of cards) {
+    if (!isMtgNonTokenEntry(entry)) continue;
+    const card = entry.card as Extract<Card, { game: 'mtg' }>;
+    if (card.typeLine.includes('Land')) continue;
+    const bucket = manaCurveBucketFor(card.cmc);
+    counts.set(bucket, (counts.get(bucket) ?? 0) + entry.row.quantity);
+  }
+  return MANA_CURVE_BUCKETS.map((bucket) => ({ label: bucket, color: MANA_CURVE_COLOR, value: counts.get(bucket) ?? 0 }));
+}
+
+const TEMPO_EARLY_CMC_MAX = 2;
+const TEMPO_LATE_CMC_MIN = 6;
+// Keywords that reliably signal early *impact* regardless of raw cmc -
+// evasion/attack-this-turn (Haste), instant-speed flexibility (Flash), and
+// attacking without losing defense (Vigilance). Deliberately not "Ramp": MTG
+// Vault's card data has no oracle/rules text field at all (see CLAUDE.md -
+// only card_id + API-resolved facts are kept), and there's no Scryfall
+// keyword for "this card ramps" - a text-based guess would be exactly the
+// kind of unverifiable guess the transparency requirement rules out, so this
+// tempo breakdown only ever counts what's structurally knowable (cmc,
+// type_line, keywords).
+const TEMPO_EARLY_IMPACT_KEYWORDS = ['Haste', 'Flash', 'Vigilance'];
+
+export interface TempoBreakdown {
+  earlyCount: number;
+  midCount: number;
+  lateCount: number;
+  earlyImpactCount: number;
+  earlyImpactKeywords: string[];
+  /** Non-land, non-token MTG cards this breakdown is actually based on (quantity-weighted) - the denominator for any "X of Y" display. */
+  totalCounted: number;
+}
+
+/**
+ * A transparent, cmc/type_line/keyword-only profile of a deck's early/mid/
+ * late-game weight - no single blended score, by explicit request ("keine
+ * Blackbox-Zahl"): every number here is a plain count the UI can label
+ * exactly as computed (e.g. "8 Karten mit CMC ≤2"), not a formula result.
+ * Lands and bonus tokens are excluded the same way getDeckManaCurve excludes
+ * them (see its own doc comment).
+ */
+export function getDeckTempoBreakdown(cards: DeckCardEntry[]): TempoBreakdown {
+  let earlyCount = 0;
+  let midCount = 0;
+  let lateCount = 0;
+  let earlyImpactCount = 0;
+  let totalCounted = 0;
+
+  for (const entry of cards) {
+    if (!isMtgNonTokenEntry(entry)) continue;
+    const card = entry.card as Extract<Card, { game: 'mtg' }>;
+    if (card.typeLine.includes('Land')) continue;
+
+    totalCounted += entry.row.quantity;
+    if (card.cmc <= TEMPO_EARLY_CMC_MAX) earlyCount += entry.row.quantity;
+    else if (card.cmc >= TEMPO_LATE_CMC_MIN) lateCount += entry.row.quantity;
+    else midCount += entry.row.quantity;
+
+    if (card.keywords.some((keyword) => TEMPO_EARLY_IMPACT_KEYWORDS.includes(keyword))) {
+      earlyImpactCount += entry.row.quantity;
+    }
+  }
+
+  return {
+    earlyCount,
+    midCount,
+    lateCount,
+    earlyImpactCount,
+    earlyImpactKeywords: TEMPO_EARLY_IMPACT_KEYWORDS,
+    totalCounted,
+  };
+}
+
+export interface KeywordSynergyEntry {
+  keyword: string;
+  /** Card copies (quantity-weighted) carrying this keyword. */
+  count: number;
+}
+
+/**
+ * Every keyword appearing on at least one of the deck's own (non-token) MTG
+ * cards, with how many card copies carry it - sorted most-common first. The
+ * lightweight, always-available synergy signal from a prior scoping session
+ * (no oracle-text/EDHREC "often played with" data available) - see
+ * MTG_LEGALITY_FORMATS's sibling constant file for the same
+ * additive-migration-034 origin of the underlying `keywords` field.
+ */
+export function getDeckKeywordSummary(cards: DeckCardEntry[]): KeywordSynergyEntry[] {
+  const counts = new Map<string, number>();
+  for (const entry of cards) {
+    if (!isMtgNonTokenEntry(entry)) continue;
+    const card = entry.card as Extract<Card, { game: 'mtg' }>;
+    for (const keyword of card.keywords) {
+      counts.set(keyword, (counts.get(keyword) ?? 0) + entry.row.quantity);
+    }
+  }
+  return [...counts.entries()]
+    .map(([keyword, count]) => ({ keyword, count }))
+    .sort((a, b) => b.count - a.count || a.keyword.localeCompare(b.keyword));
 }
