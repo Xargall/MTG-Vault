@@ -37,11 +37,18 @@ const OVERLOADED_REMINDER_INTERVAL = 3;
 // what happened: both independently assumed "2 letters then only digits"
 // after the dash, missing a multi-deck product's sub-deck-letter codes like
 // "LEHD-DEB32" - see that constant's own doc).
-// Allows (but doesn't require) a sub-deck letter between the 2-letter
-// language code and the digits (e.g. "LEHD-DEB32" = DE + sub-deck B + 32) -
-// see YUGIOH_PRINT_CODE_PATTERN's doc for why plain `[A-Z]{2}\d` isn't
-// enough. Captures only the language itself, not that trailing letter.
-const YUGIOH_PRINT_CODE_LANGUAGE_PATTERN = /-([A-Z]{2})[A-Z]*\d/;
+// Allows (but doesn't require) a sub-deck letter between the language code
+// and the digits (e.g. "LEHD-DEB32" = DE + sub-deck B + 32) - see
+// YUGIOH_PRINT_CODE_PATTERN's doc for why plain `[A-Z]{2}\d` isn't enough.
+// Also allows the language itself to be a single letter, for a pre-2004
+// print's legacy region tag (e.g. "LOB-G082" - see PRINTED_LANGUAGE_CODES'
+// doc). The 2-letter alternative is listed first so it wins whenever both
+// letters are actually there (matches toEnglishPrintCode's own precedence).
+// Captures only the language itself, not a trailing sub-deck letter. A
+// pre-2004 promo with no language segment at all ("DL1-001") or a token
+// card's "TKN" suffix both simply fail to match here, same as an
+// unreadable OCR result would - falling back to the default language below.
+const YUGIOH_PRINT_CODE_LANGUAGE_PATTERN = /-([A-Z]{2}|[A-Z])[A-Z]*\d/;
 
 /** Extracts the language segment already embedded in a Yu-Gi-Oh print code (e.g. "SDAZ-DE001" -> 'de') - unlike MTG, no separate OCR read is needed, it's part of the same code the card is identified by. Falls back to the default (English) for an unrecognized segment rather than failing the whole identification over it. */
 function extractYugiohLanguage(printCode: string): string {

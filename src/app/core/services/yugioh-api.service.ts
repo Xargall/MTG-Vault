@@ -11,29 +11,48 @@ const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
 /**
  * YGOPRODeck only ever tracks English print codes - confirmed live
  * 2026-10-23: both the synced `ygoprodeck_print_codes` mirror (0 of 38,521
- * rows have a non-"EN" language segment) and the live cardsetsinfo.php
- * endpoint 404 on e.g. "LOB-DE001", while "LOB-EN001" resolves instantly on
- * both. The set+number portion of a print code is identical across every
- * language edition though, only the 2-letter language segment differs - so
- * a German/French/Italian/etc. card is identified via its English-
- * equivalent code. The actually-printed language is tracked separately
- * (see extractYugiohLanguage in scanner.ts), so this substitution never
- * loses that information.
+ * rows have a non-"EN" language segment in the *modern* 2-letter sense) and
+ * the live cardsetsinfo.php endpoint 404 on e.g. "LOB-DE001", while
+ * "LOB-EN001" resolves instantly on both. The set+number portion of a print
+ * code is identical across every language edition though, only the
+ * language segment differs - so a German/French/Italian/etc. card is
+ * identified via its English-equivalent code. The actually-printed language
+ * is tracked separately (see extractYugiohLanguage in scanner.ts), so this
+ * substitution never loses that information.
  */
 // The 2-letter language segment isn't always immediately followed by
 // digits - live-confirmed on a real card (2026-10-26): a multi-deck product
 // like Legendary Hero Decks also inserts a sub-deck letter right after the
 // language ("LEHD-DEB32" = DE + sub-deck B + number 32), which the old
 // `[A-Z]{2}(\d+)` shape rejected outright, so this derivation silently
-// never ran for this whole category of set. Only the 2-letter language
-// portion gets swapped to "EN" - any sub-deck letters carry over unchanged
-// (confirmed against the live mirror: "LEHD-DEB32" has no local row at all,
-// but "LEHD-ENB32" does, under the German print's own card_id).
+// never ran for this whole category of set. Any sub-deck letters carry over
+// unchanged (confirmed against the live mirror: "LEHD-DEB32" has no local
+// row at all, but "LEHD-ENB32" does, under the German print's own card_id).
+//
+// Sets from 1996-2004 (LOB, MRD, MRL, SDK, SDY, DOR, ... - audited against
+// the full local mirror 2026-10-26) used a single-letter region tag instead
+// of the 2-letter one, and a *different* letter per language, not just the
+// first letter of today's code: G=German, F=French, I=Italian, S=Spanish
+// (confirmed via Yugipedia's German/French/Italian region-tag pages - e.g.
+// "LOB-G082" is a real German print of a card the mirror only has as
+// "LOB-E082"). The switch to 2-letter codes happened with Ancient
+// Sanctuary in 2004. Pre-2004 Spanish is a known gap even with this map:
+// Yugipedia shows its early Spanish LOB printing used an entirely different
+// set prefix ("LDD-S051", not "LOB-S051"), which no language-letter swap can
+// recover - mapping S here is still harmless (a miss here is the same
+// "not found locally" outcome as before, just never a false match).
+const LEGACY_SINGLE_LETTER_TO_ENGLISH: Record<string, string> = { G: 'E', F: 'E', I: 'E', S: 'E' };
+
 function toEnglishPrintCode(code: string): string | null {
-  const match = /^([A-Z0-9]+)-([A-Z]{2})([A-Z]*)(\d+)$/.exec(code);
+  const match = /^([A-Z0-9]+)-([A-Z]{2}|[A-Z])?([A-Z]*)(\d+|TKN)$/.exec(code);
   if (!match) return null;
   const [, set, lang, subDeck, number] = match;
-  return lang === 'EN' ? null : `${set}-EN${subDeck}${number}`;
+  if (!lang || lang === 'EN') return null;
+  if (lang.length === 1) {
+    const legacyEnglish = LEGACY_SINGLE_LETTER_TO_ENGLISH[lang];
+    return legacyEnglish ? `${set}-${legacyEnglish}${subDeck}${number}` : null;
+  }
+  return `${set}-EN${subDeck}${number}`;
 }
 
 interface YgoCardSet {
@@ -110,14 +129,16 @@ const POSTGRES_BATCH_SIZE = 200;
 const SEARCH_ROW_LIMIT = 50;
 
 /**
- * Matches a full print code as printed on a physical card (e.g. "LOB-DE001",
- * "RA01-DE001", or a multi-deck product's sub-deck-letter form like
- * "LEHD-DEB32" - see toEnglishPrintCode's doc) - used by searchCards() to
- * recognize that the typed query is a code, not a name, and route it
- * through identifyByPrintCode() instead (see that method's doc for the
- * German/French/etc.-to-English rewrite this then relies on).
+ * Matches a full print code as printed on a physical card - the modern
+ * 2-letter-language form ("LOB-DE001"), a multi-deck product's sub-deck-
+ * letter form ("LEHD-DEB32"), a pre-2004 single-letter-language form
+ * ("LOB-G082"), a pre-2004 promo with no language segment at all
+ * ("DL1-001"), or a Structure Deck token card ("SR03-ENTKN") - see
+ * toEnglishPrintCode's doc for how each of these gets resolved. Used by
+ * searchCards() to recognize that the typed query is a code, not a name,
+ * and route it through identifyByPrintCode() instead.
  */
-export const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]+-[A-Z]{2}[A-Z]*\d+$/i;
+export const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]+-[A-Z]*(?:\d+|TKN)$/i;
 
 @Injectable({ providedIn: 'root' })
 export class YugiohApiService implements CardApiService {

@@ -55,4 +55,15 @@ export const PRINTED_LANGUAGE_CODES: Record<string, string> = {
   ZHS: 'zhs',
   CT: 'zht',
   ZHT: 'zht',
+  // Single-letter region tags, used by Yu-Gi-Oh! print codes from before the
+  // 2004 switch to the 2-letter codes above (e.g. "LOB-G082") - confirmed
+  // via Yugipedia's per-language region-tag pages, 2026-10-26. Harmless for
+  // MTG: its own extraction patterns (parseSetCode/findPrintedLanguage/
+  // parseGeminiMtgResult in set-code-parser.ts) only ever capture 2+-letter
+  // tokens, so a bare single letter here is never looked up from that side.
+  E: 'en',
+  G: 'de',
+  F: 'fr',
+  I: 'it',
+  S: 'es',
 };
