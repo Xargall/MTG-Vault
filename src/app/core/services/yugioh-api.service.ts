@@ -20,11 +20,20 @@ const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
  * (see extractYugiohLanguage in scanner.ts), so this substitution never
  * loses that information.
  */
+// The 2-letter language segment isn't always immediately followed by
+// digits - live-confirmed on a real card (2026-10-26): a multi-deck product
+// like Legendary Hero Decks also inserts a sub-deck letter right after the
+// language ("LEHD-DEB32" = DE + sub-deck B + number 32), which the old
+// `[A-Z]{2}(\d+)` shape rejected outright, so this derivation silently
+// never ran for this whole category of set. Only the 2-letter language
+// portion gets swapped to "EN" - any sub-deck letters carry over unchanged
+// (confirmed against the live mirror: "LEHD-DEB32" has no local row at all,
+// but "LEHD-ENB32" does, under the German print's own card_id).
 function toEnglishPrintCode(code: string): string | null {
-  const match = /^([A-Z0-9]+)-([A-Z]{2})(\d+)$/.exec(code);
+  const match = /^([A-Z0-9]+)-([A-Z]{2})([A-Z]*)(\d+)$/.exec(code);
   if (!match) return null;
-  const [, set, lang, number] = match;
-  return lang === 'EN' ? null : `${set}-EN${number}`;
+  const [, set, lang, subDeck, number] = match;
+  return lang === 'EN' ? null : `${set}-EN${subDeck}${number}`;
 }
 
 interface YgoCardSet {
@@ -102,12 +111,13 @@ const SEARCH_ROW_LIMIT = 50;
 
 /**
  * Matches a full print code as printed on a physical card (e.g. "LOB-DE001",
- * "RA01-DE001") - used by searchCards() to recognize that the typed query is
- * a code, not a name, and route it through identifyByPrintCode() instead
- * (see that method's doc for the German/French/etc.-to-English rewrite this
- * then relies on).
+ * "RA01-DE001", or a multi-deck product's sub-deck-letter form like
+ * "LEHD-DEB32" - see toEnglishPrintCode's doc) - used by searchCards() to
+ * recognize that the typed query is a code, not a name, and route it
+ * through identifyByPrintCode() instead (see that method's doc for the
+ * German/French/etc.-to-English rewrite this then relies on).
  */
-export const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]+-[A-Z]{2}\d+$/i;
+export const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]+-[A-Z]{2}[A-Z]*\d+$/i;
 
 @Injectable({ providedIn: 'root' })
 export class YugiohApiService implements CardApiService {

@@ -21,7 +21,7 @@ import { GeminiVisionService } from '../../core/services/gemini-vision.service';
 import { CardCategory, MtgApiService } from '../../core/services/mtg-api.service';
 import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
 import { UserSecretsService } from '../../core/services/user-secrets.service';
-import { YugiohApiService } from '../../core/services/yugioh-api.service';
+import { YUGIOH_PRINT_CODE_PATTERN, YugiohApiService } from '../../core/services/yugioh-api.service';
 import { CollectorFinish } from '../../core/utils/set-code-parser';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
@@ -31,10 +31,17 @@ const MIN_CAPTURE_GAP_MS = 300;
 // reassure during a sustained Gemini outage without repeating on every
 // single retry.
 const OVERLOADED_REMINDER_INTERVAL = 3;
-// Yu-Gi-Oh print code as it appears on the card, e.g. "SDAZ-DE001" or
-// "LOB-EN001" - set code, two-letter language, then a 2-4 digit number.
-const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]{2,6}-[A-Z]{2}\d{2,4}$/;
-const YUGIOH_PRINT_CODE_LANGUAGE_PATTERN = /-([A-Z]{2})\d/;
+// Was its own, slightly-differently-bounded copy of
+// yugioh-api.service.ts's exported YUGIOH_PRINT_CODE_PATTERN - now imported
+// from there instead so the two can't drift out of sync again (exactly
+// what happened: both independently assumed "2 letters then only digits"
+// after the dash, missing a multi-deck product's sub-deck-letter codes like
+// "LEHD-DEB32" - see that constant's own doc).
+// Allows (but doesn't require) a sub-deck letter between the 2-letter
+// language code and the digits (e.g. "LEHD-DEB32" = DE + sub-deck B + 32) -
+// see YUGIOH_PRINT_CODE_PATTERN's doc for why plain `[A-Z]{2}\d` isn't
+// enough. Captures only the language itself, not that trailing letter.
+const YUGIOH_PRINT_CODE_LANGUAGE_PATTERN = /-([A-Z]{2})[A-Z]*\d/;
 
 /** Extracts the language segment already embedded in a Yu-Gi-Oh print code (e.g. "SDAZ-DE001" -> 'de') - unlike MTG, no separate OCR read is needed, it's part of the same code the card is identified by. Falls back to the default (English) for an unrecognized segment rather than failing the whole identification over it. */
 function extractYugiohLanguage(printCode: string): string {
