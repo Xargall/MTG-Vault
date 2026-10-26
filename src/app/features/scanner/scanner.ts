@@ -26,6 +26,11 @@ import { CollectorFinish } from '../../core/utils/set-code-parser';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
 const MIN_CAPTURE_GAP_MS = 300;
+// Paced against GeminiVisionService's own ~10s retry interval - every 3rd
+// consecutive overloaded attempt is roughly every 30s, frequent enough to
+// reassure during a sustained Gemini outage without repeating on every
+// single retry.
+const OVERLOADED_REMINDER_INTERVAL = 3;
 // Yu-Gi-Oh print code as it appears on the card, e.g. "SDAZ-DE001" or
 // "LOB-EN001" - set code, two-letter language, then a 2-4 digit number.
 const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]{2,6}-[A-Z]{2}\d{2,4}$/;
@@ -263,12 +268,18 @@ export class Scanner {
   // it's already handled gracefully (falls back silently otherwise), so
   // repeating the same explanation every subsequent hit would just be noise.
   private limitWarningShown = false;
-  // Same "once per session" treatment as limitWarningShown - a transient
-  // Gemini 503/504 (see GeminiVisionService.overloaded) already resolves
-  // itself via the gate's own retry on the next stable tick, so this is
-  // purely reassurance ("keep holding the card still") rather than
-  // something the user needs to act on every single time it happens.
-  private overloadedWarningShown = false;
+  // Unlike limitWarningShown/geminiErrorShown below, this isn't shown just
+  // once per session - a transient Gemini 503/504 (see
+  // GeminiVisionService.overloaded) does resolve itself via the gate's own
+  // retry (paced ~10s apart, see GeminiVisionService.MIN_CALL_INTERVAL_MS),
+  // but a real outage can run well past a single retry. A one-time toast
+  // then reads as "it gave up", even though it's still quietly retrying
+  // underneath - live-confirmed confusing (2026-10-26: toast appeared once,
+  // card still never got added, user had no way to tell it was still
+  // trying). Reminded again every OVERLOADED_REMINDER_INTERVAL consecutive
+  // overloaded attempt instead, reset the moment any attempt comes back
+  // with a different outcome.
+  private consecutiveOverloadedCount = 0;
   // A real Gemini/edge-function failure (bad key, 500, timeout - anything
   // other than "no card in frame") is shown once per session too - it would
   // otherwise repeat every retry (see GeminiVisionService's own pacing) and
@@ -573,6 +584,7 @@ export class Scanner {
 
       if (this.geminiVision.rateLimited()) {
         this.ocrEngine.set('limit');
+        this.consecutiveOverloadedCount = 0;
         if (!this.limitWarningShown) {
           this.limitWarningShown = true;
           this.showToast(
@@ -586,8 +598,8 @@ export class Scanner {
       }
 
       if (this.geminiVision.overloaded()) {
-        if (!this.overloadedWarningShown) {
-          this.overloadedWarningShown = true;
+        this.consecutiveOverloadedCount++;
+        if (this.consecutiveOverloadedCount === 1 || this.consecutiveOverloadedCount % OVERLOADED_REMINDER_INTERVAL === 0) {
           this.showToast(
             this.translate.instant('scanner.overloadedMessage'),
             'warning',
@@ -597,6 +609,7 @@ export class Scanner {
         }
         return null;
       }
+      this.consecutiveOverloadedCount = 0;
 
       if (!text) return null;
 
@@ -619,6 +632,7 @@ export class Scanner {
       return await this.mtgApi.identifyByGeminiResult(text);
     } catch (error) {
       console.error('Gemini Vision fehlgeschlagen:', error);
+      this.consecutiveOverloadedCount = 0;
       if (!this.geminiErrorShown) {
         this.geminiErrorShown = true;
         this.showToast(
