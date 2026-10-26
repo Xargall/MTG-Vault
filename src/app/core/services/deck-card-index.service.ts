@@ -17,7 +17,10 @@ const BATCH_SIZE = 8;
 // parsing, but an already-cached, fully-resolved entry has no way to know
 // the *parsing itself* changed - skippedCount stays 0, so it never gets
 // refetched. Bumping this clears the whole cache once and rebuilds it.
-const SCHEMA_VERSION = 2;
+// v3: added commanderCardId (see 036_decks_commander_card_id.sql) - same
+// reasoning, an already-cached v2 entry would otherwise read as
+// commanderCardId: undefined forever instead of the real value.
+const SCHEMA_VERSION = 3;
 const SCHEMA_VERSION_KEY = 'schemaVersion';
 
 // Only types where the fetch cost (one full deck JSON per entry) stays small

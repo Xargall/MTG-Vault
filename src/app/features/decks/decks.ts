@@ -316,7 +316,12 @@ export class Decks {
       const detail =
         indexed.skippedCount > 0 && precon
           ? await precon.getDeckDetail(rec.deck.fileName)
-          : { heroCardId: indexed.heroCardId, cards: indexed.cards, skippedCount: indexed.skippedCount };
+          : {
+              heroCardId: indexed.heroCardId,
+              commanderCardId: indexed.commanderCardId,
+              cards: indexed.cards,
+              skippedCount: indexed.skippedCount,
+            };
 
       await this.deckService.addPreconDeck(rec.deck.name, rec.deck.type, rec.deck.releaseDate, rec.deck.fileName, detail);
       await this.loadDecks();

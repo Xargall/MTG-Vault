@@ -49,7 +49,7 @@ export class YugiohPreconService implements PreconDeckProvider {
 
   async getDeckDetail(fileName: string): Promise<PreconDetail> {
     const { heroCardId, cards, skippedCount } = await this.getDeckIndexData(fileName);
-    return { heroCardId, cards, skippedCount };
+    return { heroCardId, commanderCardId: null, cards, skippedCount };
   }
 
   getDeckIndexData(fileName: string): Promise<PreconIndexData> {
@@ -75,6 +75,6 @@ export class YugiohPreconService implements PreconDeckProvider {
     const cards = body.data.map((card) => ({ cardId: String(card.id), quantity: 1 }));
     const heroCardId = cards[0]?.cardId ?? null;
 
-    return { names, heroCardId, cards, skippedCount: 0 };
+    return { names, heroCardId, commanderCardId: null, cards, skippedCount: 0 };
   }
 }

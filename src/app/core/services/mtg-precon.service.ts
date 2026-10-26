@@ -22,6 +22,7 @@ export class MtgPreconService implements PreconDeckProvider {
     const detail = await this.mtgjson.getDeckDetail(fileName);
     return {
       heroCardId: detail.heroScryfallId,
+      commanderCardId: detail.commanderScryfallId,
       cards: detail.cards.map((card) => ({ cardId: card.scryfallId, quantity: card.quantity })),
       skippedCount: detail.skippedCount,
     };
@@ -32,6 +33,7 @@ export class MtgPreconService implements PreconDeckProvider {
     return {
       names: data.names,
       heroCardId: data.heroScryfallId,
+      commanderCardId: data.commanderScryfallId,
       cards: data.cards.map((card) => ({ cardId: card.scryfallId, quantity: card.quantity })),
       skippedCount: data.skippedCount,
     };

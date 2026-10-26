@@ -15,6 +15,12 @@ export interface MtgjsonResolvedCard {
 
 export interface MtgjsonDeckDetail {
   heroScryfallId: string | null;
+  // Only set for a genuine Commander-type precon (deck.commander is
+  // non-empty) - unlike heroScryfallId, this never falls back to the first
+  // mainboard card, so it's safe to persist as "this deck's actual
+  // commander" rather than just "a notable card to show". See
+  // 036_decks_commander_card_id.sql.
+  commanderScryfallId: string | null;
   cards: MtgjsonResolvedCard[];
   skippedCount: number;
 }
@@ -107,8 +113,8 @@ export class MtgjsonService {
   }
 
   async getDeckDetail(fileName: string): Promise<MtgjsonDeckDetail> {
-    const { heroScryfallId, cards, skippedCount } = await this.getDeckIndexData(fileName);
-    return { heroScryfallId, cards, skippedCount };
+    const { heroScryfallId, commanderScryfallId, cards, skippedCount } = await this.getDeckIndexData(fileName);
+    return { heroScryfallId, commanderScryfallId, cards, skippedCount };
   }
 
   /**
@@ -139,14 +145,14 @@ export class MtgjsonService {
       quantities.set(scryfallId, (quantities.get(scryfallId) ?? 0) + entry.count);
     }
 
-    const heroScryfallId =
-      deck.commander[0]?.identifiers?.scryfallId ?? deck.mainBoard[0]?.identifiers?.scryfallId ?? null;
+    const commanderScryfallId = deck.commander[0]?.identifiers?.scryfallId ?? null;
+    const heroScryfallId = commanderScryfallId ?? deck.mainBoard[0]?.identifiers?.scryfallId ?? null;
 
     const cards: MtgjsonResolvedCard[] = [...quantities.entries()].map(([scryfallId, quantity]) => ({
       scryfallId,
       quantity,
     }));
 
-    return { names: [...names], heroScryfallId, cards, skippedCount };
+    return { names: [...names], heroScryfallId, commanderScryfallId, cards, skippedCount };
   }
 }

@@ -22,6 +22,13 @@ export interface DeckRow {
   all_cards_owned: boolean;
   release_date: string | null;
   mtgjson_file_name: string | null;
+  // Known (not guessed) commander card_id, set at add-time when the source
+  // data actually names one - currently only a genuine Commander-type precon
+  // (see PreconDetail.commanderCardId). Null for every other deck, including
+  // one built via addEdhrecDeck (its own commander is only known by name,
+  // via deck.name itself - see DeckDetailDialog's inferredCommanderCardId)
+  // and a manually imported deck (no commander data at all).
+  commander_card_id: string | null;
   created_at: string;
 }
 
@@ -140,6 +147,7 @@ export class DeckService {
         all_cards_owned: false,
         release_date: releaseDate,
         mtgjson_file_name: fileName,
+        commander_card_id: detail.commanderCardId,
       })
       .select('id')
       .single<{ id: string }>();
@@ -197,6 +205,7 @@ export class DeckService {
         all_cards_owned: allCardsOwned,
         release_date: null,
         mtgjson_file_name: null,
+        commander_card_id: null,
       })
       .select('id')
       .single<{ id: string }>();
@@ -243,6 +252,7 @@ export class DeckService {
         all_cards_owned: allCardsOwned,
         release_date: null,
         mtgjson_file_name: null,
+        commander_card_id: null,
       })
       .select('id')
       .single<{ id: string }>();

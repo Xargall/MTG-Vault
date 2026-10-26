@@ -235,7 +235,7 @@ export class DeckDetailDialog {
 
   // --- Commander bracket estimate (Commander decks only) -------------------
 
-  /** True only for a deck built via CommanderRecommendationsDialog (deck.format is literally 'Commander' there, see DeckService.addCommanderDeck) - a manually imported deck's format is always null (see DeckService.importDeck), so this alone would miss the common case of a pasted-in Commander decklist. See manualCommanderFlag for the fallback. */
+  /** True for a deck built via CommanderRecommendationsDialog (deck.format is literally 'Commander' there, see DeckService.addEdhrecDeck) or a genuine Commander precon (format is MTGJSON's own 'Commander Deck' type string, which the regex also matches) - a manually imported deck's format is always null (see DeckService.importDeck), so this alone would miss the common case of a pasted-in Commander decklist. See manualCommanderFlag for the fallback. */
   protected readonly commanderFormatDetected = computed(() => isCommanderFormat(this.entry().deck.format));
   /** User-confirmed override for a deck isCommanderFormat can't recognize (manual import, or an oddly-labeled format) - same "ask, don't guess" approach as the commander-card picker below. Resets every time a fresh dialog instance opens, same as searchSubstitutes. */
   protected readonly manualCommanderFlag = signal(false);
@@ -250,17 +250,25 @@ export class DeckDetailDialog {
   );
 
   /**
-   * Best-guess default only, never assumed correct - a deck built via
-   * CommanderRecommendationsDialog has deck.name literally set to the
-   * commander's name (see DeckService.addCommanderDeck), so that match pre-
-   * fills the picker; anything else (manual import) starts unselected. The
-   * user confirms or changes it either way (see selectedCommanderCardId)
-   * before a bracket combo check can run - there's no per-deck-card
-   * "is_commander" flag in this data model to rely on instead.
+   * Two sources, in order of trust:
+   * 1. deck.commander_card_id - genuinely known, not guessed, for a
+   *    Commander precon (MTGJSON's own `commander` array, see
+   *    036_decks_commander_card_id.sql). Still re-validated against this
+   *    deck's own card list rather than trusted blindly.
+   * 2. Name-matching fallback - a deck built via CommanderRecommendationsDialog
+   *    has deck.name literally set to the commander's name (see
+   *    DeckService.addEdhrecDeck), so that match pre-fills the picker.
+   * Anything else (manual import) starts unselected - the user confirms or
+   * changes it either way (see selectedCommanderCardId) before a bracket
+   * combo check can run, since there's no per-deck-card "is_commander" flag
+   * in this data model for the manual-import case.
    */
-  private readonly inferredCommanderCardId = computed(
-    () => this.commanderCandidates().find((c) => c.name === this.entry().deck.name)?.cardId ?? null,
-  );
+  private readonly inferredCommanderCardId = computed(() => {
+    const candidates = this.commanderCandidates();
+    const knownId = this.entry().deck.commander_card_id;
+    if (knownId && candidates.some((c) => c.cardId === knownId)) return knownId;
+    return candidates.find((c) => c.name === this.entry().deck.name)?.cardId ?? null;
+  });
 
   protected readonly selectedCommanderCardId = linkedSignal(() => this.inferredCommanderCardId());
 

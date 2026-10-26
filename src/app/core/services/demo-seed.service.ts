@@ -204,6 +204,7 @@ export class DemoSeedService {
       try {
         await this.deckService.addPreconDeck(entry.name, entry.type, entry.releaseDate, entry.fileName, {
           heroCardId: data.heroCardId,
+          commanderCardId: data.commanderCardId,
           cards: data.cards,
           skippedCount: data.skippedCount,
         });

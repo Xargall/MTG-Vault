@@ -216,7 +216,12 @@ export class BrowseDecksDialog {
     // set (see DeckCardIndexService.build) - fetch it live instead.
     const indexed = this.deckCardIndexActive().getEntry(deck.fileName);
     if (indexed && indexed.skippedCount === 0) {
-      const detail: PreconDetail = { heroCardId: indexed.heroCardId, cards: indexed.cards, skippedCount: indexed.skippedCount };
+      const detail: PreconDetail = {
+        heroCardId: indexed.heroCardId,
+        commanderCardId: indexed.commanderCardId,
+        cards: indexed.cards,
+        skippedCount: indexed.skippedCount,
+      };
       this.detail.set(detail);
       void this.loadDetailCards(detail);
       return;
