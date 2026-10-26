@@ -324,8 +324,30 @@ export class Scanner {
   protected readonly undoingLastAdd = signal(false);
 
   constructor() {
+    // The gate tick (every MIN_CAPTURE_GAP_MS) used to keep reading camera
+    // frames and running the stability/variance check the whole time a
+    // backgrounded tab stayed open, for no benefit - nobody can see a match
+    // happen while hidden anyway. Live-reported (2026-10-26): minimizing the
+    // window or switching tabs while scanning reliably came back to a
+    // reloaded page - consistent with Chrome discarding a tab that keeps
+    // doing camera/canvas work in the background under memory pressure.
+    // Pausing the tick's actual work (not the camera stream itself - that
+    // stays connected, see captureAndAnalyze's own check) removes that
+    // sustained background load without the reconnect/permission-prompt
+    // flicker a full stream teardown would cause on every tab switch.
+    const onVisibilityChange = () => {
+      if (document.hidden) return;
+      // A stale diff baseline from before the tab was hidden could compare
+      // against a camera frame from a while ago (lighting/position may have
+      // changed) - same reset startCamera already does for a fresh stream.
+      this.lastGateSample = null;
+      this.gateStableTicks = 0;
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     this.destroyRef.onDestroy(() => {
       this.isScanning = false;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       if (this.timerHandle) clearTimeout(this.timerHandle);
       if (this.toastTimeout) clearTimeout(this.toastTimeout);
       if (this.autoResumeTimeout) clearTimeout(this.autoResumeTimeout);
@@ -484,6 +506,16 @@ export class Scanner {
    */
   private captureAndAnalyze() {
     if (!this.isScanning || this.status() !== 'scanning') return;
+
+    // Keeps the tick itself (and the camera stream) alive so resuming is
+    // instant, but skips every bit of actual work - no frame sampling, no
+    // Gemini calls - while nobody can see it happen anyway. See the
+    // constructor's visibilitychange listener for the reset this leads into
+    // on return.
+    if (document.hidden) {
+      this.scheduleNextCapture();
+      return;
+    }
 
     const videoEl = this.video()?.nativeElement;
     if (!videoEl || videoEl.readyState < 2) {
