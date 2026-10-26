@@ -106,6 +106,57 @@
   font-variant-numeric: lining-nums tabular-nums;
 }
 
+.legality-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+}
+
+.legality-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.legality-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: default;
+
+  &--legal {
+    background: var(--color-success);
+    color: var(--color-on-success);
+  }
+
+  &--restricted {
+    background: var(--color-warning);
+    color: var(--color-on-warning);
+  }
+
+  &--banned {
+    background: var(--color-danger);
+    color: var(--color-on-accent);
+  }
+
+  // Not legal in this format at all (the common case across most formats
+  // for most cards) - muted rather than a third "warning" color, so the
+  // handful of formats a card actually cares about (legal/restricted/
+  // banned) still stand out at a glance.
+  &--not_legal {
+    background: var(--color-surface-alt);
+    color: var(--color-text-muted);
+  }
+}
+
 // --- Your copy ------------------------------------------------------------
 
 .copy-panel {

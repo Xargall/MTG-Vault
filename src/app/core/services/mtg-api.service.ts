@@ -32,6 +32,7 @@ export interface ScryfallRawCard {
   toughness?: string;
   artist?: string;
   keywords?: string[];
+  legalities?: Record<string, string>;
   cmc: number;
   color_identity: string[];
   mana_cost?: string;
@@ -90,6 +91,9 @@ interface ScryfallCardRow {
   price_usd_foil: number | null;
   cardmarket_url: string | null;
   image_url_small: string | null;
+  // Added by migration 034 - null for a row synced before it, or still
+  // waiting on its next daily sync. See MtgCard.legalities.
+  legalities: Record<string, string> | null;
 }
 
 // A token or halo-finish card gets its own collection bucket ("✨ Specials")
@@ -996,6 +1000,7 @@ export class MtgApiService implements CardApiService {
       cardmarketUrl: raw.purchase_uris?.cardmarket ?? null,
       setCode: raw.set,
       collectorNumber: raw.collector_number,
+      legalities: raw.legalities ?? null,
     };
   }
 
@@ -1032,6 +1037,7 @@ export class MtgApiService implements CardApiService {
       cardmarketUrl: row.cardmarket_url,
       setCode: row.set_code,
       collectorNumber: row.collector_number,
+      legalities: row.legalities,
     };
   }
 

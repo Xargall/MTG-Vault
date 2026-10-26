@@ -12,6 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { CARD_LANGUAGE_OPTIONS } from '../../../core/constants/card-languages';
+import { MTG_LEGALITY_FORMATS, MtgFormatOption } from '../../../core/constants/mtg-formats';
 import { Card, MtgCard, PokemonCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
 import { AppDialog } from '../../../shared/dialog/dialog';
 import { rarityLabelKey } from '../collection-filters';
@@ -197,4 +198,31 @@ export class CardDetailDialog {
     if (!card) return null;
     return POKEMON_TYPE_COLORS.get(pokemonCategoryFor(card)) ?? 'var(--color-border)';
   });
+
+  /**
+   * Every format Scryfall tracks legality for (see MTG_LEGALITY_FORMATS),
+   * paired with this card's own status in it - 'not_legal' for a format
+   * missing from the raw `legalities` object entirely (shouldn't happen on
+   * real data, but a format absent from a card's own legality map reads the
+   * same as "not legal here" either way). Empty for a non-MTG card, or an
+   * MTG card whose `legalities` hasn't synced yet (see MtgCard.legalities).
+   */
+  protected readonly formatLegalities = computed<{ format: MtgFormatOption; status: string }[]>(() => {
+    const legalities = this.asMtgCard(this.entry().card)?.legalities;
+    if (!legalities) return [];
+    return MTG_LEGALITY_FORMATS.map((format) => ({ format, status: legalities[format.slug] ?? 'not_legal' }));
+  });
+
+  protected legalityStatusLabelKey(status: string): string {
+    switch (status) {
+      case 'legal':
+        return 'cardDetail.legalityLegal';
+      case 'restricted':
+        return 'cardDetail.legalityRestricted';
+      case 'banned':
+        return 'cardDetail.legalityBanned';
+      default:
+        return 'cardDetail.legalityNotLegal';
+    }
+  }
 }

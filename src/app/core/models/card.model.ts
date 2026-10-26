@@ -59,6 +59,11 @@ export interface MtgCard extends CardBase {
   cardmarketUrl: string | null;
   setCode: string;
   collectorNumber: string;
+  // Scryfall's own per-format legality map (e.g. { standard: 'legal',
+  // modern: 'legal', pauper: 'not_legal', ... } - see MTG_LEGALITY_FORMATS
+  // for every key it can carry). Null when unresolved (e.g. a card that
+  // never went through rowToCard/toCard, or synced before migration 034).
+  legalities: Record<string, string> | null;
 }
 
 export type YugiohBanlistStatus = 'Forbidden' | 'Limited' | 'Semi-Limited';

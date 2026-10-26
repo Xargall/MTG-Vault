@@ -84,6 +84,22 @@
         }
       </dl>
 
+      @if (formatLegalities().length > 0) {
+        <div class="legality-section">
+          <span class="field-caption">{{ 'cardDetail.legalitiesHeading' | translate }}</span>
+          <div class="legality-badges">
+            @for (item of formatLegalities(); track item.format.slug) {
+              <span
+                [class]="'legality-badge legality-badge--' + item.status"
+                [title]="(item.format.nameKey | translate) + ': ' + (legalityStatusLabelKey(item.status) | translate)"
+              >
+                {{ item.format.abbrKey | translate }}
+              </span>
+            }
+          </div>
+        </div>
+      }
+
       @if (cardmarketUrl(); as url) {
         <a class="btn btn--secondary btn--sm" [href]="url" target="_blank" rel="noopener">
           {{ 'cardDetail.cardmarketLink' | translate }}
