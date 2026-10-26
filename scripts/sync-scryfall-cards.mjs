@@ -92,6 +92,16 @@ function rowFromRawCard(raw) {
     mana_cost: raw.mana_cost ?? rawFaces?.[0]?.mana_cost ?? null,
     cmc: Number(raw.cmc ?? 0) || 0,
     type_line: String(raw.type_line ?? ''),
+    // Not consumed by the app yet - data foundation for a future
+    // cross-game deck-recommendation feature (see
+    // 034_scryfall_cards_recommendation_fields.sql). keywords/legalities/
+    // edhrec_rank live only top-level (no per-face fallback needed);
+    // power/toughness follow the same per-face fallback as mana_cost.
+    keywords: raw.keywords ?? [],
+    legalities: raw.legalities ?? null,
+    edhrec_rank: raw.edhrec_rank ?? null,
+    power: raw.power ?? rawFaces?.[0]?.power ?? null,
+    toughness: raw.toughness ?? rawFaces?.[0]?.toughness ?? null,
     price_eur: parsePrice(raw.prices?.eur),
     price_eur_foil: parsePrice(raw.prices?.eur_foil),
     price_usd: parsePrice(raw.prices?.usd),
