@@ -138,6 +138,22 @@
     </div>
   }
 
+  @if (status() === 'confirmingSet' && pendingSetGuess(); as guess) {
+    <div class="match-panel">
+      <p class="choices-hint">
+        {{ 'scanner.setGuessHint' | translate: { set: guess.setName ?? guess.prefix } }}
+      </p>
+      <div class="match-form">
+        <button type="button" class="btn btn--primary" (click)="confirmSetGuess()">
+          {{ 'scanner.setGuessConfirm' | translate }}
+        </button>
+        <button type="button" class="btn btn--secondary" (click)="rejectSetGuess()">
+          {{ 'scanner.setGuessReject' | translate }}
+        </button>
+      </div>
+    </div>
+  }
+
   @if (detectedCard(); as card) {
     <div class="match-panel">
       <app-card-tile [card]="card" />

@@ -14,6 +14,16 @@ const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
 // seen live, without opening the door to suggesting an unrelated set.
 const FUZZY_PRINT_CODE_MAX_DISTANCE = 2;
 const FUZZY_PRINT_CODE_LIMIT = 5;
+// Deliberately tighter than FUZZY_PRINT_CODE_MAX_DISTANCE - a set prefix is
+// usually only 2-4 characters long, so even distance 2 is already a third+
+// of the string. findSimilarSetPrefixes' search space (a few hundred
+// distinct prefixes) is small enough that this stays safe without needing
+// to be looser.
+const FUZZY_SET_PREFIX_MAX_DISTANCE = 2;
+// Generous on purpose - needs to be high enough to surface every prefix
+// tied at the best distance (see findSimilarSetPrefixes' doc on the real
+// "LEND" -> LEDD/LEHD tie), not just a top handful.
+const FUZZY_SET_PREFIX_LIMIT = 15;
 
 /**
  * YGOPRODeck only ever tracks English print codes - confirmed live
@@ -308,10 +318,40 @@ export class YugiohApiService implements CardApiService {
       p_max_distance: FUZZY_PRINT_CODE_MAX_DISTANCE,
       p_limit: FUZZY_PRINT_CODE_LIMIT,
     });
-    if (error || !data) {
-      if (error) console.warn('match_yugioh_print_code failed:', error);
-      return [];
-    }
+    if (error) console.warn('match_yugioh_print_code failed:', error);
+    return this.resolvePrintCodeRows(data);
+  }
+
+  /**
+   * Narrower sibling of findSimilarPrintCodes/identifyByPrintCode, for once
+   * the *set* is already known - either because the user just confirmed a
+   * findSimilarSetPrefix guess, or because that guess came back an exact
+   * match (distance 0) and there's nothing to confirm. Unlike the flat
+   * whole-code search, this has no distance cap: the search space is
+   * already narrowed to one set's own codes (a handful of rows), so even a
+   * fairly different number/language is safe to surface - it can't
+   * accidentally suggest an unrelated set's card the way widening the flat
+   * search's budget would (see migration 038's doc for the live-confirmed
+   * case this exists for).
+   */
+  async findSimilarPrintCodesInSet(
+    setPrefix: string,
+    code: string,
+  ): Promise<{ card: Card; matchedCode: string; distance: number }[]> {
+    const { data, error } = await this.supabase.client.rpc('match_yugioh_print_code_in_set', {
+      p_set_prefix: setPrefix,
+      p_code: code,
+      p_limit: FUZZY_PRINT_CODE_LIMIT,
+    });
+    if (error) console.warn('match_yugioh_print_code_in_set failed:', error);
+    return this.resolvePrintCodeRows(data);
+  }
+
+  /** Shared row->Card resolution for findSimilarPrintCodes/findSimilarPrintCodesInSet - deduped by card (a card can have several print codes/reprints; only the closest-matching one per card is worth surfacing), ranked by distance. */
+  private async resolvePrintCodeRows(
+    data: unknown,
+  ): Promise<{ card: Card; matchedCode: string; distance: number }[]> {
+    if (!data) return [];
 
     const rows = data as { set_code: string; card_id: number; distance: number }[];
     const bestByCard = new Map<number, (typeof rows)[number]>();
@@ -330,6 +370,46 @@ export class YugiohApiService implements CardApiService {
         return card ? { card, matchedCode: row.set_code, distance: row.distance } : null;
       })
       .filter((entry): entry is { card: Card; matchedCode: string; distance: number } => entry !== null);
+  }
+
+  /**
+   * First stage of the two-step fallback (see migration 038's doc): is the
+   * SET portion of a scanned-but-nonexistent code (everything before the
+   * first "-") close to one of the few hundred *real* set prefixes? Only
+   * ever called after findSimilarPrintCodes has already found nothing - a
+   * much smaller, safer search space than fuzzy-matching the whole code at
+   * once, so the scanner can confirm the set first ("meintest du Set X?")
+   * before even looking at the number.
+   *
+   * Returns every prefix tied at the *best* distance found, not just one -
+   * live-confirmed (2026-10-26): "LEND" is equally one edit away from both
+   * "LEDD" (Legendary Dragon Decks) and "LEHD" (Legendary Hero Decks), two
+   * unrelated real product lines with near-identical codes. Picking either
+   * one to ask "meintest du X?" about would be a coin flip dressed up as a
+   * confident guess - the caller is expected to fall through to showing
+   * actual cards (which the user can recognize by picture) instead of a
+   * single-set yes/no question whenever more than one row comes back.
+   * Empty when nothing is close enough to suggest at all, same
+   * conservative principle as findSimilarPrintCodes.
+   */
+  async findSimilarSetPrefixes(code: string): Promise<{ prefix: string; setName: string | null; distance: number }[]> {
+    const prefix = code.split('-')[0] ?? code;
+    const { data, error } = await this.supabase.client.rpc('match_yugioh_set_prefix', {
+      p_prefix: prefix,
+      p_max_distance: FUZZY_SET_PREFIX_MAX_DISTANCE,
+      p_limit: FUZZY_SET_PREFIX_LIMIT,
+    });
+    if (error) {
+      console.warn('match_yugioh_set_prefix failed:', error);
+      return [];
+    }
+    const rows = (data ?? []) as { prefix: string; set_name: string | null; distance: number }[];
+    if (rows.length === 0) return [];
+
+    const bestDistance = Math.min(...rows.map((row) => row.distance));
+    return rows
+      .filter((row) => row.distance === bestDistance)
+      .map((row) => ({ prefix: row.prefix, setName: row.set_name, distance: row.distance }));
   }
 
   async identifyCard(rawText: string): Promise<CardIdentification | null> {

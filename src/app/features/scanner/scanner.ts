@@ -31,6 +31,11 @@ const MIN_CAPTURE_GAP_MS = 300;
 // reassure during a sustained Gemini outage without repeating on every
 // single retry.
 const OVERLOADED_REMINDER_INTERVAL = 3;
+// Caps the merged candidate list when a print-code miss resolves to a tie
+// between multiple equally-close sets (see findSimilarSetPrefixes' doc) -
+// each tied set can contribute its own close matches, so this keeps the
+// picker from growing unbounded with more tied sets.
+const FUZZY_PRINT_CODE_PICKER_LIMIT = 5;
 // Was its own, slightly-differently-bounded copy of
 // yugioh-api.service.ts's exported YUGIOH_PRINT_CODE_PATTERN - now imported
 // from there instead so the two can't drift out of sync again (exactly
@@ -204,7 +209,7 @@ const GATE_STABILITY_THRESHOLD = 6;
 const GATE_MIN_VARIANCE = 350;
 const GATE_STABLE_TICKS_REQUIRED = 3;
 
-type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'choosing' | 'error';
+type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'choosing' | 'confirmingSet' | 'error';
 type ScannerToast = { title?: string; message: string; variant: 'success' | 'warning' };
 
 // Manual focus / points-of-interest aren't in TS's bundled DOM types yet,
@@ -328,6 +333,12 @@ export class Scanner {
   // so selectCandidate can store the *matched* code's printed language
   // rather than the (likely wrong) language read off the misread original.
   private readonly pendingPrintCodeLanguages = new Map<string, string>();
+  // Drives the lightweight "meintest du Set X?" confirmation (status
+  // 'confirmingSet') - the first of the two-step fallback's two stages, see
+  // findSimilarSetPrefix's doc. Null outside that state.
+  protected readonly pendingSetGuess = signal<{ prefix: string; setName: string | null; fullCode: string } | null>(
+    null,
+  );
   protected readonly adding = signal(false);
   protected readonly addError = signal<string | null>(null);
   // Last card added this session, kept around (top-left, next to the camera
@@ -683,7 +694,48 @@ export class Scanner {
         // just reporting a miss - never auto-added, see
         // showPrintCodeSuggestions/selectCandidate.
         const suggestions = await this.yugiohApi.findSimilarPrintCodes(code);
-        if (suggestions.length > 0) this.showPrintCodeSuggestions(suggestions);
+        if (suggestions.length > 0) {
+          this.showPrintCodeSuggestions(suggestions);
+          return null;
+        }
+
+        // Still nothing - the misread may be split across both the set and
+        // the number (live-confirmed: "LEND-EN008" is edit-distance 3 from
+        // the real "LEHD-ENB00", past the flat search's budget above, which
+        // has to stay tight to avoid suggesting an unrelated set). Narrow it
+        // down in two safer steps instead, per the user's own suggestion
+        // (2026-10-26): confirm the SET first, then search only within it.
+        const setGuesses = await this.yugiohApi.findSimilarSetPrefixes(code);
+        if (setGuesses.length === 0) return null;
+
+        if (setGuesses.length > 1) {
+          // Genuine tie between two or more unrelated real sets (live-
+          // confirmed: "LEND" is equally close to "LEDD"/Legendary Dragon
+          // Decks and "LEHD"/Legendary Hero Decks) - there's no single set
+          // to ask a yes/no question about. Search within every tied set
+          // instead and let the card picker itself disambiguate - the user
+          // can recognize their own card by its picture/name even when the
+          // code alone can't tell the sets apart.
+          const merged = (
+            await Promise.all(setGuesses.map((guess) => this.yugiohApi.findSimilarPrintCodesInSet(guess.prefix, code)))
+          )
+            .flat()
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, FUZZY_PRINT_CODE_PICKER_LIMIT);
+          if (merged.length > 0) this.showPrintCodeSuggestions(merged);
+          return null;
+        }
+
+        const setGuess = setGuesses[0];
+        if (setGuess.distance === 0) {
+          // The set itself was read correctly - nothing to ask about there,
+          // just widen the number search within that already-known set.
+          const inSetSuggestions = await this.yugiohApi.findSimilarPrintCodesInSet(setGuess.prefix, code);
+          if (inSetSuggestions.length > 0) this.showPrintCodeSuggestions(inSetSuggestions);
+          return null;
+        }
+
+        this.showSetGuess(setGuess, code);
         return null;
       }
 
@@ -757,7 +809,11 @@ export class Scanner {
    * moved on must be a no-op.
    */
   private showPrintCodeSuggestions(suggestions: { card: Card; matchedCode: string; distance: number }[]) {
-    if (this.status() !== 'scanning') return;
+    // Reachable both directly from 'scanning' (the flat search found
+    // something) and from confirmSetGuess (the two-step fallback's second
+    // stage, called after the user already confirmed the set from
+    // 'confirmingSet') - either is a valid hand-off into this picker.
+    if (this.status() !== 'scanning' && this.status() !== 'confirmingSet') return;
 
     this.pendingPrintCodeLanguages.clear();
     const choices: ScoredCandidate[] = suggestions.map(({ card, matchedCode, distance }) => {
@@ -775,6 +831,40 @@ export class Scanner {
     this.candidateChoices.set(choices);
     this.pickerTier.set('printCodeGuess');
     this.status.set('choosing');
+  }
+
+  /** First stage of the two-step fallback (see findSimilarSetPrefix's doc) - shows a lightweight yes/no "meintest du Set X?" confirmation rather than jumping straight to a card picker, since nothing about the actual card is known yet. */
+  private showSetGuess(guess: { prefix: string; setName: string | null; distance: number }, fullCode: string) {
+    if (this.status() !== 'scanning') return;
+    this.detectedCard.set(null);
+    this.pendingSetGuess.set({ prefix: guess.prefix, setName: guess.setName, fullCode });
+    this.status.set('confirmingSet');
+  }
+
+  /** "Ja" on the set guess - searches only within that now-confirmed set for the closest number/language match, then hands off into the normal card picker (showPrintCodeSuggestions). A confirmed set with no in-set suggestions at all (shouldn't normally happen - the set itself exists) just falls back to a plain miss. */
+  protected async confirmSetGuess() {
+    const guess = this.pendingSetGuess();
+    this.pendingSetGuess.set(null);
+    if (!guess) {
+      this.status.set('scanning');
+      this.scheduleNextCapture();
+      return;
+    }
+
+    const suggestions = await this.yugiohApi.findSimilarPrintCodesInSet(guess.prefix, guess.fullCode);
+    if (suggestions.length > 0) {
+      this.showPrintCodeSuggestions(suggestions);
+    } else {
+      this.status.set('scanning');
+      this.scheduleNextCapture();
+    }
+  }
+
+  /** "Nein" on the set guess - same resume-scanning shape as cancelChoices. */
+  protected rejectSetGuess() {
+    this.pendingSetGuess.set(null);
+    this.status.set('scanning');
+    this.scheduleNextCapture();
   }
 
   private clearAutoAddTimeout() {
@@ -886,6 +976,7 @@ export class Scanner {
     this.detectedCardCategory.set('normal');
     this.detectedLanguage.set(DEFAULT_CARD_LANGUAGE);
     this.candidateChoices.set(null);
+    this.pendingSetGuess.set(null);
     this.status.set('scanning');
     this.scheduleNextCapture();
   }
