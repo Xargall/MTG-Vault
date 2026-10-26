@@ -19,19 +19,6 @@
     <p class="scanner-hint">{{ 'scanner.starting' | translate }}</p>
   }
 
-  @if (geminiElapsedSeconds() !== null) {
-    <span class="ocr-engine-badge ocr-engine-badge--waiting">
-      <svg aria-hidden="true"><use href="#icon-sparkles" /></svg>
-      {{ 'scanner.geminiWaitingLabel' | translate }} {{ geminiElapsedSeconds() | number: '1.1-1' }}s
-    </span>
-  } @else if (ocrEngine(); as engine) {
-    @if (engine === 'gemini') {
-      <span class="ocr-engine-badge ocr-engine-badge--gemini"><svg aria-hidden="true"><use href="#icon-sparkles" /></svg> Gemini</span>
-    } @else {
-      <span class="ocr-engine-badge ocr-engine-badge--limit"><svg aria-hidden="true"><use href="#icon-warning" /></svg> {{ 'scanner.limitBadge' | translate }}</span>
-    }
-  }
-
   @if (gameService.currentSlug() === 'mtg' && bulkData.loading() && !bulkData.ready()) {
     <p class="bulk-data-hint">
       {{ 'scanner.bulkDataLoading' | translate: { percent: bulkData.progress() } }}
@@ -41,6 +28,19 @@
   <div class="top-left-stack">
     @if (status() === 'scanning') {
       <div class="scan-pulse" aria-hidden="true"></div>
+    }
+
+    @if (geminiElapsedSeconds() !== null) {
+      <span class="ocr-engine-badge ocr-engine-badge--waiting">
+        <svg aria-hidden="true"><use href="#icon-sparkles" /></svg>
+        {{ 'scanner.geminiWaitingLabel' | translate }} {{ geminiElapsedSeconds() | number: '1.1-1' }}s
+      </span>
+    } @else if (ocrEngine(); as engine) {
+      @if (engine === 'gemini') {
+        <span class="ocr-engine-badge ocr-engine-badge--gemini"><svg aria-hidden="true"><use href="#icon-sparkles" /></svg> Gemini</span>
+      } @else {
+        <span class="ocr-engine-badge ocr-engine-badge--limit"><svg aria-hidden="true"><use href="#icon-warning" /></svg> {{ 'scanner.limitBadge' | translate }}</span>
+      }
     }
 
     @if (availableCameras().length > 1) {

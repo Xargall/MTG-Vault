@@ -157,15 +157,11 @@
   }
 }
 
-// Stacked directly below .scanner-close (same right edge, same safe-area
-// handling) rather than sharing its top offset - they used to sit at the
-// exact same spot, the badge rendering underneath the close button with no
-// way to see it. var(--tap-min) is the close button's own width/height, so
-// this clears it regardless of that token's value.
+// Lives inside .top-left-stack now, next to the pulse dot - used to be its
+// own absolutely-positioned top-right element sharing .scanner-close's exact
+// spot, rendering underneath the close button with no way to actually see
+// it. No position/top/right of its own anymore; the flex column places it.
 .ocr-engine-badge {
-  position: absolute;
-  top: calc(var(--spacing-md) + var(--tap-min) + var(--spacing-sm) + env(safe-area-inset-top));
-  right: calc(var(--spacing-md) + env(safe-area-inset-right));
   padding: 4px 10px;
   border-radius: var(--radius);
   font-size: 0.8rem;

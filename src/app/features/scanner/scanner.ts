@@ -209,6 +209,22 @@ const GATE_SAMPLE_SIZE = 32;
 const GATE_STABILITY_THRESHOLD = 6;
 const GATE_MIN_VARIANCE = 350;
 const GATE_STABLE_TICKS_REQUIRED = 3;
+// Live-reported (2026-10-26): hasContent/isStable alone fire on a stable,
+// detailed but empty scene too (patterned desk, hands at rest, clutter) -
+// neither signal knows "that's just the background", only "something is
+// there and it stopped moving". GATE_MIN_DIFF_FROM_BACKGROUND adds a third
+// check against a running estimate of what the empty scene actually looks
+// like (see backgroundEstimate) - same 0-255-per-pixel scale as
+// GATE_STABILITY_THRESHOLD, just a much higher bar, since introducing an
+// actual card is expected to change far more of the frame than ordinary
+// camera noise does. A starting estimate, not something tuned against a
+// real camera - may need adjusting once tried live.
+const GATE_MIN_DIFF_FROM_BACKGROUND = 30;
+// How fast the background estimate drifts toward the current frame while
+// adapting (see adaptBackgroundEstimate) - low on purpose, so it tracks
+// slow changes (the camera's own auto-exposure/white-balance settling, the
+// desk itself) without being fooled by one single unusual-looking tick.
+const BACKGROUND_ADAPT_RATE = 0.08;
 
 type ScannerStatus = 'starting' | 'scanning' | 'matched' | 'choosing' | 'confirmingSet' | 'error';
 type ScannerToast = { title?: string; message: string; variant: 'success' | 'warning' };
@@ -266,6 +282,11 @@ export class Scanner {
   // before never leaks into the next card's stability check.
   private lastGateSample: Uint8ClampedArray | null = null;
   private gateStableTicks = 0;
+  // Running per-pixel estimate (red-channel values, same indexing as
+  // sampleGateFrame) of what the scene looks like with no card in it - see
+  // GATE_MIN_DIFF_FROM_BACKGROUND's doc. Reset alongside lastGateSample so
+  // it never carries a stale lighting/background guess into the next card.
+  private backgroundEstimate: Float32Array | null = null;
   private geminiInFlight = false;
 
   protected readonly status = signal<ScannerStatus>('starting');
@@ -377,6 +398,7 @@ export class Scanner {
       // changed) - same reset startCamera already does for a fresh stream.
       this.lastGateSample = null;
       this.gateStableTicks = 0;
+      this.backgroundEstimate = null;
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
@@ -412,6 +434,7 @@ export class Scanner {
     // diff against a frame from the old camera/angle.
     this.lastGateSample = null;
     this.gateStableTicks = 0;
+    this.backgroundEstimate = null;
 
     let preferredDeviceId = deviceId ?? null;
     if (!preferredDeviceId) {
@@ -566,14 +589,18 @@ export class Scanner {
   /**
    * Downsamples the frame to a small grayscale grid and compares it against
    * the previous tick's sample to decide whether Gemini is even allowed to
-   * fire this tick (see GATE_* constants). Two independent signals must both
-   * hold for a few consecutive ticks: low tick-to-tick diff (the image has
-   * stopped changing - a card was just placed and is being held still, not
-   * swapped or in motion) and high variance (there's actual detail in view,
-   * not a blank hand/table/background). Only edge-triggers a single Gemini
-   * attempt per stable session - as long as the card stays in view it keeps
-   * retrying (paced by GeminiVisionService's own call-interval), but a miss
-   * doesn't turn into a tight retry loop within the same tick.
+   * fire this tick (see GATE_* constants). Three independent signals must
+   * all hold for a few consecutive ticks: low tick-to-tick diff (the image
+   * has stopped changing - a card was just placed and is being held still,
+   * not swapped or in motion), high variance (there's actual detail in
+   * view, not a blank hand/table/background), and a meaningful difference
+   * from the running background estimate (that detail is something NEW,
+   * not just the desk/hand/clutter that was already there - live-reported
+   * 2026-10-26: variance alone fires just as readily on a stable, detailed
+   * but cardless scene, e.g. a patterned desk). Only edge-triggers a single
+   * Gemini attempt per stable session - as long as the card stays in view
+   * it keeps retrying (paced by GeminiVisionService's own call-interval),
+   * but a miss doesn't turn into a tight retry loop within the same tick.
    */
   private updateGeminiGate(videoEl: HTMLVideoElement): void {
     const sample = this.sampleGateFrame(videoEl);
@@ -581,25 +608,40 @@ export class Scanner {
 
     const previous = this.lastGateSample;
     this.lastGateSample = sample;
-    if (!previous) return;
 
     const pixelCount = sample.length / 4;
     let mean = 0;
     for (let i = 0; i < sample.length; i += 4) mean += sample[i];
     mean /= pixelCount;
 
-    let diffSum = 0;
     let variance = 0;
-    for (let i = 0; i < sample.length; i += 4) {
-      diffSum += Math.abs(sample[i] - previous[i]);
-      variance += (sample[i] - mean) ** 2;
-    }
-
-    const isStable = diffSum / pixelCount < GATE_STABILITY_THRESHOLD;
+    for (let i = 0; i < sample.length; i += 4) variance += (sample[i] - mean) ** 2;
     const hasContent = variance / pixelCount > GATE_MIN_VARIANCE;
 
-    if (!isStable || !hasContent) {
+    if (!previous) {
+      // First frame of a fresh session (new stream, or a reset after the
+      // last card) - nothing to diff against yet, but it's as good a guess
+      // at "what empty looks like" as any, so seed the background estimate
+      // from it rather than leaving it null until the next tick.
+      this.backgroundEstimate = this.sampleToBackgroundArray(sample, pixelCount);
+      return;
+    }
+
+    let diffSum = 0;
+    for (let i = 0; i < sample.length; i += 4) diffSum += Math.abs(sample[i] - previous[i]);
+    const isStable = diffSum / pixelCount < GATE_STABILITY_THRESHOLD;
+
+    const diffFromBackground = this.diffFromBackground(sample, pixelCount);
+    const looksNew = diffFromBackground > GATE_MIN_DIFF_FROM_BACKGROUND;
+
+    if (!isStable || !hasContent || !looksNew) {
       this.gateStableTicks = 0;
+      // Keeps drifting toward the current scene whenever nothing
+      // foreground-like is holding still (an empty/returning-to-empty
+      // moment, or a stable-but-unchanged busy background) - but freezes
+      // the instant a stable, genuinely different object shows up, so a
+      // real card never gets slowly blended into "what empty looks like".
+      if (isStable && !looksNew) this.adaptBackgroundEstimate(sample, pixelCount);
       return;
     }
 
@@ -608,6 +650,30 @@ export class Scanner {
     if (this.geminiInFlight || this.hasGeminiKey() === false) return;
 
     void this.autoGeminiScan(videoEl);
+  }
+
+  private sampleToBackgroundArray(sample: Uint8ClampedArray, pixelCount: number): Float32Array {
+    const background = new Float32Array(pixelCount);
+    for (let i = 0; i < pixelCount; i++) background[i] = sample[i * 4];
+    return background;
+  }
+
+  /** Mean absolute per-pixel difference between the current sample and the running background estimate - 0 when there's no estimate yet (nothing to call "new" against). */
+  private diffFromBackground(sample: Uint8ClampedArray, pixelCount: number): number {
+    if (!this.backgroundEstimate) return 0;
+    let diffSum = 0;
+    for (let i = 0; i < pixelCount; i++) diffSum += Math.abs(sample[i * 4] - this.backgroundEstimate[i]);
+    return diffSum / pixelCount;
+  }
+
+  private adaptBackgroundEstimate(sample: Uint8ClampedArray, pixelCount: number): void {
+    if (!this.backgroundEstimate) {
+      this.backgroundEstimate = this.sampleToBackgroundArray(sample, pixelCount);
+      return;
+    }
+    for (let i = 0; i < pixelCount; i++) {
+      this.backgroundEstimate[i] += (sample[i * 4] - this.backgroundEstimate[i]) * BACKGROUND_ADAPT_RATE;
+    }
   }
 
   /** Small grayscale downsample used only for the gate's stability/variance check - deliberately tiny since it's read back with getImageData every tick. */
@@ -1002,8 +1068,14 @@ export class Scanner {
     this.clearAutoAddTimeout();
     // Fresh baseline for the next card - otherwise its first tick would
     // diff against whatever was in frame before this one was matched/added.
+    // Known limitation: if the just-scanned card is still physically in
+    // view at this exact moment (not yet swapped out), that frame becomes
+    // the new "empty" background estimate - a same-looking card wouldn't
+    // then register as new. A genuinely different next card still will,
+    // since it won't match that stale estimate either.
     this.lastGateSample = null;
     this.gateStableTicks = 0;
+    this.backgroundEstimate = null;
     this.detectedCard.set(null);
     this.detectedFinish.set('nonfoil');
     this.detectedCardCategory.set('normal');
