@@ -43,7 +43,49 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
       de: 'Brackets sind wie Schwierigkeitsgrade im Videospiel: 1 ist Easy-Mode mit Freunden, 5 ist "ich will gewinnen, koste es, was es wolle".',
       en: 'Brackets are like video game difficulty settings: 1 is easy mode with friends, 5 is "I\'m here to win, whatever it takes".',
     },
-    relatedTerms: ['format-commander'],
+    relatedTerms: ['format-commander', 'game-changer-card', 'mass-land-denial', 'two-card-combo'],
+  },
+  {
+    id: 'game-changer-card',
+    category: 'formats',
+    term: { de: 'Game Changer (Spielveränderer)', en: 'Game Changer' },
+    definitionNormal: {
+      de: 'Game Changer ist eine offizielle Liste besonders mächtiger Commander-Karten (aktuell 53 Stück), deren Anzahl im Deck mit über die Bracket-Einstufung entscheidet – je mehr davon, desto höher das Bracket.',
+      en: 'Game Changer is an official list of especially powerful Commander cards (53 as of writing) whose count in a deck is one of the factors deciding its bracket - more of them pushes the bracket higher.',
+    },
+    definitionTrottel: {
+      de: 'Game Changer sind die Karten auf der offiziellen "zu stark für die unteren Brackets"-Liste – je mehr davon im Deck, desto eher landest du in einem höheren Bracket.',
+      en: 'Game Changers are the cards on the official "too strong for the lower brackets" list – the more of them in your deck, the higher bracket you land in.',
+    },
+    relatedTerms: ['brackets'],
+  },
+  {
+    id: 'mass-land-denial',
+    category: 'formats',
+    term: { de: 'Mass Land Denial', en: 'Mass Land Denial' },
+    definitionNormal: {
+      de: 'Mass Land Denial bezeichnet Effekte, die mehreren Gegnern gleichzeitig Länder zerstören oder wegnehmen. In Commander gilt das als besonders unfair und fließt in die Bracket-Einstufung eines Decks ein.',
+      en: "Mass land denial refers to effects that destroy or take away multiple lands from several opponents at once. Considered especially unfair in Commander, its presence feeds into a deck's bracket rating.",
+    },
+    definitionTrottel: {
+      de: 'Mass Land Denial heißt: allen gleichzeitig die Länder wegnehmen – gilt als einer der fiesesten Spielzüge überhaupt und zieht das Bracket nach oben.',
+      en: "Mass land denial means ripping away everyone's lands at once – widely seen as one of the meanest moves in the game, and it pulls the bracket up.",
+    },
+    relatedTerms: ['brackets'],
+  },
+  {
+    id: 'two-card-combo',
+    category: 'formats',
+    term: { de: 'Zwei-Karten-Combo', en: 'Two-Card Combo' },
+    definitionNormal: {
+      de: 'Eine Zwei-Karten-Combo ist eine Kombination aus genau zwei Karten, die zusammen ein meist unendliches oder spielentscheidendes Ergebnis erzeugen. Anzahl und Geschwindigkeit solcher Combos fließen in die Bracket-Einstufung eines Commander-Decks ein.',
+      en: "A two-card combo is a combination of exactly two cards that together produce a (usually infinite or game-ending) result. How many a deck has, and how fast they come together, feeds into its Commander bracket rating.",
+    },
+    definitionTrottel: {
+      de: 'Eine Zwei-Karten-Combo heißt: zwei Karten auf den Tisch, Spiel vorbei – genau solche Kombos drücken ein Deck Richtung höheres Bracket.',
+      en: 'A two-card combo means: two cards hit the table, game over – exactly the kind of thing that pushes a deck toward a higher bracket.',
+    },
+    relatedTerms: ['brackets'],
   },
   {
     id: 'singleton',
@@ -61,7 +103,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-commander',
     category: 'formats',
-    term: { de: 'Format: Commander', en: 'Format: Commander' },
+    term: { de: 'Format: Commander (CMD)', en: 'Format: Commander (CMD)' },
     definitionNormal: {
       de: 'Commander (auch EDH) ist das meistgespielte Format: meist zu viert, 99 Hauptdeck-Karten als Singleton plus ein legendärer Commander in der Kommandozone, üblicherweise 40 Lebenspunkte Start. Erlaubt sind nur Karten innerhalb der Farbidentität des Commanders.',
       en: "Commander (also EDH) is the most-played format: typically four players, a 99-card singleton main deck plus one legendary commander in the command zone, usually starting at 40 life. Only cards within the commander's color identity are allowed.",
@@ -75,7 +117,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-oathbreaker',
     category: 'formats',
-    term: { de: 'Format: Oathbreaker', en: 'Format: Oathbreaker' },
+    term: { de: 'Format: Oathbreaker (OB)', en: 'Format: Oathbreaker (OB)' },
     definitionNormal: {
       de: 'Oathbreaker ist eine kleinere Commander-Variante: Statt eines legendären Commanders steht ein Planeswalker in der Kommandozone, dazu ein einzelner passender "Signature Spell" (Hexerei oder Spontanzauber). Das Hauptdeck hat 60 statt 99 Karten.',
       en: 'Oathbreaker is a smaller Commander variant: instead of a legendary commander, a planeswalker sits in the command zone, paired with one matching "signature spell" (an instant or sorcery). The main deck has 60 cards instead of 99.',
@@ -89,7 +131,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-duel-commander',
     category: 'formats',
-    term: { de: 'Format: Duel Commander', en: 'Format: Duel Commander' },
+    term: { de: 'Format: Duel Commander (DC)', en: 'Format: Duel Commander (DC)' },
     definitionNormal: {
       de: 'Duel Commander ist die 1-gegen-1-Variante von Commander: 100 Karten Singleton wie gewohnt, aber nur 20 statt 40 Lebenspunkte Start. Die Bannliste läuft unabhängig von der regulären Commander-Bannliste.',
       en: 'Duel Commander is the 1-vs-1 variant of Commander: the usual 100-card singleton, but starting at 20 life instead of 40. Its banned list runs independently of the regular Commander banned list.',
@@ -103,7 +145,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-pauper-commander',
     category: 'formats',
-    term: { de: 'Format: Pauper Commander', en: 'Format: Pauper Commander' },
+    term: { de: 'Format: Pauper Commander (PCM)', en: 'Format: Pauper Commander (PCM)' },
     definitionNormal: {
       de: 'Pauper Commander kombiniert Commander mit Pauper: Das 99-Karten-Hauptdeck darf nur aus Common-Karten bestehen, der Commander selbst muss eine Uncommon-Legende sein (oder eine speziell dafür gedruckte Karte).',
       en: 'Pauper Commander combines Commander with Pauper: the 99-card main deck may only contain common-rarity cards, while the commander itself must be an uncommon legendary (or a card specifically printed to serve as one).',
@@ -117,7 +159,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-brawl',
     category: 'formats',
-    term: { de: 'Format: Brawl', en: 'Format: Brawl' },
+    term: { de: 'Format: Brawl (BRL)', en: 'Format: Brawl (BRL)' },
     definitionNormal: {
       de: 'Brawl (bis Ende 2023 "Historic Brawl") ist ein 1-gegen-1-Commander-Ableger auf MTG Arena: 100 Karten Singleton, eine Legendäre Kreatur/ein Planeswalker/Fahrzeug/Raumschiff als Commander, 25 Lebenspunkte Start, Kartenpool aus dem digitalen Format Historic.',
       en: 'Brawl (called "Historic Brawl" until late 2023) is a 1-vs-1 Commander spin-off on MTG Arena: 100-card singleton, a legendary creature/planeswalker/Vehicle/Spacecraft as commander, 25 starting life, drawing its card pool from the digital Historic format.',
@@ -131,7 +173,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-standard-brawl',
     category: 'formats',
-    term: { de: 'Format: Standard Brawl', en: 'Format: Standard Brawl' },
+    term: { de: 'Format: Standard Brawl (SBR)', en: 'Format: Standard Brawl (SBR)' },
     definitionNormal: {
       de: 'Standard Brawl ist die kleinere Brawl-Variante: 60 statt 100 Karten, Kartenpool aus dem aktuellen Standard-Format statt Historic, sonst gleiche Grundidee (Commander in der Kommandozone, Singleton).',
       en: 'Standard Brawl is the smaller Brawl variant: 60 cards instead of 100, drawing its card pool from the current Standard format instead of Historic, otherwise the same core idea (a commander in the command zone, singleton).',
@@ -149,7 +191,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-competitive-brawl',
     category: 'formats',
-    term: { de: 'Format: Competitive Brawl', en: 'Format: Competitive Brawl' },
+    term: { de: 'Format: Competitive Brawl (CBR)', en: 'Format: Competitive Brawl (CBR)' },
     definitionNormal: {
       de: 'Competitive Brawl ist die separate Ranglisten-Warteschlange für Brawl auf MTG Arena: identischer Deckbau (100 Karten, Singleton, 25 Leben), aber eigene Bannliste und ohne das kostenlose Mulligan der normalen Brawl-Warteschlange.',
       en: "Competitive Brawl is the separate ranked queue for Brawl on MTG Arena: identical deckbuilding (100 cards, singleton, 25 life), but its own banned list and without casual Brawl's free mulligan.",
@@ -163,7 +205,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-historic',
     category: 'formats',
-    term: { de: 'Format: Historic', en: 'Format: Historic' },
+    term: { de: 'Format: Historic (HIS)', en: 'Format: Historic (HIS)' },
     definitionNormal: {
       de: 'Historic ist ein reines MTG-Arena-Format: nicht-rotierend, umfasst praktisch alle auf Arena verfügbaren Sets (auch längst aus Standard rotierte) sowie einige Arena-exklusive Karten.',
       en: 'Historic is an MTG Arena-only format: non-rotating, covering practically every set available on Arena (including older ones long rotated out of Standard) plus a handful of Arena-exclusive cards.',
@@ -177,7 +219,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-timeless',
     category: 'formats',
-    term: { de: 'Format: Timeless', en: 'Format: Timeless' },
+    term: { de: 'Format: Timeless (TIM)', en: 'Format: Timeless (TIM)' },
     definitionNormal: {
       de: 'Timeless ist ein 2024 eingeführtes, nicht-rotierendes MTG-Arena-Format im Eternal-Stil: ein deutlich größerer Kartenpool als Historic, inklusive einiger nur digital existierender, neu ausbalancierter Kartenversionen.',
       en: 'Timeless is a non-rotating, Eternal-style MTG Arena format introduced in 2024: a considerably larger card pool than Historic, including some digital-only rebalanced card versions.',
@@ -191,7 +233,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-alchemy',
     category: 'formats',
-    term: { de: 'Format: Alchemy', en: 'Format: Alchemy' },
+    term: { de: 'Format: Alchemy (ALC)', en: 'Format: Alchemy (ALC)' },
     definitionNormal: {
       de: 'Alchemy baut auf dem Standard-Kartenpool auf, erlaubt zusätzlich aber digital-exklusive Karten und "rebalancte" (nur auf Arena angepasste) Versionen bestehender Karten.',
       en: "Alchemy builds on the Standard card pool, but additionally allows digital-exclusive cards and 'rebalanced' versions of existing cards (adjusted only on Arena).",
@@ -205,7 +247,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-gladiator',
     category: 'formats',
-    term: { de: 'Format: Gladiator', en: 'Format: Gladiator' },
+    term: { de: 'Format: Gladiator (GLA)', en: 'Format: Gladiator (GLA)' },
     definitionNormal: {
       de: 'Gladiator ist ein reines MTG-Arena-Singleton-Format: 100 Karten, nur eine Kopie jeder Karte außer Basisländern wie bei Commander, aber ohne Commander/Kommandozone – klassisches 1-gegen-1 aus dem Historic-Kartenpool.',
       en: 'Gladiator is an MTG Arena-only singleton format: 100 cards, only one copy of each card except basic lands like Commander, but with no commander or command zone - straightforward 1-vs-1 drawn from the Historic card pool.',
@@ -219,7 +261,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-future',
     category: 'formats',
-    term: { de: 'Legalität: Future (Future Standard)', en: 'Legality: Future (Future Standard)' },
+    term: { de: 'Legalität: Future (Future Standard, FUT)', en: 'Legality: Future (Future Standard, FUT)' },
     definitionNormal: {
       de: '"Future" ist kein eigenes Spielformat, sondern eine technische Scryfall-Markierung: Sie zeigt an, welche Karten in Standard legal sein werden, sobald ihr Set alle anderen aus der Rotation verdrängt hat – nützlich, um die kommende Standard-Rotation vorherzusehen.',
       en: '"Future" isn\'t a format you actually play - it\'s a technical Scryfall tag showing which cards will be Standard-legal once their set has pushed everything else out of rotation, useful for previewing where the Standard rotation is headed.',
@@ -233,7 +275,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-penny-dreadful',
     category: 'formats',
-    term: { de: 'Format: Penny Dreadful', en: 'Format: Penny Dreadful' },
+    term: { de: 'Format: Penny Dreadful (PDL)', en: 'Format: Penny Dreadful (PDL)' },
     definitionNormal: {
       de: 'Penny Dreadful ist ein von der Community (nicht von Wizards) organisiertes Budget-Format: Erlaubt sind nur Karten, die zu einem regelmäßig neu geprüften Stichtag unter einem festgelegten Centbetrag kosteten. Der Kartenpool verschiebt sich dadurch, wenn Preise schwanken.',
       en: 'Penny Dreadful is a community-run (not Wizards-sanctioned) budget format: only cards priced under a set cents threshold as of a periodically re-checked snapshot date are legal, so the card pool shifts as prices move.',
@@ -247,7 +289,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-old-school',
     category: 'formats',
-    term: { de: 'Format: Old School 93/94', en: 'Format: Old School 93/94' },
+    term: { de: 'Format: Old School 93/94 (OS)', en: 'Format: Old School 93/94 (OS)' },
     definitionNormal: {
       de: 'Old School 93/94 ist ein von der Community gepflegtes Retro-Format: Erlaubt sind nur Karten aus den frühesten Sets (1993/1994, z. B. Alpha, Beta, Arabian Nights, Antiquities, Legends, The Dark) – welche Sets und Nachdrucke genau zählen, hängt vom jeweiligen Regelwerk der Spielgruppe ab (z. B. "Toronto"-, "Atlantic"- oder "Madrid"-Regeln).',
       en: 'Old School 93/94 is a community-run retro format: only cards from the earliest sets (1993/1994, e.g. Alpha, Beta, Arabian Nights, Antiquities, Legends, The Dark) are legal - exactly which sets and reprints count depends on the specific ruleset a playgroup uses (e.g. "Toronto", "Atlantic", or "Madrid" rules).',
@@ -260,7 +302,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-premodern',
     category: 'formats',
-    term: { de: 'Format: Premodern', en: 'Format: Premodern' },
+    term: { de: 'Format: Premodern (PM)', en: 'Format: Premodern (PM)' },
     definitionNormal: {
       de: 'Premodern ist ein von der Community gepflegtes Format für die Ära zwischen Old School und Modern: Sets von Vierte Edition bis Scourge (1995–2003), mit eigener, kurzer Bannliste.',
       en: 'Premodern is a community-run format for the era between Old School and Modern: sets from Fourth Edition through Scourge (1995-2003), with its own short banned list.',
@@ -274,7 +316,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-predh',
     category: 'formats',
-    term: { de: 'Format: PreDH', en: 'Format: PreDH' },
+    term: { de: 'Format: PreDH (PDH)', en: 'Format: PreDH (PDH)' },
     definitionNormal: {
       de: 'PreDH (Pre-Commander EDH) ist eine Commander-Variante, die nur Karten bis einschließlich New Phyrexia (2011, das letzte Set vor dem offiziellen Commander-Produkt) erlaubt – sonst gelten die regulären Commander-Regeln und die reguläre Bannliste.',
       en: 'PreDH (pre-Commander EDH) is a Commander variant that only allows cards up through New Phyrexia (2011, the last set before the official Commander product) - otherwise the regular Commander rules and banned list apply.',
@@ -288,7 +330,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-the-list',
     category: 'formats',
-    term: { de: 'The List', en: 'The List' },
+    term: { de: 'The List (TL)', en: 'The List (TL)' },
     definitionNormal: {
       de: '"The List" ist eigentlich kein Spielformat, sondern ein Nachdruck-Mechanismus: Bestimmte ältere, nostalgische Karten werden zufällig als Bonuskarte in Booster-Packungen bestimmter Produkte gemischt. Die zugehörige Scryfall-Markierung zeigt nur an, ob eine Karte für diesen Pool infrage kommt – mit der Legalität in einem Deck hat das nichts zu tun.',
       en: '"The List" isn\'t actually a format to play - it\'s a reprint mechanic: certain older, nostalgic cards are randomly inserted as bonus cards into booster packs of certain products. The matching Scryfall tag just marks whether a card is eligible for that pool - it has nothing to do with deck legality.',
@@ -301,7 +343,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-standard',
     category: 'formats',
-    term: { de: 'Format: Standard', en: 'Format: Standard' },
+    term: { de: 'Format: Standard (STD)', en: 'Format: Standard (STD)' },
     definitionNormal: {
       de: 'Standard ist ein rotierendes Format: Nur die Sets der letzten paar Jahre sind erlaubt, ältere Sets scheiden nach und nach wieder aus. Den genauen Rotationsrhythmus passt Wizards von Zeit zu Zeit an.',
       en: "Standard is a rotating format: only the last few years of sets are legal, with older sets rotating out over time. Wizards occasionally adjusts the exact rotation schedule.",
@@ -315,7 +357,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-modern',
     category: 'formats',
-    term: { de: 'Format: Modern', en: 'Format: Modern' },
+    term: { de: 'Format: Modern (MOD)', en: 'Format: Modern (MOD)' },
     definitionNormal: {
       de: 'Modern ist nicht-rotierend und beginnt beim modernen Kartenrahmen (2003, ab Achte Edition/Mirrodin) – jedes reguläre Set seitdem ist erlaubt. Die meisten Sonderprodukte (z. B. Commander-Precons) sind nicht automatisch legal.',
       en: "Modern is non-rotating and starts at the modern card frame (2003, from Eighth Edition/Mirrodin onward) - every regular set since is legal. Most supplemental products (e.g. Commander precons) aren't automatically legal.",
@@ -329,7 +371,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-legacy-vintage',
     category: 'formats',
-    term: { de: 'Format: Legacy & Vintage', en: 'Format: Legacy & Vintage' },
+    term: { de: 'Format: Legacy (LEG) & Vintage (VIN)', en: 'Format: Legacy (LEG) & Vintage (VIN)' },
     definitionNormal: {
       de: 'Legacy erlaubt (bis auf eine Bannliste) fast die gesamte Kartengeschichte seit Alpha. Vintage erlaubt praktisch alles – selbst die mächtigsten Karten (z. B. die "Power Nine") sind dort nicht verboten, sondern nur auf eine Kopie pro Deck beschränkt ("restricted").',
       en: 'Legacy allows almost the entire card pool back to Alpha (minus a banned list). Vintage allows practically everything - even the most powerful cards (e.g. the "Power Nine") aren\'t banned there, just restricted to one copy per deck.',
@@ -342,7 +384,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-pioneer',
     category: 'formats',
-    term: { de: 'Format: Pioneer', en: 'Format: Pioneer' },
+    term: { de: 'Format: Pioneer (PIO)', en: 'Format: Pioneer (PIO)' },
     definitionNormal: {
       de: 'Pioneer ist nicht-rotierend und beginnt bei Return to Ravnica (2012) – jedes neue Standard-legale Set kommt automatisch dazu.',
       en: 'Pioneer is non-rotating and starts at Return to Ravnica (2012) - every new Standard-legal set is automatically added to it.',
@@ -355,7 +397,7 @@ export const HELP_TERMS_FORMATS: HelpTermInput[] = [
   {
     id: 'format-pauper',
     category: 'formats',
-    term: { de: 'Format: Pauper', en: 'Format: Pauper' },
+    term: { de: 'Format: Pauper (PAU)', en: 'Format: Pauper (PAU)' },
     definitionNormal: {
       de: 'Pauper erlaubt ausschließlich Karten der Seltenheitsstufe "Gewöhnlich" (Common).',
       en: 'Pauper only allows cards printed at common rarity.',
