@@ -130,6 +130,8 @@ interface YgoprodeckCardRow {
 interface YgoprodeckPrintCodeRow {
   set_code: string;
   card_id: number;
+  set_name: string | null;
+  set_rarity: string | null;
 }
 
 const CARD_INFO_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
@@ -276,19 +278,38 @@ export class YugiohApiService implements CardApiService {
     const response = await fetch(`${CARD_SETS_INFO_ENDPOINT}?setcode=${encodeURIComponent(englishCode ?? code)}`);
     if (!response.ok) return null;
 
-    const body: { id: number; name: string } | { error: string } = await response.json();
+    const body: { id: number; name: string; set_name?: string; set_rarity?: string } | { error: string } =
+      await response.json();
     if ('error' in body) return null;
 
-    return this.getCard(String(body.id));
+    const card = await this.getCard(String(body.id));
+    return card ? this.withPrintInfo(card, body.set_name ?? null, body.set_rarity ?? null) : null;
+  }
+
+  /**
+   * ygoprodeck_cards only ever stores one denormalized "representative"
+   * set_name/rarity per *card* (see migration 039's doc - live-confirmed:
+   * "TN19-DE007" correctly resolved to Obelisk the Tormentor, but the app
+   * showed "2016 Mega-Tins", a different one of its 18 real printings).
+   * Overrides those two fields with the specific printing's own values once
+   * a print code has actually resolved one - never the other way around,
+   * and never touches anything but these two display fields.
+   */
+  private withPrintInfo(card: Card, setName: string | null, rarity: string | null): Card {
+    return { ...card, setName: setName ?? card.setName, rarity: rarity ?? card.rarity };
   }
 
   private async lookupPrintCodeLocally(code: string): Promise<Card | null> {
     const { data } = await this.supabase.client
       .from('ygoprodeck_print_codes')
-      .select('card_id')
+      .select('card_id, set_name, set_rarity')
       .eq('set_code', code)
       .maybeSingle();
-    return data ? this.getCard(String((data as YgoprodeckPrintCodeRow).card_id)) : null;
+    if (!data) return null;
+
+    const row = data as YgoprodeckPrintCodeRow;
+    const card = await this.getCard(String(row.card_id));
+    return card ? this.withPrintInfo(card, row.set_name, row.set_rarity) : null;
   }
 
   /**
@@ -347,13 +368,21 @@ export class YugiohApiService implements CardApiService {
     return this.resolvePrintCodeRows(data);
   }
 
-  /** Shared row->Card resolution for findSimilarPrintCodes/findSimilarPrintCodesInSet - deduped by card (a card can have several print codes/reprints; only the closest-matching one per card is worth surfacing), ranked by distance. */
+  /**
+   * Shared row->Card resolution for findSimilarPrintCodes/findSimilarPrintCodesInSet -
+   * deduped by card (a card can have several print codes/reprints; only the
+   * closest-matching one per card is worth surfacing), ranked by distance.
+   * Overrides each card's generic set_name/rarity with the matched
+   * printing's own (see withPrintInfo's doc) - without this, the picker's
+   * whole point (telling candidates apart by what's shown on screen) breaks
+   * for any card with more than one real printing, which is most of them.
+   */
   private async resolvePrintCodeRows(
     data: unknown,
   ): Promise<{ card: Card; matchedCode: string; distance: number }[]> {
     if (!data) return [];
 
-    const rows = data as { set_code: string; card_id: number; distance: number }[];
+    const rows = data as { set_code: string; card_id: number; set_name: string | null; set_rarity: string | null; distance: number }[];
     const bestByCard = new Map<number, (typeof rows)[number]>();
     for (const row of rows) {
       const existing = bestByCard.get(row.card_id);
@@ -367,7 +396,7 @@ export class YugiohApiService implements CardApiService {
     return ranked
       .map((row) => {
         const card = cardsById.get(String(row.card_id));
-        return card ? { card, matchedCode: row.set_code, distance: row.distance } : null;
+        return card ? { card: this.withPrintInfo(card, row.set_name, row.set_rarity), matchedCode: row.set_code, distance: row.distance } : null;
       })
       .filter((entry): entry is { card: Card; matchedCode: string; distance: number } => entry !== null);
   }
