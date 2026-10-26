@@ -105,7 +105,14 @@
   @if (status() === 'choosing' && candidateChoices(); as choices) {
     <div class="match-panel choices-panel">
       <p class="choices-hint">
-        {{ (pickerTier() === 'medium' ? 'scanner.chooseCardHintMedium' : 'scanner.chooseCardHintLow') | translate }}
+        {{
+          (pickerTier() === 'printCodeGuess'
+            ? 'scanner.printCodeGuessHint'
+            : pickerTier() === 'medium'
+              ? 'scanner.chooseCardHintMedium'
+              : 'scanner.chooseCardHintLow'
+          ) | translate
+        }}
       </p>
       <div class="choices-list">
         @for (choice of choices; track choice.oracleId) {

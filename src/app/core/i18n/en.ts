@@ -415,6 +415,7 @@ export const en: typeof de = {
     cameraFallbackLabel: 'Camera {{index}}',
     chooseCardHintMedium: 'Which card is this?',
     chooseCardHintLow: 'Please choose a card',
+    printCodeGuessHint: "This set code wasn't found anywhere — did you mean one of these?",
     noneOfThese: 'None of these — keep scanning',
     addToCollection: 'Add to collection',
     keepScanning: 'Keep scanning',

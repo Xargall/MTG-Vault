@@ -319,8 +319,15 @@ export class Scanner {
   // Which heading/copy the picker shows - 'medium' (5 options, fairly
   // confident guess) vs 'low' (10 options, weak signal). Derived from how
   // many runners MtgApiService already decided to include, not recomputed
-  // from a duplicated threshold here.
-  protected readonly pickerTier = signal<'medium' | 'low'>('medium');
+  // from a duplicated threshold here. 'printCodeGuess' is Yu-Gi-Oh!-only:
+  // the scanned code matched no real card at all, these are the closest
+  // *real* codes found instead (see YugiohApiService.findSimilarPrintCodes).
+  protected readonly pickerTier = signal<'medium' | 'low' | 'printCodeGuess'>('medium');
+  // Keyed by ScoredCandidate.oracleId (= Card.id for Yu-Gi-Oh!, which has no
+  // separate oracle concept) - only populated for the printCodeGuess picker,
+  // so selectCandidate can store the *matched* code's printed language
+  // rather than the (likely wrong) language read off the misread original.
+  private readonly pendingPrintCodeLanguages = new Map<string, string>();
   protected readonly adding = signal(false);
   protected readonly addError = signal<string | null>(null);
   // Last card added this session, kept around (top-left, next to the camera
@@ -667,7 +674,17 @@ export class Scanner {
         const code = text.toUpperCase().trim();
         if (!YUGIOH_PRINT_CODE_PATTERN.test(code)) return null;
         const card = await this.yugiohApi.identifyByPrintCode(code);
-        return card ? { card, finish: 'nonfoil', cardCategory: 'normal', language: extractYugiohLanguage(code) } : null;
+        if (card) return { card, finish: 'nonfoil', cardCategory: 'normal', language: extractYugiohLanguage(code) };
+
+        // The code is shaped right but matches nothing real - most likely a
+        // misread character (live-confirmed, 2026-10-26: "LEHD-DEB00" read as
+        // "LEND-EN008"). Check whether a real code is only a couple of
+        // characters away and let the user confirm it themselves instead of
+        // just reporting a miss - never auto-added, see
+        // showPrintCodeSuggestions/selectCandidate.
+        const suggestions = await this.yugiohApi.findSimilarPrintCodes(code);
+        if (suggestions.length > 0) this.showPrintCodeSuggestions(suggestions);
+        return null;
       }
 
       if (game === 'pokemon') {
@@ -731,6 +748,35 @@ export class Scanner {
     }, AUTO_ADD_DELAY_MS);
   }
 
+  /**
+   * Shows a scanned-but-nonexistent Yu-Gi-Oh! print code's closest real
+   * matches for confirmation - reuses the same candidate-picker UI/state
+   * MTG's own ambiguous-match path uses (status 'choosing' +
+   * candidateChoices), just fed from findSimilarPrintCodes instead. Guarded
+   * the same way onMatch is: a stale call landing after the panel already
+   * moved on must be a no-op.
+   */
+  private showPrintCodeSuggestions(suggestions: { card: Card; matchedCode: string; distance: number }[]) {
+    if (this.status() !== 'scanning') return;
+
+    this.pendingPrintCodeLanguages.clear();
+    const choices: ScoredCandidate[] = suggestions.map(({ card, matchedCode, distance }) => {
+      this.pendingPrintCodeLanguages.set(card.id, extractYugiohLanguage(matchedCode));
+      return {
+        card,
+        confidence: 1 - distance / Math.max(matchedCode.length, 1),
+        oracleId: card.id,
+        thumbnailUrl: card.imageUrlSmall ?? card.imageUrl ?? null,
+      };
+    });
+
+    this.addError.set(null);
+    this.detectedCard.set(null);
+    this.candidateChoices.set(choices);
+    this.pickerTier.set('printCodeGuess');
+    this.status.set('choosing');
+  }
+
   private clearAutoAddTimeout() {
     if (this.autoAddTimeout) {
       clearTimeout(this.autoAddTimeout);
@@ -743,6 +789,11 @@ export class Scanner {
   // away (quantity 1, no foil) with a success toast, rather than routing
   // through the match panel's auto-add countdown.
   protected async selectCandidate(candidate: ScoredCandidate) {
+    // Only ever populated for the printCodeGuess picker (see
+    // showPrintCodeSuggestions) - undefined for MTG's own ambiguous-match
+    // picker, same as before this existed.
+    const language = this.pendingPrintCodeLanguages.get(candidate.oracleId);
+    this.pendingPrintCodeLanguages.clear();
     this.candidateChoices.set(null);
     this.status.set('scanning');
     try {
@@ -752,6 +803,7 @@ export class Scanner {
         foil: false,
         condition: 'NM',
         oracleId: candidate.card.oracleId,
+        ...(language ? { language } : {}),
       });
       this.lastAdded.set({ card: candidate.card, result });
       this.showToast(
@@ -770,6 +822,7 @@ export class Scanner {
   }
 
   protected cancelChoices() {
+    this.pendingPrintCodeLanguages.clear();
     this.candidateChoices.set(null);
     this.status.set('scanning');
     this.scheduleNextCapture();

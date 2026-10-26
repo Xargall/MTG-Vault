@@ -7,6 +7,13 @@ import { CardApiService, CardIdentification } from './card-api.interface';
 import { SupabaseService } from './supabase.service';
 
 const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
+// How many characters a scanned-but-nonexistent print code may be off from
+// a real one before findSimilarPrintCodes stops suggesting it - see that
+// method's doc. 2 covers both a single-character misread (e.g. "B"->"8")
+// and the slightly bigger "H"->"N" + digit-shuffle case that's already been
+// seen live, without opening the door to suggesting an unrelated set.
+const FUZZY_PRINT_CODE_MAX_DISTANCE = 2;
+const FUZZY_PRINT_CODE_LIMIT = 5;
 
 /**
  * YGOPRODeck only ever tracks English print codes - confirmed live
@@ -272,6 +279,57 @@ export class YugiohApiService implements CardApiService {
       .eq('set_code', code)
       .maybeSingle();
     return data ? this.getCard(String((data as YgoprodeckPrintCodeRow).card_id)) : null;
+  }
+
+  /**
+   * Last-resort fallback for the scanner, called only once identifyByPrintCode
+   * has already failed every exact path (as read, as read's English-equivalent,
+   * and the live cardsetsinfo.php lookup) - i.e. the code Gemini read matches
+   * no real card at all. Rather than just giving up, searches the full local
+   * mirror (via migration 037's match_yugioh_print_code RPC, built on
+   * fuzzystrmatch's levenshtein()) for real codes within a couple of
+   * characters of what was read - live-confirmed case (2026-10-26): Gemini
+   * read "LEND-EN008" off a card actually printed "LEHD-DEB00", one edit away
+   * from the real "LEHD-ENB00".
+   *
+   * Deliberately returns candidates for confirmation rather than resolving
+   * one itself - a misread code could just as easily be one edit away from
+   * the WRONG card (e.g. a different set's number), so silently auto-adding
+   * the closest match risks putting a wrong card in someone's collection.
+   * The caller (scanner.ts) shows these through the same candidate-picker UI
+   * MTG's own ambiguous-match path uses, never auto-adds on its own.
+   *
+   * Deduped by card - a card can have several print codes (reprints), and
+   * only the closest-matching one per card is worth surfacing.
+   */
+  async findSimilarPrintCodes(code: string): Promise<{ card: Card; matchedCode: string; distance: number }[]> {
+    const { data, error } = await this.supabase.client.rpc('match_yugioh_print_code', {
+      p_code: code,
+      p_max_distance: FUZZY_PRINT_CODE_MAX_DISTANCE,
+      p_limit: FUZZY_PRINT_CODE_LIMIT,
+    });
+    if (error || !data) {
+      if (error) console.warn('match_yugioh_print_code failed:', error);
+      return [];
+    }
+
+    const rows = data as { set_code: string; card_id: number; distance: number }[];
+    const bestByCard = new Map<number, (typeof rows)[number]>();
+    for (const row of rows) {
+      const existing = bestByCard.get(row.card_id);
+      if (!existing || row.distance < existing.distance) bestByCard.set(row.card_id, row);
+    }
+    const ranked = [...bestByCard.values()].sort((a, b) => a.distance - b.distance);
+
+    const cards = await this.getCardsByIds(ranked.map((row) => String(row.card_id)));
+    const cardsById = new Map(cards.map((card) => [card.id, card]));
+
+    return ranked
+      .map((row) => {
+        const card = cardsById.get(String(row.card_id));
+        return card ? { card, matchedCode: row.set_code, distance: row.distance } : null;
+      })
+      .filter((entry): entry is { card: Card; matchedCode: string; distance: number } => entry !== null);
   }
 
   async identifyCard(rawText: string): Promise<CardIdentification | null> {

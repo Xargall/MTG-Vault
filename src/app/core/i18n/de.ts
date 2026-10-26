@@ -415,6 +415,7 @@ export const de = {
     cameraFallbackLabel: 'Kamera {{index}}',
     chooseCardHintMedium: 'Welche Karte ist das?',
     chooseCardHintLow: 'Bitte Karte auswählen',
+    printCodeGuessHint: 'Dieser Set-Code wurde nirgends gefunden — meintest du eine dieser Karten?',
     noneOfThese: 'Keine davon — weiter scannen',
     addToCollection: 'Zur Collection hinzufügen',
     keepScanning: 'Weiter scannen',
