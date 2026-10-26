@@ -921,17 +921,53 @@ export class MtgApiService implements CardApiService {
 
   private popularCardsCache: Promise<Card[]> | null = null;
 
-  /** Most-played cards overall, via Scryfall's `edhrec_rank` sort (rank 1 = most popular). */
+  // Rows fetched from the local mirror before dedup - edhrec_rank ties
+  // across every reprint of the same card (Scryfall assigns one rank per
+  // oracle card, not per printing), so pulling exactly `limit` rows would
+  // mostly return the same handful of staples' different printings. Generous
+  // enough that even a heavily-reprinted staple (Sol Ring et al., 50+
+  // printings) can't crowd out every other card within the window.
+  private static readonly POPULAR_ROW_FETCH_MULTIPLIER = 25;
+
+  /**
+   * Most-played cards overall. Tries the local mirror's persisted
+   * `edhrec_rank` first (see 034_scryfall_cards_recommendation_fields.sql) -
+   * falls back to Scryfall's live `order=edhrec` search if that comes back
+   * empty, which it will until the next daily sync run actually populates
+   * the column. Once populated, this avoids a live Scryfall round-trip on
+   * every dashboard load.
+   */
   async getPopularCards(limit: number): Promise<Card[]> {
     if (!this.popularCardsCache) {
-      this.popularCardsCache = this.runSearch(
-        'game:paper -t:basic',
-        'order=edhrec&unique=cards',
-        this.decorativeQueue,
-      ).then((raw) => raw.map((card) => this.toCard(card)));
+      this.popularCardsCache = this.getPopularCardsFromMirror(limit).then((cards) =>
+        cards.length > 0 ? cards : this.getPopularCardsLive(),
+      );
     }
     const cards = await this.popularCardsCache;
     return cards.slice(0, limit);
+  }
+
+  private async getPopularCardsFromMirror(limit: number): Promise<Card[]> {
+    const { data, error } = await this.supabase.client
+      .from('scryfall_cards')
+      .select('*')
+      .eq('lang', 'en')
+      .not('edhrec_rank', 'is', null)
+      // Matches the live query's "-t:basic" - basic lands have no
+      // meaningful edhrec_rank signal and would otherwise dominate the top
+      // of the ranking.
+      .not('type_line', 'ilike', 'Basic Land%')
+      .order('edhrec_rank', { ascending: true })
+      .limit(limit * MtgApiService.POPULAR_ROW_FETCH_MULTIPLIER);
+    if (error || !data) return [];
+
+    const rows = this.dedupeRowsByName(data as ScryfallCardRow[]);
+    return rows.slice(0, limit).map((row) => this.rowToCard(row));
+  }
+
+  private async getPopularCardsLive(): Promise<Card[]> {
+    const raw = await this.runSearch('game:paper -t:basic', 'order=edhrec&unique=cards', this.decorativeQueue);
+    return raw.map((card) => this.toCard(card));
   }
 
   private toCard(raw: ScryfallRawCard): MtgCard {
