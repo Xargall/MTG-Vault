@@ -69,6 +69,18 @@
   gap: var(--spacing-sm);
 }
 
+// Pulse dot and OCR-engine badge side by side instead of stacked - both are
+// small/inline on their own, so sharing a row reads as one status line
+// instead of the badge trailing awkwardly underneath. Still its own row
+// (not a flex-direction: row on .top-left-stack itself) since the camera
+// picker/undo thumbnail below it are full-width and belong on their own
+// line.
+.top-left-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
 .last-added {
   position: relative;
 }
