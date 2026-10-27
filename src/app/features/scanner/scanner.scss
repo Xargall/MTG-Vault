@@ -184,6 +184,14 @@
     background: var(--scrim);
     color: var(--color-text);
   }
+
+  // Same neutral "in-progress, not success/failure" reasoning as --waiting -
+  // this just covers the earlier stretch where the gate is still watching
+  // for a card at all, not yet an actual in-flight Gemini call.
+  &--idle {
+    background: var(--scrim);
+    color: var(--color-text);
+  }
 }
 
 .gemini-key-hint {

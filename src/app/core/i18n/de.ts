@@ -420,6 +420,8 @@ export const de = {
     setGuessConfirm: 'Ja, genau',
     setGuessReject: 'Nein',
     geminiWaitingLabel: 'Gemini denkt nach…',
+    idleWaitLabel: 'Warte auf Karte…',
+    geminiCooldownLabel: 'bereit in',
     noneOfThese: 'Keine davon — weiter scannen',
     addToCollection: 'Zur Collection hinzufügen',
     keepScanning: 'Weiter scannen',

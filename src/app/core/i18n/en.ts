@@ -420,6 +420,8 @@ export const en: typeof de = {
     setGuessConfirm: 'Yes, that one',
     setGuessReject: 'No',
     geminiWaitingLabel: 'Gemini is thinking…',
+    idleWaitLabel: 'Waiting for a card…',
+    geminiCooldownLabel: 'ready in',
     noneOfThese: 'None of these — keep scanning',
     addToCollection: 'Add to collection',
     keepScanning: 'Keep scanning',

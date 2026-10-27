@@ -35,6 +35,14 @@
         <svg aria-hidden="true"><use href="#icon-sparkles" /></svg>
         {{ 'scanner.geminiWaitingLabel' | translate }} {{ geminiElapsedSeconds() | number: '1.1-1' }}s
       </span>
+    } @else if (idleWaitSeconds() !== null) {
+      <span class="ocr-engine-badge ocr-engine-badge--idle">
+        <svg aria-hidden="true"><use href="#icon-sparkles" /></svg>
+        {{ 'scanner.idleWaitLabel' | translate }} {{ idleWaitSeconds() | number: '1.1-1' }}s
+        @if (geminiCooldownSeconds(); as cooldown) {
+          · {{ 'scanner.geminiCooldownLabel' | translate }} {{ cooldown | number: '1.1-1' }}s
+        }
+      </span>
     } @else if (ocrEngine(); as engine) {
       @if (engine === 'gemini') {
         <span class="ocr-engine-badge ocr-engine-badge--gemini"><svg aria-hidden="true"><use href="#icon-sparkles" /></svg> Gemini</span>

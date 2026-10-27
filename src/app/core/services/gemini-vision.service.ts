@@ -105,4 +105,19 @@ export class GeminiVisionService {
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     this.lastCallAt = Date.now();
   }
+
+  /**
+   * Milliseconds left on the client-side pacing (MIN_CALL_INTERVAL_MS)
+   * before the next call could actually go out - 0 once it's clear. Plain
+   * getter, not a signal - a caller that needs this live (Scanner's idle-
+   * wait badge, see its own doc) already polls on its own interval, same
+   * as geminiElapsedSeconds does, so there's no need for this service to
+   * be reactive on its own. Reported live (2026-10-27): while the gate is
+   * still watching for a card (no call in flight yet), there was no way to
+   * tell "Gemini just isn't being asked yet" apart from "Gemini is still
+   * cooling down from the last call" - both looked identical (nothing).
+   */
+  getCooldownRemainingMs(): number {
+    return Math.max(0, MIN_CALL_INTERVAL_MS - (Date.now() - this.lastCallAt));
+  }
 }

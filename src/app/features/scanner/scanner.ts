@@ -332,6 +332,23 @@ export class Scanner {
   // unusually long", not a running total.
   protected readonly geminiElapsedSeconds = signal<number | null>(null);
   private geminiElapsedTimer: ReturnType<typeof setInterval> | null = null;
+  // Live-requested (2026-10-27): the existing geminiElapsedSeconds badge
+  // only ever appears once a card has already tripped the gate and a call
+  // is actually in flight - while the gate is still watching for a stable,
+  // new card (which can take a while, e.g. the user repositioning a
+  // partially-framed Yu-Gi-Oh! card), there was no feedback at all, making
+  // "nothing's happening yet" indistinguishable from "it's stuck". Ticks
+  // while status is 'scanning' and no Gemini call is in flight; stopped the
+  // moment one starts (autoGeminiScan) and restarted once it finishes
+  // without a match, so the two badges never show at the same time.
+  protected readonly idleWaitSeconds = signal<number | null>(null);
+  // Remaining ms on GeminiVisionService's own client-side pacing
+  // (MIN_CALL_INTERVAL_MS), sampled on the same tick as idleWaitSeconds -
+  // null once it's clear, so the idle badge can tell "not asking yet" apart
+  // from "still cooling down from the last call" instead of both looking
+  // like silence.
+  protected readonly geminiCooldownSeconds = signal<number | null>(null);
+  private idleWaitTimer: ReturnType<typeof setInterval> | null = null;
   // Gates the automatic Gemini path (see updateGeminiGate) and drives the
   // "set up your own key" hint - null (not checked yet) fails open, so a
   // flaky/unmigrated status check never silently disables a working feature.
@@ -432,6 +449,7 @@ export class Scanner {
       if (this.autoResumeTimeout) clearTimeout(this.autoResumeTimeout);
       if (this.autoAddTimeout) clearTimeout(this.autoAddTimeout);
       if (this.geminiElapsedTimer) clearInterval(this.geminiElapsedTimer);
+      if (this.idleWaitTimer) clearInterval(this.idleWaitTimer);
       this.stream?.getTracks().forEach((track) => track.stop());
       this.bulkData.releaseNameIndex();
     });
@@ -534,6 +552,7 @@ export class Scanner {
     // never start.
     this.isScanning = true;
     this.status.set('scanning');
+    this.startIdleWaitTimer();
     this.scheduleNextCapture();
   }
 
@@ -662,23 +681,6 @@ export class Scanner {
     const diffFromBackground = this.diffFromBackground(sample, pixelCount);
     const looksNew = diffFromBackground > minDiffFromBackground;
 
-    // Temporary diagnostic (2026-10-27): lowering the YGO thresholds alone
-    // didn't make the gate fire - rather than guess again blind, log the
-    // actual numbers so we can see which of the three conditions is really
-    // the blocker (or whether it's stuck in the adaptive-background-absorbs-
-    // the-card trap described on GATE_MIN_DIFF_FROM_BACKGROUND_YUGIOH).
-    // Yu-Gi-Oh!-only - MTG's gate isn't in question here. Remove once
-    // resolved.
-    if (isYugioh) {
-      console.log(
-        '[YGO gate]',
-        'variance', (variance / pixelCount).toFixed(0), '/', minVariance,
-        'diffTick', (diffSum / pixelCount).toFixed(1), '/', GATE_STABILITY_THRESHOLD,
-        'diffBg', diffFromBackground.toFixed(1), '/', minDiffFromBackground,
-        '->', hasContent, isStable, looksNew,
-      );
-    }
-
     if (!isStable || !hasContent || !looksNew) {
       this.gateStableTicks = 0;
       // Keeps drifting toward the current scene whenever nothing
@@ -743,11 +745,16 @@ export class Scanner {
    */
   private async autoGeminiScan(videoEl: HTMLVideoElement): Promise<void> {
     this.geminiInFlight = true;
+    this.stopIdleWaitTimer();
     try {
       const result = await this.tryGeminiPath(videoEl);
       if (result) this.onMatch({ card: result.card, confidence: 1 }, result);
     } finally {
       this.geminiInFlight = false;
+      // Only restart the idle clock if nothing matched - onMatch already
+      // moved status away from 'scanning', and idleWaitSeconds has no
+      // business ticking while the match panel/picker is showing.
+      if (this.status() === 'scanning') this.startIdleWaitTimer();
     }
   }
 
@@ -986,6 +993,7 @@ export class Scanner {
     this.pendingSetGuess.set(null);
     if (!guess) {
       this.status.set('scanning');
+      this.startIdleWaitTimer();
       this.scheduleNextCapture();
       return;
     }
@@ -995,6 +1003,7 @@ export class Scanner {
       this.showPrintCodeSuggestions(suggestions);
     } else {
       this.status.set('scanning');
+      this.startIdleWaitTimer();
       this.scheduleNextCapture();
     }
   }
@@ -1003,6 +1012,7 @@ export class Scanner {
   protected rejectSetGuess() {
     this.pendingSetGuess.set(null);
     this.status.set('scanning');
+    this.startIdleWaitTimer();
     this.scheduleNextCapture();
   }
 
@@ -1020,6 +1030,28 @@ export class Scanner {
       this.geminiElapsedTimer = null;
     }
     this.geminiElapsedSeconds.set(null);
+  }
+
+  /** See idleWaitSeconds' own doc - started whenever scanning (re)starts with nothing in flight, stopped the instant a Gemini call actually begins. */
+  private startIdleWaitTimer() {
+    if (this.idleWaitTimer) clearInterval(this.idleWaitTimer);
+    const startedAt = Date.now();
+    this.idleWaitSeconds.set(0);
+    this.geminiCooldownSeconds.set(null);
+    this.idleWaitTimer = setInterval(() => {
+      this.idleWaitSeconds.set((Date.now() - startedAt) / 1000);
+      const cooldownMs = this.geminiVision.getCooldownRemainingMs();
+      this.geminiCooldownSeconds.set(cooldownMs > 0 ? cooldownMs / 1000 : null);
+    }, 100);
+  }
+
+  private stopIdleWaitTimer() {
+    if (this.idleWaitTimer) {
+      clearInterval(this.idleWaitTimer);
+      this.idleWaitTimer = null;
+    }
+    this.idleWaitSeconds.set(null);
+    this.geminiCooldownSeconds.set(null);
   }
 
   private clearAutoAddTimeout() {
@@ -1041,6 +1073,7 @@ export class Scanner {
     this.pendingPrintCodeLanguages.clear();
     this.candidateChoices.set(null);
     this.status.set('scanning');
+    this.startIdleWaitTimer();
     try {
       const result = await this.collectionService.addCard({
         cardId: candidate.card.id,
@@ -1071,6 +1104,7 @@ export class Scanner {
     this.pendingPrintCodeLanguages.clear();
     this.candidateChoices.set(null);
     this.status.set('scanning');
+    this.startIdleWaitTimer();
     this.scheduleNextCapture();
   }
 
@@ -1141,6 +1175,7 @@ export class Scanner {
     this.candidateChoices.set(null);
     this.pendingSetGuess.set(null);
     this.status.set('scanning');
+    this.startIdleWaitTimer();
     this.scheduleNextCapture();
   }
 
