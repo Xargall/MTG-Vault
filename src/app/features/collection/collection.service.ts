@@ -4,6 +4,7 @@ import { DEFAULT_CARD_LANGUAGE } from '../../core/constants/card-languages';
 import { Card } from '../../core/models/card.model';
 import { GameService } from '../../core/services/game.service';
 import { SupabaseService } from '../../core/services/supabase.service';
+import { YugiohApiService } from '../../core/services/yugioh-api.service';
 
 export interface CollectionCardRow {
   id: string;
@@ -32,6 +33,15 @@ export interface CollectionCardRow {
   // (see card.model.ts). Used to recognize a different printing of the same
   // card as a deck substitute (see deck-stats.ts).
   oracle_id: string | null;
+  // The specific printing's set_code (e.g. "TN19-EN007"), Yu-Gi-Oh!-only -
+  // see 040_collection_set_code.sql's doc for why this exists at all (its
+  // card_id alone can't tell two different real printings of the same card
+  // apart, unlike MTG where every printing already has its own card_id).
+  // Null for every MTG/Pokémon row and for any Yu-Gi-Oh! row added without a
+  // specifically-known printing (e.g. a deck grant, not a scan/exact-code
+  // search) - same "unknown, fall back to the card's generic value"
+  // handling as the card having no printCode of its own.
+  set_code: string | null;
 }
 
 export interface CollectionEntry {
@@ -48,6 +58,8 @@ export interface AddCardInput {
   cardCategory?: string;
   language?: string;
   oracleId?: string | null;
+  /** The specific printing's set_code (Yu-Gi-Oh! only) - see CollectionCardRow.set_code's doc. */
+  setCode?: string | null;
 }
 
 // Discriminated on `merged` so undoAdd() can't be called with a
@@ -69,6 +81,14 @@ const COLLECTION_PAGE_SIZE = 1000;
 export class CollectionService {
   private readonly supabase = inject(SupabaseService);
   private readonly gameService = inject(GameService);
+  // Injected directly (not through GameService.cardApi()'s generic
+  // CardApiService interface) since resolving a row's own set_code is a
+  // Yu-Gi-Oh!-specific concept (see CollectionCardRow.set_code's doc) with
+  // no equivalent for MTG (whose card_id is already per-printing) or
+  // Pokémon (no print-code concept at all yet) - adding a no-op method to
+  // every other game's service just to keep this fully game-agnostic would
+  // be speculative generality for a need only one of the three games has.
+  private readonly yugiohApi = inject(YugiohApiService);
 
   /**
    * Runs `query` repeatedly with an increasing `.range()` until a page comes
@@ -133,10 +153,23 @@ export class CollectionService {
       throw new Error('Kartendaten konnten nicht geladen werden. Bitte versuche es erneut.');
     }
 
+    // Yu-Gi-Oh! rows with a known set_code (see CollectionCardRow.set_code's
+    // doc) need their OWN set/rarity, not the shared card_id's generic one -
+    // without this, every row re-fetched here would revert right back to
+    // the same wrong/generic display the set_code column exists to fix in
+    // the first place. Batched once across every distinct code in this
+    // collection rather than per row.
+    const setCodes = [...new Set(data.map((row) => row.set_code).filter((code): code is string => !!code))];
+    const setInfoByCode =
+      setCodes.length > 0 ? await this.yugiohApi.getSetInfoForCodes(setCodes) : new Map<string, { setName: string | null; rarity: string | null }>();
+
     return data
       .map((row) => {
         const card = cardsById.get(row.card_id);
-        return card ? { row, card } : null;
+        if (!card) return null;
+        const printInfo = row.set_code ? setInfoByCode.get(row.set_code) : undefined;
+        if (!printInfo) return { row, card };
+        return { row, card: { ...card, setName: printInfo.setName ?? card.setName, rarity: printInfo.rarity ?? card.rarity } };
       })
       .filter((entry): entry is CollectionEntry => entry !== null);
   }
@@ -224,6 +257,7 @@ export class CollectionService {
     cardCategory = 'normal',
     language = DEFAULT_CARD_LANGUAGE,
     oracleId = null,
+    setCode = null,
   }: AddCardInput): Promise<AddCardResult> {
     await this.gameService.ready;
     const userId = this.supabase.session()?.user.id;
@@ -231,18 +265,27 @@ export class CollectionService {
     const gameId = this.gameService.currentGameId();
     if (!gameId) throw new Error('Kein aktives Spiel.');
 
-    // `finish`/`language` are part of the match, not just `foil` - a halo or
-    // German copy of a card must stack separately from a nonfoil/English
-    // copy of the same card_id, even though both have foil=false.
-    const { data: existing, error: selectError } = await this.supabase.client
+    // `finish`/`language`/`set_code` are part of the match, not just `foil` -
+    // a halo or German copy of a card must stack separately from a
+    // nonfoil/English copy of the same card_id, even though both have
+    // foil=false, and (Yu-Gi-Oh! only) a known-different printing must stack
+    // separately from both an unknown-printing row and any other printing -
+    // see CollectionCardRow.set_code's doc. `.is()` rather than `.eq()` for
+    // a null setCode since PostgREST's `.eq()` never matches a NULL column.
+    let query = this.supabase.client
       .from('collection_cards')
       .select('id, quantity, oracle_id')
       .eq('game_id', gameId)
       .eq('card_id', cardId)
       .eq('foil', foil)
       .eq('finish', finish)
-      .eq('language', language)
-      .maybeSingle<{ id: string; quantity: number; oracle_id: string | null }>();
+      .eq('language', language);
+    query = setCode ? query.eq('set_code', setCode) : query.is('set_code', null);
+    const { data: existing, error: selectError } = await query.maybeSingle<{
+      id: string;
+      quantity: number;
+      oracle_id: string | null;
+    }>();
 
     if (selectError) throw selectError;
 
@@ -270,6 +313,7 @@ export class CollectionService {
       card_category: cardCategory,
       language,
       oracle_id: oracleId,
+      set_code: setCode,
     };
     const { data, error } = await this.supabase.client
       .from('collection_cards')

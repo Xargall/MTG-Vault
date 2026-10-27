@@ -73,6 +73,7 @@ function toEnglishPrintCode(code: string): string | null {
 }
 
 interface YgoCardSet {
+  set_code: string;
   set_name: string;
   set_rarity: string;
   set_price: string;
@@ -268,11 +269,13 @@ export class YugiohApiService implements CardApiService {
       const base = this.rowToCard(row);
       const { data: printRows } = await this.supabase.client
         .from('ygoprodeck_print_codes')
-        .select('set_name, set_rarity')
+        .select('set_code, set_name, set_rarity')
         .eq('card_id', row.id)
         .order('set_name');
-      const prints = (printRows ?? []) as { set_name: string | null; set_rarity: string | null }[];
-      if (prints.length > 0) return prints.map((print) => this.withPrintInfo(base, print.set_name, print.set_rarity));
+      const prints = (printRows ?? []) as { set_code: string; set_name: string | null; set_rarity: string | null }[];
+      if (prints.length > 0) {
+        return prints.map((print) => this.withPrintInfo(base, print.set_name, print.set_rarity, print.set_code));
+      }
       return [base];
     }
 
@@ -281,7 +284,7 @@ export class YugiohApiService implements CardApiService {
     const base = this.toCard(raw[0]);
     const sets = raw[0].card_sets ?? [];
     if (sets.length === 0) return [base];
-    return sets.map((set) => this.withPrintInfo(base, set.set_name, set.set_rarity));
+    return sets.map((set) => this.withPrintInfo(base, set.set_name, set.set_rarity, set.set_code));
   }
 
   /**
@@ -308,12 +311,43 @@ export class YugiohApiService implements CardApiService {
     const response = await fetch(`${CARD_SETS_INFO_ENDPOINT}?setcode=${encodeURIComponent(englishCode ?? code)}`);
     if (!response.ok) return null;
 
-    const body: { id: number; name: string; set_name?: string; set_rarity?: string } | { error: string } =
-      await response.json();
+    const body:
+      | { id: number; name: string; set_code?: string; set_name?: string; set_rarity?: string }
+      | { error: string } = await response.json();
     if ('error' in body) return null;
 
     const card = await this.getCard(String(body.id));
-    return card ? this.withPrintInfo(card, body.set_name ?? null, body.set_rarity ?? null) : null;
+    return card
+      ? this.withPrintInfo(card, body.set_name ?? null, body.set_rarity ?? null, body.set_code ?? englishCode ?? code)
+      : null;
+  }
+
+  /**
+   * Batch counterpart to withPrintInfo, for a caller (CollectionService)
+   * that already has its own Cards and just needs each one's specific
+   * printing's set_name/rarity by the print_code it persisted at add-time
+   * (040_collection_set_code.sql) - rather than resolving one Card per code
+   * via identifyByPrintCode (which would also re-fetch the whole card).
+   * Missing/unsynced codes are simply absent from the returned map, left
+   * for the caller to fall back to the card's own generic set/rarity.
+   */
+  async getSetInfoForCodes(codes: string[]): Promise<Map<string, { setName: string | null; rarity: string | null }>> {
+    const result = new Map<string, { setName: string | null; rarity: string | null }>();
+    if (codes.length === 0) return result;
+
+    const { data, error } = await this.supabase.client
+      .from('ygoprodeck_print_codes')
+      .select('set_code, set_name, set_rarity')
+      .in('set_code', codes);
+    if (error) {
+      console.warn('ygoprodeck_print_codes set_code batch failed:', error);
+      return result;
+    }
+
+    for (const row of (data ?? []) as { set_code: string; set_name: string | null; set_rarity: string | null }[]) {
+      result.set(row.set_code, { setName: row.set_name, rarity: row.set_rarity });
+    }
+    return result;
   }
 
   /**
@@ -325,8 +359,23 @@ export class YugiohApiService implements CardApiService {
    * a print code has actually resolved one - never the other way around,
    * and never touches anything but these two display fields.
    */
-  private withPrintInfo(card: Card, setName: string | null, rarity: string | null): Card {
-    return { ...card, setName: setName ?? card.setName, rarity: rarity ?? card.rarity };
+  /**
+   * `printCode` (new, see 040_collection_set_code.sql) is the actual
+   * matched set_code this printing's info came from, when known - kept on
+   * the Card itself (not just used to compute setName/rarity here) so a
+   * caller than persists the add to the collection (scanner.ts,
+   * AddCardDialog) can save *which* printing was picked, not just its
+   * display values. Every call site in this file is Yu-Gi-Oh!-only despite
+   * the broader `Card` param/return type (shared with the other games'
+   * services via CardApiService) - safe to assert as YugiohCard.
+   */
+  private withPrintInfo(card: Card, setName: string | null, rarity: string | null, printCode: string | null = null): Card {
+    return {
+      ...card,
+      setName: setName ?? card.setName,
+      rarity: rarity ?? card.rarity,
+      printCode: printCode ?? (card as YugiohCard).printCode ?? null,
+    } as YugiohCard;
   }
 
   private async lookupPrintCodeLocally(code: string): Promise<Card | null> {
@@ -339,7 +388,7 @@ export class YugiohApiService implements CardApiService {
 
     const row = data as YgoprodeckPrintCodeRow;
     const card = await this.getCard(String(row.card_id));
-    return card ? this.withPrintInfo(card, row.set_name, row.set_rarity) : null;
+    return card ? this.withPrintInfo(card, row.set_name, row.set_rarity, code) : null;
   }
 
   /**
@@ -426,7 +475,9 @@ export class YugiohApiService implements CardApiService {
     return ranked
       .map((row) => {
         const card = cardsById.get(String(row.card_id));
-        return card ? { card: this.withPrintInfo(card, row.set_name, row.set_rarity), matchedCode: row.set_code, distance: row.distance } : null;
+        return card
+          ? { card: this.withPrintInfo(card, row.set_name, row.set_rarity, row.set_code), matchedCode: row.set_code, distance: row.distance }
+          : null;
       })
       .filter((entry): entry is { card: Card; matchedCode: string; distance: number } => entry !== null);
   }
@@ -612,6 +663,7 @@ export class YugiohApiService implements CardApiService {
       atk: raw.atk ?? null,
       def: raw.def ?? null,
       banlistStatus: raw.banlist_info?.ban_tcg ?? null,
+      printCode: null,
     };
   }
 
@@ -639,6 +691,7 @@ export class YugiohApiService implements CardApiService {
       atk: row.atk,
       def: row.def,
       banlistStatus: row.banlist_status,
+      printCode: null,
     };
   }
 }

@@ -186,6 +186,11 @@ export class AddCardDialog {
         condition: this.condition(),
         language: this.language(),
         oracleId: card.oracleId,
+        // The specific printing picked in the "Druck wählen" step (Yu-Gi-Oh!
+        // only - see YugiohApiService.getPrints) - persisted so this exact
+        // print's set/rarity survives the collection being re-read later
+        // (see 040_collection_set_code.sql).
+        setCode: card.game === 'yugioh' ? card.printCode : null,
       });
       this.added.emit();
       this.close.emit();

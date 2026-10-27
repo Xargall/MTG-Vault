@@ -84,6 +84,14 @@ export interface YugiohCard extends CardBase {
   atk: number | null;
   def: number | null;
   banlistStatus: YugiohBanlistStatus | null;
+  // The specific printing's own set code (e.g. "TN19-EN007"), when this
+  // Card is known to be one exact printing rather than the card's generic
+  // "representative" set/rarity (see YugiohApiService.withPrintInfo) - null
+  // for the plain id/name lookups that only ever know the generic values.
+  // Persisted on the collection row (040_collection_set_code.sql) so the
+  // actually-owned printing's set/rarity survives being re-read later,
+  // instead of silently reverting to the generic one on every reload.
+  printCode: string | null;
 }
 
 // Matches TCGdex's own German-locale `category` values verbatim (confirmed

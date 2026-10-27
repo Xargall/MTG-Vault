@@ -1,0 +1,23 @@
+-- Adds a `set_code` column to collection_cards so a Yu-Gi-Oh! copy can
+-- remember which of its card's many real printings it actually is.
+--
+-- Unlike MTG (where every printing already has its own distinct `card_id`
+-- in scryfall_cards, so the set is implied by card_id alone),
+-- YGOPRODeck's `card_id` is one id per *card*, shared across every one of
+-- its printings - ygoprodeck_cards only stores one denormalized
+-- "representative" set_name/rarity per card entity (see 039's doc). Found
+-- live (2026-10-27): a scan correctly resolved the exact scanned printing
+-- (e.g. "TN19-EN007" / 2019 Gold Sarcophagus Tin) for its brief on-screen
+-- confirmation, but since nothing about *which* print was ever persisted,
+-- re-reading the collection afterward re-fetched the same old generic
+-- representative value ("2016 Mega-Tins") every time - the correct result
+-- was never actually lost, just never saved in the first place.
+--
+-- Nullable and not part of the dedup unique constraint, same precedent as
+-- `oracle_id` (015_oracle_id_and_deck_binding.sql) - a null here just means
+-- "unknown print" (every pre-existing row, and any future MTG/Pokémon row,
+-- which have no use for this column at all), not a value to match on.
+--
+-- Run this once in the Supabase SQL editor. Safe to re-run (idempotent).
+
+alter table collection_cards add column if not exists set_code text;

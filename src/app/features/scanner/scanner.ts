@@ -62,6 +62,11 @@ function extractYugiohLanguage(printCode: string): string {
   return (token && PRINTED_LANGUAGE_CODES[token]) || DEFAULT_CARD_LANGUAGE;
 }
 
+/** The specific printing's set_code to persist on the collection row (see 040_collection_set_code.sql) - null for every game but Yu-Gi-Oh!, and null even there when the resolved Card never carried one (e.g. a plain name-search result, not a scan/exact-code match). */
+function setCodeOf(card: Card): string | null {
+  return card.game === 'yugioh' ? card.printCode : null;
+}
+
 /**
  * Percentile-clipped linear contrast stretch (a "levels"/auto-contrast
  * adjustment), applied in place to a crop's own pixel data. Does NOT
@@ -1003,6 +1008,7 @@ export class Scanner {
         foil: false,
         condition: 'NM',
         oracleId: candidate.card.oracleId,
+        setCode: setCodeOf(candidate.card),
         ...(language ? { language } : {}),
       });
       this.lastAdded.set({ card: candidate.card, result });
@@ -1054,6 +1060,7 @@ export class Scanner {
         cardCategory: this.detectedCardCategory(),
         language: this.detectedLanguage(),
         oracleId: card.oracleId,
+        setCode: setCodeOf(card),
       });
       this.lastAdded.set({ card, result });
       this.showToast(
