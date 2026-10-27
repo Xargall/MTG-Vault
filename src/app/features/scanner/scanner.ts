@@ -662,6 +662,23 @@ export class Scanner {
     const diffFromBackground = this.diffFromBackground(sample, pixelCount);
     const looksNew = diffFromBackground > minDiffFromBackground;
 
+    // Temporary diagnostic (2026-10-27): lowering the YGO thresholds alone
+    // didn't make the gate fire - rather than guess again blind, log the
+    // actual numbers so we can see which of the three conditions is really
+    // the blocker (or whether it's stuck in the adaptive-background-absorbs-
+    // the-card trap described on GATE_MIN_DIFF_FROM_BACKGROUND_YUGIOH).
+    // Yu-Gi-Oh!-only - MTG's gate isn't in question here. Remove once
+    // resolved.
+    if (isYugioh) {
+      console.log(
+        '[YGO gate]',
+        'variance', (variance / pixelCount).toFixed(0), '/', minVariance,
+        'diffTick', (diffSum / pixelCount).toFixed(1), '/', GATE_STABILITY_THRESHOLD,
+        'diffBg', diffFromBackground.toFixed(1), '/', minDiffFromBackground,
+        '->', hasContent, isStable, looksNew,
+      );
+    }
+
     if (!isStable || !hasContent || !looksNew) {
       this.gateStableTicks = 0;
       // Keeps drifting toward the current scene whenever nothing
