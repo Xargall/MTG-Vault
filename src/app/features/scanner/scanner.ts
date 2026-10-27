@@ -768,6 +768,13 @@ export class Scanner {
         const code = text.toUpperCase().trim();
         if (!YUGIOH_PRINT_CODE_PATTERN.test(code)) return null;
         const card = await this.yugiohApi.identifyByPrintCode(code);
+        // Temporary diagnostic (2026-10-27): the matched set/rarity is
+        // correct by construction once a code resolves (see
+        // YugiohApiService.withPrintInfo), so a wrong set shown to the user
+        // means Gemini read a different code than expected, not a logic
+        // bug - this is the only way to see what it actually read. Remove
+        // once the current round of live reports is resolved.
+        console.debug('[YGO scan] OCR read', code, '-> resolved to', card?.name, card?.setName);
         if (card) return { card, finish: 'nonfoil', cardCategory: 'normal', language: extractYugiohLanguage(code) };
 
         // The code is shaped right but matches nothing real - most likely a
