@@ -225,6 +225,23 @@ const GATE_STABLE_TICKS_REQUIRED = 3;
 // camera noise does. A starting estimate, not something tuned against a
 // real camera - may need adjusting once tried live.
 const GATE_MIN_DIFF_FROM_BACKGROUND = 30;
+// Live-reported (2026-10-27): unlike MTG (card fills most of the frame),
+// the user's own Yu-Gi-Oh! scanning technique only ever pushes PART of the
+// card into view (usually just the bottom edge carrying the print code,
+// since that crops tighter for Gemini - see stretchFullFrame's doc). That
+// changes only a fraction of the 32x32 gate sample, so the frame-WIDE
+// average GATE_MIN_VARIANCE/GATE_MIN_DIFF_FROM_BACKGROUND above - tuned
+// assuming a full card - rarely clears the bar, diluted by the untouched
+// rest of the frame; worse, with looksNew staying false, the background
+// estimate below slowly adapts the held card corner INTO the background
+// instead, making it fire even less over time. Lowered specifically for
+// Yu-Gi-Oh! rather than loosened globally - MTG's full-card framing has no
+// such dilution problem, and a global loosening would just make its own
+// gate fire more readily on hands/clutter too. First-pass estimates (~60%/
+// ~40% of the full-card values), not live-tested yet - may need further
+// tuning once tried against a real camera.
+const GATE_MIN_VARIANCE_YUGIOH = 200;
+const GATE_MIN_DIFF_FROM_BACKGROUND_YUGIOH = 12;
 // How fast the background estimate drifts toward the current frame while
 // adapting (see adaptBackgroundEstimate) - low on purpose, so it tracks
 // slow changes (the camera's own auto-exposure/white-balance settling, the
@@ -619,9 +636,15 @@ export class Scanner {
     for (let i = 0; i < sample.length; i += 4) mean += sample[i];
     mean /= pixelCount;
 
+    // See GATE_MIN_VARIANCE_YUGIOH/GATE_MIN_DIFF_FROM_BACKGROUND_YUGIOH's
+    // doc - only Yu-Gi-Oh!'s own partial-card framing needs the lower bar.
+    const isYugioh = this.gameService.currentSlug() === 'yugioh';
+    const minVariance = isYugioh ? GATE_MIN_VARIANCE_YUGIOH : GATE_MIN_VARIANCE;
+    const minDiffFromBackground = isYugioh ? GATE_MIN_DIFF_FROM_BACKGROUND_YUGIOH : GATE_MIN_DIFF_FROM_BACKGROUND;
+
     let variance = 0;
     for (let i = 0; i < sample.length; i += 4) variance += (sample[i] - mean) ** 2;
-    const hasContent = variance / pixelCount > GATE_MIN_VARIANCE;
+    const hasContent = variance / pixelCount > minVariance;
 
     if (!previous) {
       // First frame of a fresh session (new stream, or a reset after the
@@ -637,7 +660,7 @@ export class Scanner {
     const isStable = diffSum / pixelCount < GATE_STABILITY_THRESHOLD;
 
     const diffFromBackground = this.diffFromBackground(sample, pixelCount);
-    const looksNew = diffFromBackground > GATE_MIN_DIFF_FROM_BACKGROUND;
+    const looksNew = diffFromBackground > minDiffFromBackground;
 
     if (!isStable || !hasContent || !looksNew) {
       this.gateStableTicks = 0;
