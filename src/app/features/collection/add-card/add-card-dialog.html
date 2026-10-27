@@ -49,7 +49,10 @@
         <p class="state-message error">{{ printsError() }}</p>
       } @else {
         <div class="results-grid" [class.is-stale]="searching()" [attr.aria-busy]="searching()">
-          @for (print of prints(); track print.id) {
+          <!-- Yu-Gi-Oh!'s prints all share the same underlying card id (see
+               YugiohApiService.getPrints) - tracking by id alone would
+               collide across them, so $index is folded in too. -->
+          @for (print of prints(); track print.id + '-' + $index) {
             <button type="button" class="result-item" (click)="selectPrint(print)">
               <app-card-tile [card]="print" />
               <span class="print-meta">{{ print.setName }}<!--

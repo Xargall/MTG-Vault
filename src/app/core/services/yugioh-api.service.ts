@@ -240,18 +240,48 @@ export class YugiohApiService implements CardApiService {
     return raw.map((card) => this.toCard(card));
   }
 
+  /**
+   * YGOPRODeck has no per-printing artwork/id like Scryfall - every result
+   * here shares the same underlying card (id, image, atk/def, ...) - but it
+   * DOES track a real set_name/rarity per printing (ygoprodeck_print_codes,
+   * same table identifyByPrintCode resolves against), so there's still a
+   * real, meaningful choice to make here: which of the card's actual prints
+   * the user physically has. Reported live (2026-10-27): searching by name
+   * only ever offered ygoprodeck_cards' single denormalized "representative"
+   * print (e.g. Obelisk the Tormentor always showing as "2016 Mega-Tins"),
+   * with no way to pick the print actually owned (e.g. "2019 Gold
+   * Sarcophagus Tin") - same underlying one-row-per-card-entity limitation
+   * the scanner's print-code path already works around via withPrintInfo.
+   * Falls back to a single generic entry only if no print rows exist at all
+   * (shouldn't normally happen - the representative entry's own set/rarity
+   * came from one of these rows in the first place).
+   */
   async getPrints(name: string): Promise<Card[]> {
-    // YGOPRODeck has no per-printing artwork/id like Scryfall - a card has
-    // one canonical entry, so there's nothing meaningful to pick between.
     const { data } = await this.supabase.client
       .from('ygoprodeck_cards')
       .select('*')
       .eq('name', name)
       .maybeSingle();
-    if (data) return [this.rowToCard(data as YgoprodeckCardRow)];
+
+    if (data) {
+      const row = data as YgoprodeckCardRow;
+      const base = this.rowToCard(row);
+      const { data: printRows } = await this.supabase.client
+        .from('ygoprodeck_print_codes')
+        .select('set_name, set_rarity')
+        .eq('card_id', row.id)
+        .order('set_name');
+      const prints = (printRows ?? []) as { set_name: string | null; set_rarity: string | null }[];
+      if (prints.length > 0) return prints.map((print) => this.withPrintInfo(base, print.set_name, print.set_rarity));
+      return [base];
+    }
 
     const raw = await this.fetchCardInfo({ name });
-    return raw.length > 0 ? [this.toCard(raw[0])] : [];
+    if (raw.length === 0) return [];
+    const base = this.toCard(raw[0]);
+    const sets = raw[0].card_sets ?? [];
+    if (sets.length === 0) return [base];
+    return sets.map((set) => this.withPrintInfo(base, set.set_name, set.set_rarity));
   }
 
   /**
