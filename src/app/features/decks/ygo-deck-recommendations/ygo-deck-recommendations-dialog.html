@@ -1,0 +1,146 @@
+<app-dialog [heading]="'ygoDeckRecs.title' | translate" maxWidth="640px" (closeRequest)="close.emit()">
+  @if (!selectedCategory()) {
+    <p class="hint">{{ 'ygoDeckRecs.hint' | translate }}</p>
+    <div class="format-picker">
+      @for (category of categories; track category.slug) {
+        <button type="button" class="format-button" (click)="selectCategory(category.slug)">
+          {{ category.labelKey | translate }}
+        </button>
+      }
+    </div>
+  } @else if (selectedRecommendation(); as rec) {
+    <div class="detail-view">
+      <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToList()">
+        <svg aria-hidden="true"><use href="#icon-chevron-left" /></svg>
+        {{ 'formatRecs.backToList' | translate }}
+      </button>
+
+      <h3>{{ rec.name }}</h3>
+      @if (rec.sourceLabel) {
+        <p class="source-label">{{ rec.sourceLabel }}</p>
+      }
+
+      @if (loadingDetail()) {
+        <p class="state-message">{{ 'browseDecks.loadingDetail' | translate }}</p>
+      } @else if (detailError()) {
+        <p class="state-message error">{{ detailError() }}</p>
+      } @else {
+        <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="freeDetailMatchPercent()" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-bar-fill progress-bar-fill--free" [style.width.%]="freeDetailMatchPercent()"></div>
+          <span class="progress-bar-label">
+            {{ 'commanderRecs.freeMatchBadge' | translate: { percent: freeDetailMatchPercent() } }}
+          </span>
+        </div>
+
+        @if (ownedCards().length > 0) {
+          <h4>{{ 'commanderRecs.ownedSection' | translate: { count: freeQuantityTotal() } }}</h4>
+          <div class="results-grid">
+            @for (entry of ownedCards(); track entry.card.id) {
+              <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="owned" />
+            }
+          </div>
+        }
+
+        @if (missingCards().length > 0 || unresolvedCount() > 0) {
+          <h4>{{ 'commanderRecs.missingSection' | translate: { count: missingQuantityTotal() } }}</h4>
+          <div class="results-grid">
+            @for (entry of missingCards(); track entry.card.id) {
+              <app-card-tile [card]="entry.card" [quantity]="entry.quantity" status="missing" />
+            }
+          </div>
+
+          @if (unresolvedCount() > 0) {
+            <p class="unresolved-note">
+              {{ 'ygoDeckRecs.unresolvedCards' | translate: { count: unresolvedCount() } }}
+            </p>
+          }
+
+          <div class="wishlist-row">
+            <span>{{ 'deckDetail.missingCards' | translate: { count: missingQuantityTotal() } }}</span>
+            @if (wishlistError()) {
+              <span class="state-message error">{{ wishlistError() }}</span>
+            } @else if (wishlistAdded()) {
+              <span class="wishlist-confirm">{{ 'deckDetail.onWishlist' | translate }}</span>
+            } @else {
+              <button
+                type="button"
+                class="btn btn--secondary btn--sm"
+                [disabled]="addingToWishlist()"
+                (click)="addMissingToWishlist()"
+              >
+                {{ 'deckDetail.wishlistButton' | translate }}
+              </button>
+            }
+          </div>
+        }
+
+        @if (addDeckError()) {
+          <p class="state-message error">{{ addDeckError() }}</p>
+        }
+
+        @if (deckAdded()) {
+          <p class="wishlist-confirm">{{ 'commanderRecs.deckAdded' | translate }}</p>
+        } @else {
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              [checked]="allCardsOwned()"
+              (change)="allCardsOwned.set($any($event.target).checked)"
+            />
+            {{ 'deckImport.allCardsOwnedOption' | translate }}
+          </label>
+          <button type="button" class="btn btn--primary submit-button" [disabled]="addingDeck()" (click)="addDeck()">
+            {{ 'decks.addToMyDecks' | translate }}
+          </button>
+        }
+      }
+    </div>
+  } @else {
+    <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToCategories()">
+      <svg aria-hidden="true"><use href="#icon-chevron-left" /></svg>
+      {{ 'ygoDeckRecs.backToCategories' | translate }}
+    </button>
+
+    @if (selectedCategoryDescriptionKey(); as descriptionKey) {
+      <p class="format-description">{{ descriptionKey | translate }}</p>
+    }
+
+    <label class="include-assigned-toggle">
+      <input
+        type="checkbox"
+        [checked]="includeAssignedElsewhere()"
+        (change)="toggleIncludeAssignedElsewhere()"
+      />
+      {{ 'deckMatch.includeAssignedToggle' | translate }}
+    </label>
+
+    @if (loading()) {
+      <p class="state-message">{{ 'ygoDeckRecs.loading' | translate }}</p>
+    } @else if (errorMessage()) {
+      <p class="state-message error">{{ errorMessage() }}</p>
+    } @else if (hasNoResults()) {
+      <p class="state-message">{{ 'ygoDeckRecs.noResults' | translate }}</p>
+    }
+
+    <ul class="recommendation-list">
+      @for (rec of recommendations(); track rec.deckNum) {
+        <li>
+          <button type="button" class="recommendation-row" (click)="selectRecommendation(rec)">
+            <div class="commander-placeholder"></div>
+
+            <div class="recommendation-info">
+              <p class="commander-name">{{ rec.name }}</p>
+              <p class="source-label">{{ rec.sourceLabel }}</p>
+            </div>
+
+            <div class="match-badges">
+              <span class="match-badge match-badge--free" [class.is-complete]="rec.matchPercent === 100">
+                {{ 'commanderRecs.freeMatchBadge' | translate: { percent: rec.matchPercent } }}
+              </span>
+            </div>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</app-dialog>

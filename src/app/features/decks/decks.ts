@@ -22,6 +22,7 @@ import { CommanderRecommendationsDialog } from './commander-recommendations/comm
 import { DeckDetailDialog } from './deck-detail-dialog/deck-detail-dialog';
 import { DeckImportDialog } from './deck-import-dialog/deck-import-dialog';
 import { FormatDeckRecommendationsDialog } from './format-deck-recommendations/format-deck-recommendations-dialog';
+import { YgoDeckRecommendationsDialog } from './ygo-deck-recommendations/ygo-deck-recommendations-dialog';
 import {
   buildAssignedElsewhereMaps,
   buildOwnedMap,
@@ -91,6 +92,7 @@ function pickBannerSample(list: PreconListEntry[], count: number): PreconListEnt
     DeckDetailDialog,
     CommanderRecommendationsDialog,
     FormatDeckRecommendationsDialog,
+    YgoDeckRecommendationsDialog,
     ArchetypeBrowserDialog,
     DeckImportDialog,
     TranslatePipe,
@@ -129,6 +131,7 @@ export class Decks {
   protected readonly showBrowseDialog = signal(false);
   protected readonly showCommanderRecs = signal(false);
   protected readonly showFormatRecs = signal(false);
+  protected readonly showYgoDeckRecs = signal(false);
   protected readonly showArchetypeBrowser = signal(false);
   protected readonly showDeckImport = signal(false);
   protected readonly selectedDeck = signal<DeckEntry | null>(null);

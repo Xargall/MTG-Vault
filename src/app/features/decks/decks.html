@@ -14,6 +14,9 @@
         {{ 'decks.formatRecsButton' | translate }}
       </button>
     } @else if (gameService.currentSlug() === 'yugioh') {
+      <button type="button" class="btn btn--secondary" (click)="showYgoDeckRecs.set(true)">
+        {{ 'ygoDeckRecs.openButton' | translate }}
+      </button>
       <button type="button" class="btn btn--secondary" (click)="showArchetypeBrowser.set(true)">
         {{ 'archetypeBrowser.openButton' | translate }}
       </button>
@@ -137,6 +140,10 @@
 
 @if (showFormatRecs()) {
   <app-format-deck-recommendations-dialog (close)="showFormatRecs.set(false)" (added)="onDeckAdded()" />
+}
+
+@if (showYgoDeckRecs()) {
+  <app-ygo-deck-recommendations-dialog (close)="showYgoDeckRecs.set(false)" (added)="onDeckAdded()" />
 }
 
 @if (showArchetypeBrowser()) {

@@ -180,6 +180,45 @@ export function getAvailabilityMatch(
   return { percent, plannedElsewherePercent: Math.max(0, rawPercent - percent) };
 }
 
+export interface ExactDeckSplit {
+  owned: Array<{ cardId: string; quantity: number }>;
+  missing: Array<{ cardId: string; quantity: number }>;
+}
+
+/**
+ * Per-card owned/missing split for a decklist that's already keyed by exact
+ * card id - no name resolution, no oracle_id print-substitution, unlike
+ * splitAverageDeckByAvailability below (which exists only because MTG has
+ * both of those). Used by YgoDeckRecommendationsDialog today; any future
+ * game whose cards have no print variance (Pokémon's precons, say) can reuse
+ * this as-is instead of a game-specific copy.
+ */
+export function splitExactDeckByAvailability(
+  required: RequiredCard[],
+  owned: Map<string, number>,
+  ownedByOracle: Map<string, number>,
+  assignedElsewhere: Map<string, number>,
+  assignedElsewhereByOracle: Map<string, number>,
+): ExactDeckSplit {
+  const ownedOut: ExactDeckSplit['owned'] = [];
+  const missingOut: ExactDeckSplit['missing'] = [];
+  for (const item of required) {
+    const availability = getCardAvailability(
+      item,
+      item.quantity,
+      owned,
+      ownedByOracle,
+      assignedElsewhere,
+      assignedElsewhereByOracle,
+    );
+    const availableForThis = Math.min(item.quantity, availability.available);
+    if (availableForThis > 0) ownedOut.push({ cardId: item.cardId, quantity: availableForThis });
+    const missingQty = item.quantity - availableForThis;
+    if (missingQty > 0) missingOut.push({ cardId: item.cardId, quantity: missingQty });
+  }
+  return { owned: ownedOut, missing: missingOut };
+}
+
 export interface AssignedElsewhereEntry {
   deckId: string;
   deckName: string;
