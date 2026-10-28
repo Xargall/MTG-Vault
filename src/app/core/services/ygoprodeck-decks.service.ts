@@ -52,10 +52,15 @@ function writeCache<T>(data: Record<string, T>): void {
 
 // The real `_sft_category` values the live `filter-format` <select> on
 // ygoprodeck.com/deck-search/ offers (confirmed live via browser network
-// inspection, 2026-10-28) - a handful of regional/niche variants (Genesys,
-// OCG China/Asian-English, anime/fun-casual decks) are left out to keep the
-// picker to the categories someone building a real, ownable deck actually
-// cares about.
+// inspection, 2026-10-28 and again 2026-10-28 when the picker was widened to
+// cover the format's full "Alternative Formats"/"Competitive" optgroups) -
+// a handful of regional/niche variants (OCG China/Asian-English,
+// anime/fun-casual decks, Common Charity Decks, and the empty "Tournament
+// Meta Decks (Genesys OCG)" - confirmed 0 decks live) are left out to keep
+// the picker to categories someone building a real, ownable deck actually
+// cares about. Every slug below was spot-checked live against
+// getDecks.php directly (not just the proxy) to confirm it returns a
+// non-empty deck list before being added.
 export const YGO_DECK_CATEGORIES: readonly { slug: string; labelKey: string; descriptionKey: string }[] = [
   {
     slug: 'Tournament Meta Decks',
@@ -66,6 +71,16 @@ export const YGO_DECK_CATEGORIES: readonly { slug: string; labelKey: string; des
     slug: 'Tournament Meta Decks OCG',
     labelKey: 'ygoDeckRecs.categoryTournamentMetaOcg',
     descriptionKey: 'ygoDeckRecs.categoryTournamentMetaOcgDescription',
+  },
+  {
+    slug: 'Tournament Meta Decks Worlds',
+    labelKey: 'ygoDeckRecs.categoryTournamentMetaWorlds',
+    descriptionKey: 'ygoDeckRecs.categoryTournamentMetaWorldsDescription',
+  },
+  {
+    slug: 'Tournament Meta Decks (Genesys)',
+    labelKey: 'ygoDeckRecs.categoryGenesysTournament',
+    descriptionKey: 'ygoDeckRecs.categoryGenesysTournamentDescription',
   },
   {
     slug: 'meta decks',
@@ -86,6 +101,46 @@ export const YGO_DECK_CATEGORIES: readonly { slug: string; labelKey: string; des
     slug: 'master duel decks',
     labelKey: 'ygoDeckRecs.categoryMasterDuel',
     descriptionKey: 'ygoDeckRecs.categoryMasterDuelDescription',
+  },
+  {
+    slug: 'genesys decks',
+    labelKey: 'ygoDeckRecs.categoryGenesysCasual',
+    descriptionKey: 'ygoDeckRecs.categoryGenesysCasualDescription',
+  },
+  {
+    slug: 'speed duel decks',
+    labelKey: 'ygoDeckRecs.categorySpeedDuel',
+    descriptionKey: 'ygoDeckRecs.categorySpeedDuelDescription',
+  },
+  {
+    slug: 'goat format decks',
+    labelKey: 'ygoDeckRecs.categoryGoat',
+    descriptionKey: 'ygoDeckRecs.categoryGoatDescription',
+  },
+  {
+    slug: 'edison format decks',
+    labelKey: 'ygoDeckRecs.categoryEdison',
+    descriptionKey: 'ygoDeckRecs.categoryEdisonDescription',
+  },
+  {
+    slug: 'domain format decks',
+    labelKey: 'ygoDeckRecs.categoryDomain',
+    descriptionKey: 'ygoDeckRecs.categoryDomainDescription',
+  },
+  {
+    slug: 'trinity format decks',
+    labelKey: 'ygoDeckRecs.categoryTrinity',
+    descriptionKey: 'ygoDeckRecs.categoryTrinityDescription',
+  },
+  {
+    slug: 'worlds format decks',
+    labelKey: 'ygoDeckRecs.categoryWorldsFormat',
+    descriptionKey: 'ygoDeckRecs.categoryWorldsFormatDescription',
+  },
+  {
+    slug: 'world championship decks',
+    labelKey: 'ygoDeckRecs.categoryWorldChampionship',
+    descriptionKey: 'ygoDeckRecs.categoryWorldChampionshipDescription',
   },
 ];
 
