@@ -52,15 +52,14 @@ function writeCache<T>(data: Record<string, T>): void {
 
 // The real `_sft_category` values the live `filter-format` <select> on
 // ygoprodeck.com/deck-search/ offers (confirmed live via browser network
-// inspection, 2026-10-28 and again 2026-10-28 when the picker was widened to
-// cover the format's full "Alternative Formats"/"Competitive" optgroups) -
-// a handful of regional/niche variants (OCG China/Asian-English,
-// anime/fun-casual decks, Common Charity Decks, and the empty "Tournament
-// Meta Decks (Genesys OCG)" - confirmed 0 decks live) are left out to keep
-// the picker to categories someone building a real, ownable deck actually
-// cares about. Every slug below was spot-checked live against
-// getDecks.php directly (not just the proxy) to confirm it returns a
-// non-empty deck list before being added.
+// inspection, 2026-10-28, widened the same day to cover the full
+// "Alternative Formats"/"Competitive" optgroups, and again to add back
+// Anime/Fun-Casual on explicit request) - only the regional OCG variants
+// (China/Asian-English), Common Charity Decks, and the empty "Tournament
+// Meta Decks (Genesys OCG)" (confirmed 0 decks live) are left out. Every
+// slug below was spot-checked live against getDecks.php directly (not
+// just the proxy) to confirm it returns a non-empty deck list before
+// being added.
 export const YGO_DECK_CATEGORIES: readonly { slug: string; labelKey: string; descriptionKey: string }[] = [
   {
     slug: 'Tournament Meta Decks',
@@ -141,6 +140,16 @@ export const YGO_DECK_CATEGORIES: readonly { slug: string; labelKey: string; des
     slug: 'world championship decks',
     labelKey: 'ygoDeckRecs.categoryWorldChampionship',
     descriptionKey: 'ygoDeckRecs.categoryWorldChampionshipDescription',
+  },
+  {
+    slug: 'anime decks',
+    labelKey: 'ygoDeckRecs.categoryAnime',
+    descriptionKey: 'ygoDeckRecs.categoryAnimeDescription',
+  },
+  {
+    slug: 'fun/casual decks',
+    labelKey: 'ygoDeckRecs.categoryFunCasual',
+    descriptionKey: 'ygoDeckRecs.categoryFunCasualDescription',
   },
 ];
 

@@ -22,9 +22,10 @@ const FETCH_HEADERS = {
 // Only the real `_sft_category` values the live `filter-format` <select> on
 // ygoprodeck.com/deck-search/ offers (confirmed live, 2026-10-28 and
 // re-confirmed non-empty one by one, same day, when the client picker grew
-// to cover the full "Competitive"/"Alternative Formats" optgroups) - never
-// an open fetch-any-category proxy. 'Tournament Meta Decks (Genesys OCG)'
-// is a real option in that <select> too but was left out here: it returned
+// to cover the full "Competitive"/"Alternative Formats" optgroups, then
+// again to add Anime/Fun-Casual back on request) - never an open
+// fetch-any-category proxy. 'Tournament Meta Decks (Genesys OCG)' is a
+// real option in that <select> too but was left out here: it returned
 // zero decks live.
 const ALLOWED_CATEGORIES = new Set([
   'Tournament Meta Decks',
@@ -43,6 +44,8 @@ const ALLOWED_CATEGORIES = new Set([
   'trinity format decks',
   'worlds format decks',
   'world championship decks',
+  'anime decks',
+  'fun/casual decks',
 ]);
 const ALLOWED_SORTS = new Set(['Deck Views', 'Date', 'Comments', 'Updated']);
 const MAX_LIMIT = 25;
