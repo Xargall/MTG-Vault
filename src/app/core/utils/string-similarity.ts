@@ -1,4 +1,5 @@
-function levenshtein(a: string, b: string): number {
+/** Raw edit distance, exported for callers that need the count itself (not the normalized 0-1 ratio `similarity` derives from it) - e.g. comparing a scanned Yu-Gi-Oh! set prefix against a cached one. */
+export function levenshtein(a: string, b: string): number {
   const rows = a.length + 1;
   const cols = b.length + 1;
   const dist: number[][] = Array.from({ length: rows }, (_, i) => [i, ...new Array(cols - 1).fill(0)]);

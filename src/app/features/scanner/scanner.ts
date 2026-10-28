@@ -24,6 +24,7 @@ import { MtgBulkDataService } from '../../core/services/mtg-bulk-data.service';
 import { UserSecretsService } from '../../core/services/user-secrets.service';
 import { YUGIOH_PRINT_CODE_PATTERN, YugiohApiService } from '../../core/services/yugioh-api.service';
 import { CollectorFinish } from '../../core/utils/set-code-parser';
+import { levenshtein } from '../../core/utils/string-similarity';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
 
 const MIN_CAPTURE_GAP_MS = 300;
@@ -37,6 +38,12 @@ const OVERLOADED_REMINDER_INTERVAL = 3;
 // each tied set can contribute its own close matches, so this keeps the
 // picker from growing unbounded with more tied sets.
 const FUZZY_PRINT_CODE_PICKER_LIMIT = 5;
+// How close a freshly-scanned code's own set prefix has to be to the
+// session's last-resolved one before trusting the same-set shortcut below -
+// mirrors match_yugioh_set_prefix's own default budget (038_...sql), so this
+// local pre-check stays exactly as permissive as the server-side fallback it
+// skips ahead of, never more.
+const CACHED_SET_PREFIX_MAX_DISTANCE = 2;
 // Was its own, slightly-differently-bounded copy of
 // yugioh-api.service.ts's exported YUGIOH_PRINT_CODE_PATTERN - now imported
 // from there instead so the two can't drift out of sync again (exactly
@@ -369,6 +376,15 @@ export class Scanner {
   // overloaded attempt instead, reset the moment any attempt comes back
   // with a different outcome.
   private consecutiveOverloadedCount = 0;
+  // The last successfully-resolved Yu-Gi-Oh! print code's set prefix (e.g.
+  // "INCH" from "INCH-DE003") - cards get scanned one box/deck at a time, so
+  // the next card is very likely from the same set. On a misread code that
+  // matches nothing exactly, this lets the miss path check that one
+  // already-known set first (see the `game === 'yugioh'` branch below)
+  // instead of always falling straight to the slower, less certain
+  // two-stage global fuzzy guess. Session-only, in memory - never persisted,
+  // and simply overwritten the moment a card from a different set resolves.
+  private lastYugiohSetPrefix: string | null = null;
   // A real Gemini/edge-function failure (bad key, 500, timeout - anything
   // other than "no card in frame") is shown once per session too - it would
   // otherwise repeat every retry (see GeminiVisionService's own pacing) and
@@ -831,14 +847,36 @@ export class Scanner {
         // the user's console showed "4 ausgeblendet" with the actual
         // diagnostic line nowhere visible at the default filter level).
         console.log('[YGO scan] OCR read', code, '-> resolved to', card?.name, card?.setName);
-        if (card) return { card, finish: 'nonfoil', cardCategory: 'normal', language: extractYugiohLanguage(code) };
+        if (card) {
+          this.lastYugiohSetPrefix = code.split('-', 1)[0];
+          return { card, finish: 'nonfoil', cardCategory: 'normal', language: extractYugiohLanguage(code) };
+        }
 
         // The code is shaped right but matches nothing real - most likely a
         // misread character (live-confirmed, 2026-10-26: "LEHD-DEB00" read as
-        // "LEND-EN008"). Check whether a real code is only a couple of
-        // characters away and let the user confirm it themselves instead of
-        // just reporting a miss - never auto-added, see
-        // showPrintCodeSuggestions/selectCandidate.
+        // "LEND-EN008"). Before guessing across the whole 38k-row mirror,
+        // check the one set already known from the previous scan this
+        // session (see lastYugiohSetPrefix's doc) - only when the just-read
+        // code's own prefix is still plausibly that set (cheap local check,
+        // no RPC), and only trusted when the in-set match comes back
+        // genuinely close, so switching to a different box mid-session still
+        // falls through to the full flow below rather than forcing a wrong
+        // set's suggestions.
+        if (this.lastYugiohSetPrefix) {
+          const scannedPrefix = code.split('-', 1)[0];
+          if (levenshtein(scannedPrefix, this.lastYugiohSetPrefix) <= CACHED_SET_PREFIX_MAX_DISTANCE) {
+            const sameSetSuggestions = (
+              await this.yugiohApi.findSimilarPrintCodesInSet(this.lastYugiohSetPrefix, code)
+            ).filter((suggestion) => suggestion.distance <= CACHED_SET_PREFIX_MAX_DISTANCE);
+            if (sameSetSuggestions.length > 0) {
+              this.showPrintCodeSuggestions(sameSetSuggestions);
+              return null;
+            }
+          }
+        }
+
+        // Let the user confirm it themselves instead of just reporting a
+        // miss - never auto-added, see showPrintCodeSuggestions/selectCandidate.
         const suggestions = await this.yugiohApi.findSimilarPrintCodes(code);
         if (suggestions.length > 0) {
           this.showPrintCodeSuggestions(suggestions);
@@ -1075,13 +1113,19 @@ export class Scanner {
     this.status.set('scanning');
     this.startIdleWaitTimer();
     try {
+      const printCode = setCodeOf(candidate.card);
+      // A manually-confirmed Yu-Gi-Oh! print code is just as good a signal
+      // for the next scan's same-set shortcut as an auto-resolved one (see
+      // lastYugiohSetPrefix's doc) - keeps the cache from going stale after
+      // the picker corrects a misread onto a different set.
+      if (printCode) this.lastYugiohSetPrefix = printCode.split('-', 1)[0];
       const result = await this.collectionService.addCard({
         cardId: candidate.card.id,
         quantity: 1,
         foil: false,
         condition: 'NM',
         oracleId: candidate.card.oracleId,
-        setCode: setCodeOf(candidate.card),
+        setCode: printCode,
         ...(language ? { language } : {}),
       });
       this.lastAdded.set({ card: candidate.card, result });
