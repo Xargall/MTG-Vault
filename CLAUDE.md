@@ -23,6 +23,7 @@ Motivation: volle Kontrolle über Features, Filterung und Kartenlimit (kein Payw
 - **YGOPRODeck API** (Yu-Gi-Oh Kartendaten, Bilder, Preise — kostenlos)
 - **MTGJSON** (MTG Preconstructed Decks — kostenlos)
 - **EDHREC** (MTG Community Decklisten via json.edhrec.com — inoffiziell)
+- **YGOPRODeck Deck-Browser** (Yu-Gi-Oh Community-/Turnier-Decklisten via ygoprodeck.com/api/decks/getDecks.php — inoffiziell, gleiches Muster wie EDHREC)
 - **Anthropic API / Claude** (KI-Deckvorschläge)
 
 ## Supabase Schema
@@ -70,7 +71,7 @@ Gemeinsame Methoden die jede API-Implementierung bereitstellt:
 
 1. **Collection** — Übersicht der eigenen Karten
 2. **Kartensuche** — Karten finden und zur Collection hinzufügen
-3. **Decks** — Precons laden, eigene Decks bauen (aktuell nur MTG)
+3. **Decks** — Precons laden, eigene Decks bauen, Community-Deck-Empfehlungen (MTG vollständig; Yu-Gi-Oh! ebenfalls — siehe Decks (Yu-Gi-Oh!) unten; Pokémon noch offen)
 
 ## Feature-Details
 
@@ -97,6 +98,15 @@ Gemeinsame Methoden die jede API-Implementierung bereitstellt:
 - Deck-Match: % der Karten bereits in Collection
 - Fehlende Karten → Wunschliste
 - KI-Deckvorschlag via Anthropic API
+
+### Decks (Yu-Gi-Oh!)
+
+Gleiche Erfahrung wie bei MTG, zwei Quellen:
+
+- **Precons**: Structure/Starter-Decks via YGOPRODecks `cardinfo.php?cardset=...` (`YugiohPreconService`/`YugiohPreconIndexService`, ~85 Decks, voll im Hintergrund indiziert) — speist zusammen mit MTGs Precon-Index dieselbe "Fast komplett"-Empfehlungsleiste auf der Decks-Hauptseite (`decks.ts`/`decks.html`, ≥75% Collection-Match).
+- **Community-/Turnier-Decks** (2026-10-28 ergänzt, Pendant zu MTGs Moxfield/MTGO-Dialog): eigener Dialog `YgoDeckRecommendationsDialog` (`src/app/features/decks/ygo-deck-recommendations/`), Button "Community-Decks" auf der Decks-Seite. Quelle ist YGOPRODecks eigene, undokumentierte Deck-Browser-JSON-API `ygoprodeck.com/api/decks/getDecks.php?_sft_category=...` (live per Browser-Netzwerk-Mitschnitt verifiziert, 2026-10-28) — liefert pro Deck bereits die vollständige, nach Main/Extra/Side gezonte Kartenliste in einem Call, kein Scraping einzelner Deck-Seiten nötig. Abgerufen über die neue Edge Function `supabase/functions/ygoprodeck-decks-proxy` (Kategorie-Allowlist, parst `main_deck`/`extra_deck`/`side_deck` serverseitig zu `{cardId, quantity}[]`) und den Client-Service `src/app/core/services/ygoprodeck-decks.service.ts` (`YGO_DECK_CATEGORIES`: Tournament Meta Decks (TCG/OCG/Worlds), Meta Decks, Non-Meta Decks, Theorycrafting, Master Duel Decks — Caching/Pacing nach Moxfield-Vorbild).
+- **Matching**: YGO-Karten sind bereits exakt per `card_id` identifiziert (keine Namens-Fuzzy-Suche, kein Oracle-/Print-Substitutions-Konzept wie bei MTG nötig) — dafür die neue generische Funktion `splitExactDeckByAvailability` in `deck-stats.ts` (bewusst spielneutral benannt, nicht YGO-spezifisch, da sie später auch für Pokémon-Precons wiederverwendbar ist), aufbauend auf den schon bestehenden generischen Primitiven `buildOwnedMap`/`getAvailabilityMatch`/`buildAssignedElsewhereMaps`.
+- Status (2026-10-28): Edge Function ist live deployed und per curl verifiziert (liefert echte Decks mit korrekt gezählten Karten), `tsc`/`ng build` laufen fehlerfrei. Noch **kein Live-Test im Browser** (App starten, YGO wählen, Button öffnen, Kategorie wählen, Deck hinzufügen prüfen). Plan-Dokument: `~/.claude/plans/virtual-spinning-flame.md`.
 
 ### Wunschliste
 
@@ -138,6 +148,13 @@ MTG-Begriffs-Lexikon, falls man als Spieler mal "auf dem Schlauch steht". Verlin
 - Average Deck: GET https://json.edhrec.com/pages/commanders/[slug].json
 - Slug-Format: lowercase, Sonderzeichen entfernt, Leerzeichen → Bindestriche
 - npm: edhrec-recs
+
+### YGOPRODeck Deck-Browser (Yu-Gi-Oh Community Decks)
+
+- Liste: GET https://ygoprodeck.com/api/decks/getDecks.php?_sft_category=[Kategorie]&sort=[Sortierung]&limit=[N]&offset=[M]
+- Kategorien (exakt wie im `filter-format`-Select auf ygoprodeck.com/deck-search/): `Tournament Meta Decks`, `Tournament Meta Decks OCG`, `Tournament Meta Decks Worlds`, `meta decks`, `non-meta decks`, `theorycrafting decks`, `master duel decks`
+- Felder je Deck: `deck_name`, `format`, `deck_views`, `deck_price`, `pretty_url`, `tournamentName`/`tournamentPlacement`, `main_deck`/`extra_deck`/`side_deck` (jeweils ein **JSON-String** mit einer Karten-ID pro physischer Kopie, Duplikate wiederholt - serverseitig in der Edge Function zu `{cardId, quantity}[]` verdichtet)
+- Kein CORS-Header → Edge-Function-Proxy nötig (`ygoprodeck-decks-proxy`), aber kein spezieller User-Agent/Grant nötig (anders als Moxfield) - ein normaler Server-Fetch ohne Browser-Fingerprint liefert 200, live bestätigt (2026-10-28)
 
 ## Kartentypen je Spiel
 
