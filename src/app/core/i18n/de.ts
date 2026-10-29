@@ -181,7 +181,7 @@ export const de = {
     title: 'Karte hinzufügen',
     searchPlaceholder: 'Kartenname suchen…',
     searchPlaceholderMtg: 'Kartenname oder Set-Kürzel suchen (z. B. „EMN“)…',
-    searchPlaceholderYugioh: 'Kartenname oder Set-Code suchen (z. B. „LOB-DE001“)…',
+    searchPlaceholderYugioh: 'Kartenname, Set-Code (z. B. „LOB-DE001“) oder Set-Kürzel (z. B. „AMDE“) suchen…',
     searching: 'Suche…',
     searchFailed: 'Die Kartensuche ist gerade nicht erreichbar.',
     retry: 'Erneut versuchen',

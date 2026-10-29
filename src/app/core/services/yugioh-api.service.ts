@@ -160,6 +160,20 @@ const SEARCH_ROW_LIMIT = 50;
  */
 export const YUGIOH_PRINT_CODE_PATTERN = /^[A-Z0-9]+-[A-Z]*(?:\d+|TKN)$/i;
 
+// A bare set code (e.g. "AMDE") typed into the search box, with nothing
+// else - mirrors MtgApiService's SET_CODE_QUERY_PATTERN. Real Yu-Gi-Oh! set
+// prefixes run 2-8 alphanumeric characters with no dash (a full print code,
+// which always has one, already matches YUGIOH_PRINT_CODE_PATTERN above
+// first), so this cheaply rules out an actual card name before bothering
+// with the extra query - checked against actual set_code rows below rather
+// than a fixed-length regex alone, so a short card name typed alone (e.g.
+// "Kuriboh") still falls through to behave like a normal search.
+const YUGIOH_SET_CODE_QUERY_PATTERN = /^[a-z0-9]{2,8}$/i;
+// Generous enough for any real set without a limit - this is "show me the
+// whole set", not a ranked search. Same value as MtgApiService's own
+// SET_CARDS_LIMIT.
+const SET_CARDS_LIMIT = 600;
+
 @Injectable({ providedIn: 'root' })
 export class YugiohApiService implements CardApiService {
   private readonly supabase = inject(SupabaseService);
@@ -185,6 +199,15 @@ export class YugiohApiService implements CardApiService {
     if (YUGIOH_PRINT_CODE_PATTERN.test(trimmed)) {
       const card = await this.identifyByPrintCode(trimmed.toUpperCase());
       if (card) return [card];
+    }
+
+    // A bare set code (e.g. "AMDE") browses every print under that set
+    // prefix instead of searching by name - falls through to the name
+    // search below if it doesn't actually match a real set prefix. See
+    // getCardsBySetCodePrefix.
+    if (YUGIOH_SET_CODE_QUERY_PATTERN.test(trimmed)) {
+      const setCards = await this.getCardsBySetCodePrefix(trimmed.toUpperCase(), signal);
+      if (setCards.length > 0) return setCards;
     }
 
     const escaped = trimmed.replace(/[%_]/g, '\\$&');
@@ -320,6 +343,46 @@ export class YugiohApiService implements CardApiService {
     return card
       ? this.withPrintInfo(card, body.set_name ?? null, body.set_rarity ?? null, body.set_code ?? englishCode ?? code)
       : null;
+  }
+
+  /**
+   * Bare-set-code browse counterpart to identifyByPrintCode - every print
+   * whose set_code starts with this prefix (e.g. "AMDE" -> every
+   * "AMDE-..." printing), for browsing/adding a whole set at once instead
+   * of searching by name. Mirrors MtgApiService's getCardsBySetCode, but
+   * unlike MTG (where every printing already has its own card_id/row) a
+   * matched row here still needs its underlying card resolved and its own
+   * printCode/setName/rarity overlaid via withPrintInfo - the same card_id
+   * can legitimately appear more than once if a set has several
+   * rarities/sub-decks of the same card. Returns [] for anything that
+   * isn't actually a known set prefix (the caller falls back to a plain
+   * name search then).
+   */
+  private async getCardsBySetCodePrefix(prefix: string, signal?: AbortSignal): Promise<Card[]> {
+    const escaped = prefix.replace(/[%_]/g, '\\$&');
+    const { data, error } = await withSignal(
+      this.supabase.client
+        .from('ygoprodeck_print_codes')
+        .select('set_code, card_id, set_name, set_rarity')
+        .ilike('set_code', `${escaped}-%`)
+        .order('set_code')
+        .limit(SET_CARDS_LIMIT),
+      signal,
+    );
+    if (error) throw error;
+
+    const rows = (data ?? []) as YgoprodeckPrintCodeRow[];
+    if (rows.length === 0) return [];
+
+    const cards = await this.getCardsByIds(rows.map((row) => String(row.card_id)));
+    const cardsById = new Map(cards.map((card) => [card.id, card]));
+
+    return rows
+      .map((row) => {
+        const card = cardsById.get(String(row.card_id));
+        return card ? this.withPrintInfo(card, row.set_name, row.set_rarity, row.set_code) : null;
+      })
+      .filter((entry): entry is YugiohCard => entry !== null);
   }
 
   /**

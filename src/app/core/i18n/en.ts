@@ -183,7 +183,7 @@ export const en: typeof de = {
     title: 'Add Card',
     searchPlaceholder: 'Search card name…',
     searchPlaceholderMtg: 'Search card name or set code (e.g. "EMN")…',
-    searchPlaceholderYugioh: 'Search card name or set code (e.g. "LOB-DE001")…',
+    searchPlaceholderYugioh: 'Search card name, set code (e.g. "LOB-DE001"), or set prefix (e.g. "AMDE")…',
     searching: 'Searching…',
     searchFailed: 'Card search is unavailable right now.',
     retry: 'Try again',
