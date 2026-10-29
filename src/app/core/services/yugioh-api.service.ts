@@ -72,6 +72,24 @@ function toEnglishPrintCode(code: string): string | null {
   return `${set}-EN${subDeck}${number}`;
 }
 
+/**
+ * Just the printed number portion of a full print code (e.g. "AMDE-DE033"
+ * -> "033", "LEHD-DEB32" -> "B32", "DL1-001" -> "001") - for a UI that
+ * wants to show the number printed on the card itself (e.g. browsing a
+ * whole set via AddCardDialog's bare-set-code search) without the
+ * set/language prefix repeating on every tile. Reuses the same shape
+ * toEnglishPrintCode already parses rather than a second ad-hoc regex.
+ * Falls back to the full code unchanged if it doesn't actually match that
+ * shape - shouldn't happen for anything that already resolved a printCode,
+ * but safer than throwing on a genuinely unexpected value.
+ */
+export function yugiohPrintNumber(code: string): string {
+  const match = /^[A-Z0-9]+-(?:[A-Z]{2}|[A-Z])?([A-Z]*)(\d+|TKN)$/.exec(code);
+  if (!match) return code;
+  const [, subDeck, number] = match;
+  return `${subDeck}${number}`;
+}
+
 interface YgoCardSet {
   set_code: string;
   set_name: string;

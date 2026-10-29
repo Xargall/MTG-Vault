@@ -84,6 +84,7 @@
 }
 
 .result-item {
+  position: relative;
   background: transparent;
   border: none;
   padding: 0;
@@ -96,6 +97,24 @@
   &:hover {
     outline: 2px solid var(--color-accent);
   }
+}
+
+// The number printed on the card itself (see AddCardDialog.cardNumber) -
+// shown as a sticker over the art's top-left corner rather than inline text,
+// so it stays legible and in the same spot on every tile while scanning a
+// whole browsed set for one specific number.
+.card-number {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 1px 5px;
+  border-radius: var(--radius);
+  pointer-events: none;
 }
 
 .print-meta {

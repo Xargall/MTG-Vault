@@ -60,6 +60,9 @@
         @for (card of results(); track card.id) {
           <button type="button" class="result-item" (click)="selectCard(card)">
             <app-card-tile [card]="card" />
+            @if (cardNumber(card)) {
+              <span class="card-number">#{{ cardNumber(card) }}</span>
+            }
             <span class="print-meta">{{ card.setName }}<!--
               --> @if (card.rarity) { · {{ card.rarity }} }</span>
           </button>
@@ -86,6 +89,9 @@
           @for (print of prints(); track print.id + '-' + $index) {
             <button type="button" class="result-item" (click)="selectPrint(print)">
               <app-card-tile [card]="print" />
+              @if (cardNumber(print)) {
+                <span class="card-number">#{{ cardNumber(print) }}</span>
+              }
               <span class="print-meta">{{ print.setName }}<!--
                 --> @if (print.rarity) { · {{ print.rarity }} }</span>
             </button>

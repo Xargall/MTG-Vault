@@ -5,6 +5,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
 import { Card } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
+import { yugiohPrintNumber } from '../../../core/services/yugioh-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AppDialog } from '../../../shared/dialog/dialog';
 import { CollectionService } from '../collection.service';
@@ -149,6 +150,13 @@ export class AddCardDialog {
       this.directPrint.set(false);
       void this.selectName(card);
     }
+  }
+
+  /** The number printed on the card itself, for scanning a browsed set quickly (e.g. typing "DABL" lists every card with its number, instead of just name/art) - MTG's own collectorNumber, or (Yu-Gi-Oh!, only once a specific printing is known - see selectCard's doc on printCode) the number portion of printCode. Null for a Yu-Gi-Oh! result with no resolved printing yet (a plain name search), where there's no one specific number to show. */
+  protected cardNumber(card: Card): string | null {
+    if (card.game === 'mtg') return card.collectorNumber;
+    if (card.game === 'yugioh' && card.printCode) return yugiohPrintNumber(card.printCode);
+    return null;
   }
 
   async selectName(card: Card) {
