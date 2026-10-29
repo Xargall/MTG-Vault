@@ -1,84 +1,85 @@
 # TCG Vault
 
-Ein selbst gehosteter, werbefreier Trading-Card-Game-Collector als Angular PWA — volle Kontrolle über Features, Filterung und Kartenlimit, ohne Paywall.
+A self-hosted, ad-free trading card game collector built as an Angular PWA — full control over features, filtering, and card limits, no paywall.
 
-Verwaltet Kartensammlungen, Decks und Wunschlisten für mehrere TCGs in einer App.
+Manages card collections, decks, and wishlists for multiple TCGs in one app.
 
 🔗 **Live:** [tcg-vault.mathias-mayer.de](https://tcg-vault.mathias-mayer.de/)
 
-## Unterstützte Spiele
+## Supported games
 
-| Spiel                | API           | Status      |
-| --------------------- | ------------- | ----------- |
-| Magic: The Gathering  | [Scryfall](https://scryfall.com/docs/api) | ✅ aktiv |
-| Yu-Gi-Oh!              | [YGOPRODeck](https://ygoprodeck.com/api-guide/) | ✅ aktiv |
-| Pokémon                | [pokemontcg.io](https://pokemontcg.io/) | 🚧 vorbereitet |
+| Game                  | API           | Status      |
+| ---------------------- | ------------- | ----------- |
+| Magic: The Gathering    | [Scryfall](https://scryfall.com/docs/api) | ✅ active |
+| Yu-Gi-Oh!               | [YGOPRODeck](https://ygoprodeck.com/api-guide/) | ✅ active |
+| Pokémon                 | [pokemontcg.io](https://pokemontcg.io/) | 🚧 prepared |
 
 ## Features
 
-- **Collection** — Übersicht der eigenen Sammlung mit Donut-Chart nach Farbe/Attribut, Kategorie-Grid und Grid-/Listenansicht
-- **Kartensuche** — Autocomplete-Suche, Karten mit Menge/Foil/Zustand zur Sammlung hinzufügen
-- **Kamera-Scan** — Karten per Kamera erfassen; die Set-Code-/Sammlenummer-Zeile wird serverseitig per Gemini Vision erkannt (Edge Function, siehe unten)
-- **Decks (MTG)** — Vorgefertigte Precon-Decks (MTGJSON) und Community-Decklisten (EDHREC) laden, Abgleich mit der eigenen Sammlung, fehlende Karten direkt auf die Wunschliste
-- **Wunschliste** — Fehlende Karten mit Priorität, Notizen und aktuellem Marktpreis je Spiel
-- **Mehrsprachig** — Deutsch/Englisch via ngx-translate
-- **PWA** — installierbar, offline-fähig
+- **Collection** — overview of your own collection with a donut chart by color/attribute, a category grid, and a grid/list view toggle
+- **Card search** — autocomplete search, including browsing a whole set by just its set code (e.g. "EMN" for MTG, "AMDE" for Yu-Gi-Oh!); add several cards to the collection in one batch instead of the dialog closing after each one
+- **Camera scan** — capture cards via camera; the set code/collector number line is recognized server-side via Gemini Vision (Edge Function, see below)
+- **Decks** — MTG: load precon decks (MTGJSON) and community decklists (EDHREC); Yu-Gi-Oh!: load structure/starter decks and community/tournament decklists (YGOPRODeck) — both matched against your own collection, with missing cards going straight to the wishlist
+- **Wishlist** — track missing cards with priority, notes, and each game's current market price
+- **Help / glossary** (`/help`) — a searchable MTG and Yu-Gi-Oh! terms glossary, with a "simplified mode" toggle for quick, informal explanations
+- **Multi-language** — German/English via ngx-translate
+- **PWA** — installable, offline-capable
 
-## Tech-Stack
+## Tech stack
 
-- **[Angular](https://angular.dev/)** (Standalone Components, Signals, PWA)
-- **[Supabase](https://supabase.com/)** — Postgres-Datenbank, Auth, Edge Functions
-- **[Scryfall API](https://scryfall.com/docs/api)** — MTG-Kartendaten, Bilder, Preise
-- **[YGOPRODeck API](https://ygoprodeck.com/api-guide/)** — Yu-Gi-Oh-Kartendaten, Bilder, Preise
-- **[MTGJSON](https://mtgjson.com/)** — MTG Preconstructed Decks
-- **[EDHREC](https://edhrec.com/)** — MTG Community-Decklisten (inoffiziell, via `json.edhrec.com`)
-- **[Gemini API](https://ai.google.dev/)** — Kartenerkennung beim Kamera-Scan (server-seitig via Supabase Edge Function)
-- **[Vitest](https://vitest.dev/)** — Unit Tests
+- **[Angular](https://angular.dev/)** (standalone components, signals, PWA)
+- **[Supabase](https://supabase.com/)** — Postgres database, auth, edge functions
+- **[Scryfall API](https://scryfall.com/docs/api)** — MTG card data, images, prices
+- **[YGOPRODeck API](https://ygoprodeck.com/api-guide/)** — Yu-Gi-Oh! card data, images, prices
+- **[MTGJSON](https://mtgjson.com/)** — MTG preconstructed decks
+- **[EDHREC](https://edhrec.com/)** — MTG community decklists (unofficial, via `json.edhrec.com`)
+- **[Gemini API](https://ai.google.dev/)** — card recognition for the camera scan (server-side via a Supabase Edge Function)
+- **[Vitest](https://vitest.dev/)** — unit tests
 
-## Architektur
+## Architecture
 
-Jedes Spiel wird über ein gemeinsames `CardApiService`-Interface angebunden (`searchCards`, `getCard`, `getPrints`), das `GameService` liefert je nach aktivem Spiel die passende Implementierung (`MtgApiService`, `YugiohApiService`, künftig `PokemonApiService`). Kartendaten selbst werden nicht in Supabase gespeichert — nur `card_id` + `game_id`, alles Weitere (inkl. Preise) kommt on-demand von der jeweiligen API. Details siehe [`CLAUDE.md`](./CLAUDE.md).
+Each game is wired in through a shared `CardApiService` interface (`searchCards`, `getCard`, `getPrints`); `GameService` hands out the matching implementation (`MtgApiService`, `YugiohApiService`, eventually `PokemonApiService`) for whichever game is active. Card data itself is never stored in Supabase — only `card_id` + `game_id`; everything else (including prices) is fetched on demand from the respective API. See [`CLAUDE.md`](./CLAUDE.md) for details.
 
 ## Setup
 
-### Voraussetzungen
+### Prerequisites
 
-- Node.js (siehe `package.json` → `packageManager`)
-- Ein [Supabase](https://supabase.com/)-Projekt
-- Ein [Gemini API Key](https://ai.google.dev/) (für den Kamera-Scan)
+- Node.js (see `package.json` → `packageManager`)
+- A [Supabase](https://supabase.com/) project
+- A [Gemini API key](https://ai.google.dev/) (for the camera scan)
 
-### Installation
+### Install
 
 ```bash
 npm install
 ```
 
-### Supabase konfigurieren
+### Configure Supabase
 
-1. Umgebungsdatei anlegen:
+1. Create the environment file:
 
    ```bash
    cp src/environments/environment.example.ts src/environments/environment.ts
    ```
 
-   und `supabaseUrl` / `supabaseAnonKey` mit den Werten aus deinem Supabase-Projekt füllen.
+   and fill in `supabaseUrl` / `supabaseAnonKey` with the values from your Supabase project.
 
-2. SQL-Skripte aus [`supabase/sql`](./supabase/sql) der Reihe nach im Supabase SQL-Editor ausführen (Tabellen für Collection, Decks, Wishlist, Invite-Gating etc.).
+2. Run the SQL scripts from [`supabase/sql`](./supabase/sql) in order in the Supabase SQL editor (tables for collection, decks, wishlist, invite gating, etc.).
 
-3. Edge Function für den Kamera-Scan deployen:
+3. Deploy the Edge Function for the camera scan:
 
    ```bash
    supabase functions deploy gemini-ocr
-   supabase secrets set GEMINI_API_KEY=<dein-gemini-key>
+   supabase secrets set GEMINI_API_KEY=<your-gemini-key>
    ```
 
-### Entwicklung
+### Development
 
 ```bash
 npm start
 ```
 
-Öffnet die App unter `http://localhost:4200/` mit automatischem Reload bei Dateiänderungen.
+Opens the app at `http://localhost:4200/` with automatic reload on file changes.
 
 ### Build
 
@@ -86,7 +87,7 @@ npm start
 npm run build
 ```
 
-Erzeugt die Produktions-Artefakte in `dist/`.
+Produces the production build in `dist/`.
 
 ### Tests
 
@@ -94,16 +95,16 @@ Erzeugt die Produktions-Artefakte in `dist/`.
 npm test
 ```
 
-Führt die Unit-Tests mit [Vitest](https://vitest.dev/) aus.
+Runs the unit tests with [Vitest](https://vitest.dev/).
 
-## Projektstruktur
+## Project structure
 
 ```
 src/app/
-├── core/          # Services, Guards, Models, i18n
-├── features/       # Collection, Kartensuche/Scanner, Decks, Wishlist, Auth
-└── shared/          # Wiederverwendbare Komponenten (Card-Tiles, Charts, Layout)
+├── core/          # Services, guards, models, i18n
+├── features/       # Collection, card search/scanner, decks, wishlist, auth, help
+└── shared/          # Reusable components (card tiles, charts, layout)
 supabase/
-├── functions/       # Edge Functions (z. B. gemini-ocr)
-└── sql/             # Schema-Migrationen, manuell im SQL-Editor auszuführen
+├── functions/       # Edge functions (e.g. gemini-ocr, ygoprodeck-decks-proxy)
+└── sql/             # Schema migrations, run manually in the SQL editor
 ```
