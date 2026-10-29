@@ -121,18 +121,38 @@ async function fetchCardsForSetWithRetry(setName) {
  * conflict-target row twice in one statement ("ON CONFLICT DO UPDATE
  * command cannot affect row a second time") - duplicates must be
  * collapsed before flushInBatches, not left for the DB to sort out.
+ *
+ * Also returns extraCardRows: live-confirmed 2026-10-29, a handful of
+ * card ids (distinct alternate-artwork printings, e.g. a Duel Terminal
+ * parallel-rare "Dark Magician" under its own numeric id 46986421) are
+ * completely absent from the bulk misc=yes dump - not just missing a
+ * card_sets entry, the id itself never appears there at all - yet a
+ * cardset= query for a set that uses that exact artwork returns the full
+ * card object for it anyway. Upserting a print-code row for such an id
+ * without its own ygoprodeck_cards row first violates
+ * ygoprodeck_print_codes_card_id_fkey and silently drops the whole
+ * surrounding batch of up to BATCH_SIZE otherwise-valid rows with it
+ * (confirmed live: several hundred good rows lost to a handful of these).
+ * Since the cardset= response already carries this card's full data
+ * (name/image/atk/def/...), collecting it here costs zero extra requests -
+ * main() just upserts these into ygoprodeck_cards before
+ * ygoprodeck_print_codes, so the FK always has something to point at.
  */
-async function fetchAllPrintCodeRows() {
+async function fetchAllPrintCodeRows(knownCardIds) {
   const sets = await fetchSets();
   console.log(`Found ${sets.length} sets.`);
 
   const printCodeRowsByCode = new Map();
+  const extraCardRowsById = new Map();
   let setsFailed = 0;
   for (const [index, set] of sets.entries()) {
     try {
       const cards = await fetchCardsForSetWithRetry(set.set_name);
       for (const raw of cards) {
         if (typeof raw.id !== 'number') continue;
+        if (!knownCardIds.has(raw.id) && !extraCardRowsById.has(raw.id)) {
+          extraCardRowsById.set(raw.id, cardRowFromRaw(raw));
+        }
         for (const row of printCodeRowsFromRaw(raw)) {
           printCodeRowsByCode.set(row.set_code, row);
         }
@@ -146,7 +166,10 @@ async function fetchAllPrintCodeRows() {
   }
 
   if (setsFailed > 0) console.error(`${setsFailed} set(s) failed after retries and were skipped.`);
-  return [...printCodeRowsByCode.values()];
+  if (extraCardRowsById.size > 0) {
+    console.log(`Found ${extraCardRowsById.size} card id(s) present in set data but missing from misc=yes.`);
+  }
+  return { printCodeRows: [...printCodeRowsByCode.values()], extraCardRows: [...extraCardRowsById.values()] };
 }
 
 async function upsertBatch(table, batch) {
@@ -206,13 +229,19 @@ async function main() {
   console.log(`Fetched ${cards.length} cards.`);
 
   const cardRows = [];
+  const knownCardIds = new Set();
   for (const raw of cards) {
     if (typeof raw.id !== 'number') continue;
     cardRows.push(cardRowFromRaw(raw));
+    knownCardIds.add(raw.id);
   }
 
   console.log('Fetching print codes set-by-set (see CARD_SETS_ENDPOINT doc)...');
-  const printCodeRows = await fetchAllPrintCodeRows();
+  const { printCodeRows, extraCardRows } = await fetchAllPrintCodeRows(knownCardIds);
+  // Must land in ygoprodeck_cards before ygoprodeck_print_codes is upserted
+  // below, or the FK violation this whole thing exists to avoid happens
+  // anyway - see fetchAllPrintCodeRows' own doc.
+  cardRows.push(...extraCardRows);
 
   console.log(`Upserting ${cardRows.length} cards...`);
   const cardResult = await flushInBatches('ygoprodeck_cards', cardRows);
