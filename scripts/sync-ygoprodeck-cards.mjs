@@ -16,6 +16,25 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 }
 
 const CARD_INFO_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardinfo.php?misc=yes';
+// Building the print-code mirror from misc=yes's own per-card `card_sets`
+// field (as this script used to do) silently misses real printings for any
+// card with enough reprints that YGOPRODeck's own API seems to truncate
+// that field - live-confirmed 2026-10-29: "Dark Magician"/"Barrel Dragon"/
+// "Elemental HERO Neos" (all heavily reprinted) are each missing their
+// Hidden Arsenal: Chapter 1 printing (HAC1-EN002/EN006/EN004) from BOTH
+// misc=yes and a plain cardinfo.php?name= lookup, even though
+// cardinfo.php?cardset=... for that exact set returns it correctly - this
+// is an upstream YGOPRODeck data/API inconsistency, not something this
+// script's own parsing was getting wrong. Querying every known set via
+// cardsetsEndpoint+cardset= below instead is slower (~1000 extra requests)
+// but is the only path that's actually returned complete per-printing data
+// so far.
+const CARD_SETS_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardsets.php';
+const CARD_INFO_BY_SET_PARAM = 'cardset';
+// Polite pacing across ~1000 sequential cardset requests - same idea as
+// YgoprodeckDecksService's own MIN_DELAY_MS for the live deck-browser API,
+// just a plain sequential script rather than a per-user rate limiter.
+const SET_FETCH_DELAY_MS = 400;
 const BATCH_SIZE = 500;
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 2000;
@@ -58,6 +77,76 @@ function printCodeRowsFromRaw(raw) {
       set_name: set.set_name ?? null,
       set_rarity: set.set_rarity ?? null,
     }));
+}
+
+async function fetchSets() {
+  const response = await fetch(CARD_SETS_ENDPOINT, {
+    headers: { 'User-Agent': 'TCGVault/1.0 (mathias-mayer.de)' },
+  });
+  if (!response.ok) throw new Error(`cardsets.php request failed (${response.status})`);
+  return response.json();
+}
+
+async function fetchCardsForSet(setName) {
+  const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?${CARD_INFO_BY_SET_PARAM}=${encodeURIComponent(setName)}`;
+  const response = await fetch(url, { headers: { 'User-Agent': 'TCGVault/1.0 (mathias-mayer.de)' } });
+  // Mirrors YugiohApiService.fetchCardInfo's own handling - YGOPRODeck
+  // returns 400 (not an empty list) when a cardset query matches nothing.
+  if (response.status === 400) return [];
+  if (!response.ok) throw new Error(`cardinfo.php?cardset failed (${response.status})`);
+  const body = await response.json();
+  return body.data ?? [];
+}
+
+async function fetchCardsForSetWithRetry(setName) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fetchCardsForSet(setName);
+    } catch (error) {
+      if (attempt === MAX_ATTEMPTS) throw error;
+      console.error(`Fetching set "${setName}" failed (attempt ${attempt}/${MAX_ATTEMPTS}), retrying:`, error.message);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+    }
+  }
+}
+
+/**
+ * Builds the complete print-code table by querying every known set
+ * individually (see CARD_SETS_ENDPOINT's doc on why misc=yes's own
+ * card_sets field isn't trustworthy on its own). Deduped by set_code (last
+ * one wins) for two reasons: the same card/set code legitimately turns up
+ * again and again across many different cardset queries (every set a
+ * reprinted card belongs to returns that card's full, same card_sets
+ * list), and Postgres's upsert rejects a batch that affects the same
+ * conflict-target row twice in one statement ("ON CONFLICT DO UPDATE
+ * command cannot affect row a second time") - duplicates must be
+ * collapsed before flushInBatches, not left for the DB to sort out.
+ */
+async function fetchAllPrintCodeRows() {
+  const sets = await fetchSets();
+  console.log(`Found ${sets.length} sets.`);
+
+  const printCodeRowsByCode = new Map();
+  let setsFailed = 0;
+  for (const [index, set] of sets.entries()) {
+    try {
+      const cards = await fetchCardsForSetWithRetry(set.set_name);
+      for (const raw of cards) {
+        if (typeof raw.id !== 'number') continue;
+        for (const row of printCodeRowsFromRaw(raw)) {
+          printCodeRowsByCode.set(row.set_code, row);
+        }
+      }
+    } catch (error) {
+      console.error(`Fetching set "${set.set_name}" failed, skipping:`, error.message);
+      setsFailed++;
+    }
+    if ((index + 1) % 100 === 0) console.log(`  ...${index + 1}/${sets.length} sets fetched`);
+    await new Promise((resolve) => setTimeout(resolve, SET_FETCH_DELAY_MS));
+  }
+
+  if (setsFailed > 0) console.error(`${setsFailed} set(s) failed after retries and were skipped.`);
+  return [...printCodeRowsByCode.values()];
 }
 
 async function upsertBatch(table, batch) {
@@ -117,21 +206,13 @@ async function main() {
   console.log(`Fetched ${cards.length} cards.`);
 
   const cardRows = [];
-  // Deduped by set_code (last one wins) - YGOPRODeck's own data occasionally
-  // repeats the exact same set_code within a card's card_sets (different
-  // set_price, same code). Postgres's upsert rejects a batch that affects
-  // the same conflict-target row twice in one statement ("ON CONFLICT DO
-  // UPDATE command cannot affect row a second time"), so duplicates must be
-  // collapsed here rather than left for the DB to sort out.
-  const printCodeRowsByCode = new Map();
   for (const raw of cards) {
     if (typeof raw.id !== 'number') continue;
     cardRows.push(cardRowFromRaw(raw));
-    for (const row of printCodeRowsFromRaw(raw)) {
-      printCodeRowsByCode.set(row.set_code, row);
-    }
   }
-  const printCodeRows = [...printCodeRowsByCode.values()];
+
+  console.log('Fetching print codes set-by-set (see CARD_SETS_ENDPOINT doc)...');
+  const printCodeRows = await fetchAllPrintCodeRows();
 
   console.log(`Upserting ${cardRows.length} cards...`);
   const cardResult = await flushInBatches('ygoprodeck_cards', cardRows);
