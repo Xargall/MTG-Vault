@@ -45,6 +45,8 @@ wishlist
   user_id, game_id, card_id, priority, notes
 ```
 
+**Setup (2026-10-29):** `supabase/schema.sql` ist der konsolidierte End-Zustand aller 41 Dateien unter `supabase/sql/` in einem Skript — für ein frisches Supabase-Projekt reicht das eine Skript, statt alle 41 der Reihe nach auszuführen. Die laufende Produktions-DB hat die 41 Dateien bereits angewendet und braucht `schema.sql` nicht; die einzelnen `supabase/sql/*.sql`-Dateien bleiben unverändert als historisches Protokoll (jede mit ihrer eigenen Begründung) erhalten, nicht gelöscht. `schema.sql` wurde live gegen einen frischen Postgres-Container getestet (Docker, mit Stub-Schemas für `auth`/`vault`/`storage`/`cron`) — läuft fehlerfrei durch. Zwei Dinge darin sind in keiner der 41 Dateien erfasst, weil sie offenbar direkt im Supabase Studio angelegt wurden: die `games`-Tabelle selbst und die `game_id`-Spalte auf `collection_cards`/`decks`/`wishlist` (plus `wishlist.quantity`) — rekonstruiert aus den echten TypeScript-Row-Interfaces (`CollectionCardRow`/`DeckRow`/`WishlistRow`) und einer Live-Abfrage der laufenden `games`-Tabelle.
+
 ## Architektur
 
 ### GameService

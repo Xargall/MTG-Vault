@@ -64,7 +64,7 @@ npm install
 
    and fill in `supabaseUrl` / `supabaseAnonKey` with the values from your Supabase project.
 
-2. Run the SQL scripts from [`supabase/sql`](./supabase/sql) in order in the Supabase SQL editor (tables for collection, decks, wishlist, invite gating, etc.).
+2. Run [`supabase/schema.sql`](./supabase/schema.sql) once in the Supabase SQL editor — a single consolidated script that sets up every table, function, policy, and cron job this app needs on a fresh project. (The individual numbered files in [`supabase/sql`](./supabase/sql) are the historical migration log, each explaining why a particular change was made — useful for context, but you don't need to run them one by one.)
 
 3. Deploy the Edge Function for the camera scan:
 
@@ -106,5 +106,6 @@ src/app/
 └── shared/          # Reusable components (card tiles, charts, layout)
 supabase/
 ├── functions/       # Edge functions (e.g. gemini-ocr, ygoprodeck-decks-proxy)
-└── sql/             # Schema migrations, run manually in the SQL editor
+├── schema.sql       # Consolidated fresh-install schema (run this on a new project)
+└── sql/             # Historical migration log, one file per change, with reasoning
 ```
