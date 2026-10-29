@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -34,6 +34,10 @@ export class AddCardDialog {
   protected readonly gameService = inject(GameService);
   private readonly collectionService = inject(CollectionService);
   private readonly translate = inject(TranslateService);
+
+  // Scoped per game, same as the collection itself - avoids a Yu-Gi-Oh!
+  // draft reappearing while browsing MTG, or vice versa.
+  private readonly pendingItemsStorageKey = `addCard.pendingItems.${this.gameService.currentSlug()}`;
 
   readonly close = output<void>();
   readonly added = output<void>();
@@ -73,10 +77,22 @@ export class AddCardDialog {
   // every single card, which is what submit() used to do unconditionally.
   // Flushed as one batch by commitAll(), called whenever the dialog
   // actually closes (see finishAndClose()).
-  protected readonly pendingItems = signal<PendingAddItem[]>([]);
+  //
+  // Initialized from (and mirrored to - see persistPendingItems below)
+  // sessionStorage, not just an empty array: a backgrounded/minimized tab
+  // getting discarded by the browser under memory pressure and reloaded on
+  // return (live-reported for the camera scanner, see its own doc on this
+  // exact behavior) wipes every in-memory signal, this one included, with
+  // no app code involved at all - there's no way to prevent that reload,
+  // only to make reopening this dialog afterward not lose the list. A
+  // genuinely new tab/window starts with nothing staged, which is the
+  // right scope for a draft nobody asked to keep around forever.
+  protected readonly pendingItems = signal<PendingAddItem[]>(this.loadPendingItems());
   protected readonly committing = signal(false);
   protected readonly commitError = signal<string | null>(null);
-  private nextTempId = 0;
+  private nextTempId = Math.max(-1, ...this.pendingItems().map((item) => item.tempId)) + 1;
+
+  private readonly persistPendingItems = effect(() => this.savePendingItems(this.pendingItems()));
 
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
   // Aborts the previous search's actual request (not just its result) when
@@ -234,6 +250,28 @@ export class AddCardDialog {
   private pendingKey(card: Card, foil: boolean, language: string): string {
     const setCode = card.game === 'yugioh' ? card.printCode : null;
     return `${card.id}|${foil}|${language}|${setCode ?? ''}`;
+  }
+
+  private loadPendingItems(): PendingAddItem[] {
+    try {
+      const raw = sessionStorage.getItem(this.pendingItemsStorageKey);
+      return raw ? (JSON.parse(raw) as PendingAddItem[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** sessionStorage can throw (private browsing, quota, disabled storage) - losing the persisted draft is harmless, the in-memory list still works for the rest of this session either way. */
+  private savePendingItems(items: PendingAddItem[]): void {
+    try {
+      if (items.length === 0) {
+        sessionStorage.removeItem(this.pendingItemsStorageKey);
+      } else {
+        sessionStorage.setItem(this.pendingItemsStorageKey, JSON.stringify(items));
+      }
+    } catch {
+      // See doc above - nothing to recover from here.
+    }
   }
 
   /** Sends every staged item to Supabase as one batch. Returns whether it succeeded, so finishAndClose() knows whether it's safe to actually close. */
