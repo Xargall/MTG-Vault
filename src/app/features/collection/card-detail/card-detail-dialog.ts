@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  OnDestroy,
   computed,
   inject,
   input,
@@ -41,6 +42,12 @@ const BANLIST_LABELS: Record<YugiohBanlistStatus, string> = {
   'Semi-Limited': 'yugioh.banlistSemiLimited',
 };
 
+// A quantity bump (stepper or typed) saves on its own after this much quiet
+// time, instead of making every "+1" require its own explicit Save click -
+// long enough that a quick run of stepper clicks (or retyping a number)
+// settles into one save, not one per click/keystroke.
+const QUANTITY_AUTOSAVE_DEBOUNCE_MS = 700;
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-card-detail-dialog',
@@ -48,7 +55,7 @@ const BANLIST_LABELS: Record<YugiohBanlistStatus, string> = {
   templateUrl: './card-detail-dialog.html',
   styleUrl: './card-detail-dialog.scss',
 })
-export class CardDetailDialog {
+export class CardDetailDialog implements OnDestroy {
   private readonly collectionService = inject(CollectionService);
   private readonly translate = inject(TranslateService);
 
@@ -100,11 +107,36 @@ export class CardDetailDialog {
     );
   });
 
+  private quantityAutosaveHandle: ReturnType<typeof setTimeout> | null = null;
+
   protected stepQuantity(delta: number) {
     this.editQuantity.set(Math.max(1, Math.trunc(Number(this.editQuantity()) || 1) + delta));
+    this.scheduleQuantityAutosave();
+  }
+
+  protected onQuantityInput(value: number) {
+    this.editQuantity.set(value);
+    this.scheduleQuantityAutosave();
+  }
+
+  /** Quiets down a run of stepper clicks/keystrokes into one saveEdit() call - see QUANTITY_AUTOSAVE_DEBOUNCE_MS's doc. Re-checks against the stored row once the debounce actually fires rather than when it's scheduled, so stepping away from and back to the original quantity within the window correctly saves nothing. */
+  private scheduleQuantityAutosave() {
+    if (this.quantityAutosaveHandle) clearTimeout(this.quantityAutosaveHandle);
+    this.quantityAutosaveHandle = setTimeout(() => {
+      this.quantityAutosaveHandle = null;
+      if (this.editQuantity() === this.entry().row.quantity) return;
+      void this.saveEdit();
+    }, QUANTITY_AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  private cancelQuantityAutosave() {
+    if (!this.quantityAutosaveHandle) return;
+    clearTimeout(this.quantityAutosaveHandle);
+    this.quantityAutosaveHandle = null;
   }
 
   protected discardEdit() {
+    this.cancelQuantityAutosave();
     const row = this.entry().row;
     this.editQuantity.set(row.quantity);
     this.editFoil.set(row.foil);
@@ -119,7 +151,13 @@ export class CardDetailDialog {
     this.confirmingDelete.set(true);
   }
 
+  /** Closing the dialog before the debounce fires abandons the pending autosave rather than saving behind the user's back after they've already navigated away - same "closing never saves on its own" rule the add-card dialog's own staged-list bug taught (see AddCardDialog.finishAndClose's doc). */
+  ngOnDestroy(): void {
+    this.cancelQuantityAutosave();
+  }
+
   async saveEdit() {
+    this.cancelQuantityAutosave();
     const quantity = Math.trunc(this.editQuantity());
     if (!Number.isFinite(quantity) || quantity < 1) {
       this.saveError.set(this.translate.instant('cardDetail.invalidQuantity'));

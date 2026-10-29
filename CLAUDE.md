@@ -81,6 +81,7 @@ Gemeinsame Methoden die jede API-Implementierung bereitstellt:
 - 2-Spalten Kategorie-Grid, teuerste Karte als Hero-Artwork
 - Klick auf Kategorie → gefilterte Kartenansicht
 - Grid / Listen Toggle
+- **Kartendetails (`CardDetailDialog`):** Menge/Foil/Sprache einer schon besessenen Karte editierbar in place (kein separater Edit-Modus) — Save/Discard erscheinen nur, wenn sich etwas von der gespeicherten `collection_cards`-Zeile unterscheidet (`dirty`). Die Menge speichert sich seit 2026-10-29 zusätzlich automatisch: Stepper-Klicks und Tippen im Mengenfeld lösen nach 700ms Ruhe ein `saveEdit()` aus (`QUANTITY_AUTOSAVE_DEBOUNCE_MS`), ohne dass der explizite Save-Button nötig wäre — Foil/Sprache bleiben bewusst beim expliziten Save. Schließen des Dialogs vor Ablauf der Debounce-Zeit verwirft den anstehenden Autosave (`ngOnDestroy`), statt im Hintergrund doch noch zu speichern — gleiche Lehre wie beim Add-Card-Dialog-Bug (Schließen darf nie selbst einen Save/Submit auslösen).
 
 **MTG Kategorien:** Weiß, Blau, Schwarz, Rot, Grün, Multikolor, Farblos
 **Yu-Gi-Oh Kategorien:** FIRE, WATER, EARTH, WIND, LIGHT, DARK

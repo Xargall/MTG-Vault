@@ -133,7 +133,7 @@
             min="1"
             aria-labelledby="copy-quantity-label"
             [ngModel]="editQuantity()"
-            (ngModelChange)="editQuantity.set($event)"
+            (ngModelChange)="onQuantityInput($event)"
           />
           <button
             type="button"
