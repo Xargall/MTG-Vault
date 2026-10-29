@@ -189,7 +189,7 @@ export class AddCardDialog {
     this.selectedCard.set(null);
   }
 
-  /** Stages the configured card/quantity/foil/condition/language instead of sending it to Supabase right away, then resets straight back to a fresh search so the next card can be added without leaving the dialog - see pendingItems' doc. */
+  /** Stages the configured card/quantity/foil/condition/language instead of sending it to Supabase right away, then goes back to the search results (same query, same results - see backToSearch()) so another card from the same search can be added right after, without retyping it - see pendingItems' doc. */
   protected addToList(): void {
     const card = this.selectedCard();
     if (!card) return;
@@ -216,13 +216,7 @@ export class AddCardDialog {
       return merged;
     });
 
-    this.selectedName.set(null);
-    this.prints.set([]);
-    this.selectedCard.set(null);
-    this.directPrint.set(false);
-    this.query.set('');
-    this.results.set([]);
-    this.searchError.set(null);
+    this.backToSearch();
   }
 
   protected removePending(tempId: number): void {
