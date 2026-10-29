@@ -1,12 +1,17 @@
-<app-dialog [heading]="'addCard.title' | translate" maxWidth="720px" (closeRequest)="finishAndClose()">
+<app-dialog [heading]="'addCard.title' | translate" maxWidth="720px" (closeRequest)="close.emit()">
 
   @if (pendingItems().length > 0) {
     <div class="pending-list">
       <div class="pending-list-header">
         <span>{{ 'addCard.pendingCount' | translate: { count: pendingItems().length } }}</span>
-        <button type="button" class="btn btn--primary btn--sm" [disabled]="committing()" (click)="finishAndClose()">
-          {{ 'addCard.addAll' | translate }}
-        </button>
+        <div class="pending-list-actions">
+          <button type="button" class="btn btn--ghost btn--sm" [disabled]="committing()" (click)="clearPendingItems()">
+            {{ 'addCard.clearList' | translate }}
+          </button>
+          <button type="button" class="btn btn--primary btn--sm" [disabled]="committing()" (click)="finishAndClose()">
+            {{ 'addCard.addAll' | translate }}
+          </button>
+        </div>
       </div>
       <ul class="pending-items">
         @for (item of pendingItems(); track item.tempId) {

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -75,24 +75,34 @@ export class AddCardDialog {
   // several cards in a row stay in one dialog session instead of the
   // dialog closing (and the search having to restart from scratch) after
   // every single card, which is what submit() used to do unconditionally.
-  // Flushed as one batch by commitAll(), called whenever the dialog
-  // actually closes (see finishAndClose()).
+  // Flushed as one batch only by the explicit "Alle hinzufügen" button
+  // (commitAll() via finishAndClose() - see its own doc on why this is
+  // deliberately NOT tied to the dialog closing in general).
   //
-  // Initialized from (and mirrored to - see persistPendingItems below)
-  // sessionStorage, not just an empty array: a backgrounded/minimized tab
-  // getting discarded by the browser under memory pressure and reloaded on
-  // return (live-reported for the camera scanner, see its own doc on this
-  // exact behavior) wipes every in-memory signal, this one included, with
-  // no app code involved at all - there's no way to prevent that reload,
-  // only to make reopening this dialog afterward not lose the list. A
-  // genuinely new tab/window starts with nothing staged, which is the
-  // right scope for a draft nobody asked to keep around forever.
+  // Initialized from (and mirrored to on every mutation below - addToList(),
+  // removePending(), commitAll(), clearPendingItems() all call
+  // savePendingItems() directly) sessionStorage, not just an empty array: a
+  // backgrounded/minimized tab getting discarded by the browser under
+  // memory pressure and reloaded on return (live-reported for the camera
+  // scanner, see its own doc on this exact behavior) wipes every in-memory
+  // signal, this one included, with no app code involved at all - there's
+  // no way to prevent that reload, only to make reopening this dialog
+  // afterward not lose the list. A genuinely new tab/window starts with
+  // nothing staged, which is the right scope for a draft nobody asked to
+  // keep around forever.
+  //
+  // Deliberately NOT an effect() mirroring this signal - an effect only
+  // flushes on the next change-detection tick, and commitAll() clearing
+  // this signal is immediately followed by the dialog closing (see
+  // finishAndClose()), which can destroy this component before that flush
+  // ever runs - live-confirmed: sessionStorage kept holding the just-added
+  // cards after a successful commit. Calling savePendingItems() straight
+  // from the same synchronous block that mutates the signal has no such
+  // race.
   protected readonly pendingItems = signal<PendingAddItem[]>(this.loadPendingItems());
   protected readonly committing = signal(false);
   protected readonly commitError = signal<string | null>(null);
   private nextTempId = Math.max(-1, ...this.pendingItems().map((item) => item.tempId)) + 1;
-
-  private readonly persistPendingItems = effect(() => this.savePendingItems(this.pendingItems()));
 
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
   // Aborts the previous search's actual request (not just its result) when
@@ -239,12 +249,20 @@ export class AddCardDialog {
       merged[index] = { ...merged[index], quantity: merged[index].quantity + quantity };
       return merged;
     });
+    this.savePendingItems(this.pendingItems());
 
     this.backToSearch();
   }
 
   protected removePending(tempId: number): void {
     this.pendingItems.update((items) => items.filter((item) => item.tempId !== tempId));
+    this.savePendingItems(this.pendingItems());
+  }
+
+  /** Discards every staged card without sending any of it to Supabase - the "start over" counterpart to commitAll(). */
+  protected clearPendingItems(): void {
+    this.pendingItems.set([]);
+    this.savePendingItems([]);
   }
 
   private pendingKey(card: Card, foil: boolean, language: string): string {
@@ -278,6 +296,12 @@ export class AddCardDialog {
   protected async commitAll(): Promise<boolean> {
     const items = this.pendingItems();
     if (items.length === 0) return true;
+    // Guards against a double-click/double-Enter sending the same batch
+    // twice before [disabled]="committing()" has actually re-rendered -
+    // not just a defensive nicety, the whole point of upsertOne() merging
+    // by dedup key means a second identical commit wouldn't error, it'd
+    // silently double every quantity (see finishAndClose's doc).
+    if (this.committing()) return false;
 
     this.committing.set(true);
     this.commitError.set(null);
@@ -298,6 +322,7 @@ export class AddCardDialog {
         })),
       );
       this.pendingItems.set([]);
+      this.savePendingItems([]);
       this.added.emit();
       return true;
     } catch (error) {
@@ -311,14 +336,19 @@ export class AddCardDialog {
   }
 
   /**
-   * Bound to the dialog's own closeRequest (header ✕, Escape, backdrop, and
-   * the explicit "Alle hinzufügen" button all go through this one path) -
-   * always flushes whatever's still staged first rather than treating
-   * "close" as "discard the list". The list already has its own per-item
-   * remove button for discarding a single entry, so there's no separate
-   * "close without adding" action that would otherwise make staged cards
-   * vanish silently. Stays open with commitError shown if the flush itself
-   * fails, instead of closing and losing the list.
+   * Bound only to the explicit "Alle hinzufügen" button, NOT to the
+   * dialog's own closeRequest (header ✕/Escape/backdrop just emit close
+   * directly - see the template) - closing the dialog any other way only
+   * hides it, leaving the staged list exactly as it is (still mirrored in
+   * sessionStorage, restored the next time the dialog opens - see
+   * pendingItems' doc). Committing used to run on every close, which
+   * combined with a since-fixed sessionStorage flush race (see
+   * pendingItems' doc) silently re-sent an already-added batch and doubled
+   * quantities in the collection - live-reported, not hypothetical. Tying
+   * the actual network call to one explicit button only, instead of to
+   * "the dialog is going away" in general, removes that whole class of
+   * accidental-resubmit bug rather than just patching the one race that
+   * triggered it this time.
    */
   protected async finishAndClose(): Promise<void> {
     if (await this.commitAll()) this.close.emit();

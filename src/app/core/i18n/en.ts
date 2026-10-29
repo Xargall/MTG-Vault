@@ -199,6 +199,7 @@ export const en: typeof de = {
     language: 'Language',
     addToList: 'Add to list',
     pendingCount: '{{count}} card(s) staged',
+    clearList: 'Clear list',
     addAll: 'Add all',
     removeFromList: 'Remove from list',
     addFailed: 'Card could not be added.',

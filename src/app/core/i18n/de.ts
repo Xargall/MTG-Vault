@@ -197,6 +197,7 @@ export const de = {
     language: 'Sprache',
     addToList: 'Zur Liste hinzufügen',
     pendingCount: '{{count}} Karte(n) vorgemerkt',
+    clearList: 'Liste leeren',
     addAll: 'Alle hinzufügen',
     removeFromList: 'Aus Liste entfernen',
     addFailed: 'Karte konnte nicht hinzugefügt werden.',
