@@ -197,8 +197,12 @@ export const en: typeof de = {
     foil: 'Foil',
     condition: 'Condition',
     language: 'Language',
-    submit: 'Add',
+    addToList: 'Add to list',
+    pendingCount: '{{count}} card(s) staged',
+    addAll: 'Add all',
+    removeFromList: 'Remove from list',
     addFailed: 'Card could not be added.',
+    addAllFailed: 'Cards could not be added.',
   },
   cardDetail: {
     title: 'Card Details',

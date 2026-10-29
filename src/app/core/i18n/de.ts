@@ -195,8 +195,12 @@ export const de = {
     foil: 'Foil',
     condition: 'Zustand',
     language: 'Sprache',
-    submit: 'Hinzufügen',
+    addToList: 'Zur Liste hinzufügen',
+    pendingCount: '{{count}} Karte(n) vorgemerkt',
+    addAll: 'Alle hinzufügen',
+    removeFromList: 'Aus Liste entfernen',
     addFailed: 'Karte konnte nicht hinzugefügt werden.',
+    addAllFailed: 'Karten konnten nicht hinzugefügt werden.',
   },
   cardDetail: {
     title: 'Kartendetails',

@@ -5,13 +5,22 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
 import { Card } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
-import { YUGIOH_PRINT_CODE_PATTERN } from '../../../core/services/yugioh-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AppDialog } from '../../../shared/dialog/dialog';
 import { CollectionService } from '../collection.service';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
+
+/** One card staged for a batch add - see pendingItems' doc. */
+interface PendingAddItem {
+  tempId: number;
+  card: Card;
+  quantity: number;
+  foil: boolean;
+  condition: string;
+  language: string;
+}
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -56,8 +65,17 @@ export class AddCardDialog {
   protected readonly foil = signal(false);
   protected readonly condition = signal('NM');
   protected readonly language = signal(DEFAULT_CARD_LANGUAGE);
-  protected readonly submitting = signal(false);
-  protected readonly submitError = signal<string | null>(null);
+
+  // Cards staged via addToList() but not yet sent to Supabase - lets adding
+  // several cards in a row stay in one dialog session instead of the
+  // dialog closing (and the search having to restart from scratch) after
+  // every single card, which is what submit() used to do unconditionally.
+  // Flushed as one batch by commitAll(), called whenever the dialog
+  // actually closes (see finishAndClose()).
+  protected readonly pendingItems = signal<PendingAddItem[]>([]);
+  protected readonly committing = signal(false);
+  protected readonly commitError = signal<string | null>(null);
+  private nextTempId = 0;
 
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
   // Aborts the previous search's actual request (not just its result) when
@@ -117,12 +135,12 @@ export class AddCardDialog {
     }
   }
 
-  /** Normal name search still goes through selectName()'s "pick a print" step; typing an exact set code (MTG, e.g. "emn") or an exact print code (Yu-Gi-Oh!, e.g. "LOB-DE001") already landed on one specific card, so this skips straight to it instead of making the user re-pick the same (and for Yu-Gi-Oh!, only) print. */
+  /** Normal name search still goes through selectName()'s "pick a print" step; typing an exact set code (MTG, e.g. "emn"), a bare set prefix (Yu-Gi-Oh!, e.g. "AMDE"), or an exact print code (Yu-Gi-Oh!, e.g. "LOB-DE001") already landed on one specific print, so this skips straight to it instead of making the user re-pick the same one. A Yu-Gi-Oh! result only ever carries a resolved printCode when it came from one of those two direct-hit searches (see YugiohApiService.searchCards) - the plain name search always returns printCode: null - so checking that field covers both cases without needing to re-parse the query here. */
   protected selectCard(card: Card) {
     const trimmed = this.query().trim();
     const isDirectHit =
       (card.game === 'mtg' && card.setCode.toLowerCase() === trimmed.toLowerCase()) ||
-      (card.game === 'yugioh' && YUGIOH_PRINT_CODE_PATTERN.test(trimmed));
+      (card.game === 'yugioh' && card.printCode != null);
     if (isDirectHit) {
       this.directPrint.set(true);
       this.selectedName.set(card.name);
@@ -161,7 +179,6 @@ export class AddCardDialog {
     this.foil.set(false);
     this.condition.set('NM');
     this.language.set(DEFAULT_CARD_LANGUAGE);
-    this.submitError.set(null);
   }
 
   backToPrints() {
@@ -172,34 +189,98 @@ export class AddCardDialog {
     this.selectedCard.set(null);
   }
 
-  async submit() {
+  /** Stages the configured card/quantity/foil/condition/language instead of sending it to Supabase right away, then resets straight back to a fresh search so the next card can be added without leaving the dialog - see pendingItems' doc. */
+  protected addToList(): void {
     const card = this.selectedCard();
     if (!card) return;
 
-    this.submitting.set(true);
-    this.submitError.set(null);
+    const quantity = this.quantity();
+    const foil = this.foil();
+    const condition = this.condition();
+    const language = this.language();
+    const key = this.pendingKey(card, foil, language);
+
+    this.pendingItems.update((items) => {
+      const index = items.findIndex((item) => this.pendingKey(item.card, item.foil, item.language) === key);
+      if (index === -1) {
+        return [...items, { tempId: this.nextTempId++, card, quantity, foil, condition, language }];
+      }
+      // Same dedup key CollectionService.upsertOne() would merge into one
+      // row anyway (card/foil/language/Yu-Gi-Oh!-print - see
+      // AddCardInput.setCode's doc) - merging here too avoids both a
+      // confusing duplicate-looking list entry and a race between two
+      // concurrent inserts for the same not-yet-existing row in
+      // commitAll()'s Promise.all (see CollectionService.addCards).
+      const merged = [...items];
+      merged[index] = { ...merged[index], quantity: merged[index].quantity + quantity };
+      return merged;
+    });
+
+    this.selectedName.set(null);
+    this.prints.set([]);
+    this.selectedCard.set(null);
+    this.directPrint.set(false);
+    this.query.set('');
+    this.results.set([]);
+    this.searchError.set(null);
+  }
+
+  protected removePending(tempId: number): void {
+    this.pendingItems.update((items) => items.filter((item) => item.tempId !== tempId));
+  }
+
+  private pendingKey(card: Card, foil: boolean, language: string): string {
+    const setCode = card.game === 'yugioh' ? card.printCode : null;
+    return `${card.id}|${foil}|${language}|${setCode ?? ''}`;
+  }
+
+  /** Sends every staged item to Supabase as one batch. Returns whether it succeeded, so finishAndClose() knows whether it's safe to actually close. */
+  protected async commitAll(): Promise<boolean> {
+    const items = this.pendingItems();
+    if (items.length === 0) return true;
+
+    this.committing.set(true);
+    this.commitError.set(null);
     try {
-      await this.collectionService.addCard({
-        cardId: card.id,
-        quantity: this.quantity(),
-        foil: this.foil(),
-        condition: this.condition(),
-        language: this.language(),
-        oracleId: card.oracleId,
-        // The specific printing picked in the "Druck wählen" step (Yu-Gi-Oh!
-        // only - see YugiohApiService.getPrints) - persisted so this exact
-        // print's set/rarity survives the collection being re-read later
-        // (see 040_collection_set_code.sql).
-        setCode: card.game === 'yugioh' ? card.printCode : null,
-      });
-      this.added.emit();
-      this.close.emit();
-    } catch (error) {
-      this.submitError.set(
-        error instanceof Error ? error.message : this.translate.instant('addCard.addFailed'),
+      await this.collectionService.addCards(
+        items.map((item) => ({
+          cardId: item.card.id,
+          quantity: item.quantity,
+          foil: item.foil,
+          condition: item.condition,
+          language: item.language,
+          oracleId: item.card.oracleId,
+          // The specific printing picked in the "Druck wählen" step
+          // (Yu-Gi-Oh! only - see YugiohApiService.getPrints) - persisted
+          // so this exact print's set/rarity survives the collection being
+          // re-read later (see 040_collection_set_code.sql).
+          setCode: item.card.game === 'yugioh' ? item.card.printCode : null,
+        })),
       );
+      this.pendingItems.set([]);
+      this.added.emit();
+      return true;
+    } catch (error) {
+      this.commitError.set(
+        error instanceof Error ? error.message : this.translate.instant('addCard.addAllFailed'),
+      );
+      return false;
     } finally {
-      this.submitting.set(false);
+      this.committing.set(false);
     }
+  }
+
+  /**
+   * Bound to the dialog's own closeRequest (header ✕, Escape, backdrop, and
+   * the explicit "Alle hinzufügen" button all go through this one path) -
+   * always flushes whatever's still staged first rather than treating
+   * "close" as "discard the list". The list already has its own per-item
+   * remove button for discarding a single entry, so there's no separate
+   * "close without adding" action that would otherwise make staged cards
+   * vanish silently. Stays open with commitError shown if the flush itself
+   * fails, instead of closing and losing the list.
+   */
+  protected async finishAndClose(): Promise<void> {
+    if (await this.commitAll()) this.close.emit();
   }
 }

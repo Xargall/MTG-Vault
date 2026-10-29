@@ -89,6 +89,7 @@ Gemeinsame Methoden die jede API-Implementierung bereitstellt:
 
 - Autocomplete ab 2-3 Zeichen (je nach API)
 - Karte hinzufügen: Menge, Foil (nur MTG), Zustand
+- **Mehrfach-Hinzufügen (2026-10-29):** `AddCardDialog` schließt sich nicht mehr nach jeder einzelnen Karte. „Zur Liste hinzufügen“ merkt die konfigurierte Karte nur lokal vor (`pendingItems`-Signal, in der Liste per „×“ wieder entfernbar); erst beim Schließen des Dialogs (Header-✕, Escape, Backdrop oder der Button „Alle hinzufügen“) geht der ganze Stapel als ein `CollectionService.addCards()`-Batch an Supabase — bleibt der Batch-Request fehlerhaft, bleibt der Dialog offen statt die Liste zu verlieren.
 - Phase 2: Kamera-Scan via Tesseract.js OCR
 
 ### Decks (MTG)

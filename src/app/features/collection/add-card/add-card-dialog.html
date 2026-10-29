@@ -1,4 +1,35 @@
-<app-dialog [heading]="'addCard.title' | translate" maxWidth="720px" (closeRequest)="close.emit()">
+<app-dialog [heading]="'addCard.title' | translate" maxWidth="720px" (closeRequest)="finishAndClose()">
+
+  @if (pendingItems().length > 0) {
+    <div class="pending-list">
+      <div class="pending-list-header">
+        <span>{{ 'addCard.pendingCount' | translate: { count: pendingItems().length } }}</span>
+        <button type="button" class="btn btn--primary btn--sm" [disabled]="committing()" (click)="finishAndClose()">
+          {{ 'addCard.addAll' | translate }}
+        </button>
+      </div>
+      <ul class="pending-items">
+        @for (item of pendingItems(); track item.tempId) {
+          <li>
+            <span class="pending-item-name">{{ item.card.name }}</span>
+            <span class="pending-item-qty">×{{ item.quantity }}</span>
+            @if (item.foil) { <span class="pending-item-foil">✨</span> }
+            <button
+              type="button"
+              class="pending-item-remove"
+              [attr.aria-label]="'addCard.removeFromList' | translate"
+              (click)="removePending(item.tempId)"
+            >
+              <svg aria-hidden="true"><use href="#icon-close" /></svg>
+            </button>
+          </li>
+        }
+      </ul>
+      @if (commitError()) {
+        <p class="state-message error">{{ commitError() }}</p>
+      }
+    </div>
+  }
 
   @if (!selectedName()) {
     <input
@@ -111,12 +142,8 @@
             }
           </select>
 
-          @if (submitError()) {
-            <p class="state-message error">{{ submitError() }}</p>
-          }
-
-          <button type="button" class="btn btn--primary submit-button" [disabled]="submitting()" (click)="submit()">
-            {{ 'addCard.submit' | translate }}
+          <button type="button" class="btn btn--primary submit-button" (click)="addToList()">
+            {{ 'addCard.addToList' | translate }}
           </button>
         </div>
       </div>
