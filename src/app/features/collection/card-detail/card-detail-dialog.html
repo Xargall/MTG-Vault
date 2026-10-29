@@ -116,33 +116,42 @@
     <div class="copy-fields">
       <div class="copy-field">
         <span class="field-caption" id="copy-quantity-label">{{ 'cardDetail.quantity' | translate }}</span>
-        <div class="stepper" role="group" aria-labelledby="copy-quantity-label">
-          <button
-            type="button"
-            class="icon-btn stepper-button"
-            [disabled]="editQuantity() <= 1"
-            (click)="stepQuantity(-1)"
-            [attr.aria-label]="'cardDetail.decrease' | translate"
-          >
-            <svg aria-hidden="true"><use href="#icon-minus" /></svg>
-          </button>
-          <input
-            class="stepper-value"
-            type="number"
-            inputmode="numeric"
-            min="1"
-            aria-labelledby="copy-quantity-label"
-            [ngModel]="editQuantity()"
-            (ngModelChange)="onQuantityInput($event)"
-          />
-          <button
-            type="button"
-            class="icon-btn stepper-button"
-            (click)="stepQuantity(1)"
-            [attr.aria-label]="'cardDetail.increase' | translate"
-          >
-            <svg aria-hidden="true"><use href="#icon-plus" /></svg>
-          </button>
+        <div class="quantity-row">
+          <div class="stepper" role="group" aria-labelledby="copy-quantity-label">
+            <button
+              type="button"
+              class="icon-btn stepper-button"
+              [disabled]="editQuantity() <= 1"
+              (click)="stepQuantity(-1)"
+              [attr.aria-label]="'cardDetail.decrease' | translate"
+            >
+              <svg aria-hidden="true"><use href="#icon-minus" /></svg>
+            </button>
+            <input
+              class="stepper-value"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              aria-labelledby="copy-quantity-label"
+              [ngModel]="editQuantity()"
+              (ngModelChange)="onQuantityInput($event)"
+            />
+            <button
+              type="button"
+              class="icon-btn stepper-button"
+              (click)="stepQuantity(1)"
+              [attr.aria-label]="'cardDetail.increase' | translate"
+            >
+              <svg aria-hidden="true"><use href="#icon-plus" /></svg>
+            </button>
+          </div>
+          <!-- Purely a visual "saved" confirmation - saveError() below
+               already surfaces a failure accessibly, so this stays
+               decorative rather than an aria-live region announcing every
+               autosave. -->
+          <svg class="quantity-saved-check" [class.is-visible]="quantityJustSaved()" aria-hidden="true">
+            <use href="#icon-check" />
+          </svg>
         </div>
       </div>
 

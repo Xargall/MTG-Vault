@@ -193,6 +193,28 @@
   font-size: 0.85rem;
 }
 
+.quantity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+// The green autosave confirmation (see CardDetailDialog.quantityJustSaved) -
+// always in the DOM (not @if-ed) so toggling .is-visible actually animates
+// instead of popping in/out, and reserves its own width so the stepper
+// doesn't shift sideways as it fades in and out.
+.quantity-saved-check {
+  width: 16px;
+  height: 16px;
+  color: var(--color-success);
+  opacity: 0;
+  transition: opacity var(--dur-state) ease;
+
+  &.is-visible {
+    opacity: 1;
+  }
+}
+
 // [-] 5 [+]: one inset slot with the controls set into it.
 .stepper {
   display: inline-flex;

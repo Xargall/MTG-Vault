@@ -47,6 +47,9 @@ const BANLIST_LABELS: Record<YugiohBanlistStatus, string> = {
 // long enough that a quick run of stepper clicks (or retyping a number)
 // settles into one save, not one per click/keystroke.
 const QUANTITY_AUTOSAVE_DEBOUNCE_MS = 700;
+// How long the green "saved" checkmark next to the quantity stays visible
+// before fading back out on its own (see quantityJustSaved's doc).
+const QUANTITY_SAVED_BADGE_MS = 2000;
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -97,25 +100,32 @@ export class CardDetailDialog implements OnDestroy {
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
 
-  /** Save/discard only appear once something actually differs from what's stored. */
+  // Quantity saves on its own (see scheduleQuantityAutosave) - only a
+  // foil/language edit still needs the explicit Save/Discard pair, so
+  // those two are all "dirty" tracks now. A quantity change alone shows
+  // the green checkmark (quantityJustSaved) instead, never this pair.
   protected readonly dirty = computed(() => {
     const row = this.entry().row;
-    return (
-      this.editQuantity() !== row.quantity ||
-      this.editFoil() !== row.foil ||
-      this.editLanguage() !== (row.language)
-    );
+    return this.editFoil() !== row.foil || this.editLanguage() !== row.language;
   });
 
   private quantityAutosaveHandle: ReturnType<typeof setTimeout> | null = null;
+  // Drives the green checkmark next to the quantity stepper - set once an
+  // autosave actually completes, cleared the moment the user touches the
+  // quantity again (stepQuantity/onQuantityInput) or after
+  // QUANTITY_SAVED_BADGE_MS of no further edits, whichever comes first.
+  protected readonly quantityJustSaved = signal(false);
+  private quantitySavedFadeHandle: ReturnType<typeof setTimeout> | null = null;
 
   protected stepQuantity(delta: number) {
     this.editQuantity.set(Math.max(1, Math.trunc(Number(this.editQuantity()) || 1) + delta));
+    this.quantityJustSaved.set(false);
     this.scheduleQuantityAutosave();
   }
 
   protected onQuantityInput(value: number) {
     this.editQuantity.set(value);
+    this.quantityJustSaved.set(false);
     this.scheduleQuantityAutosave();
   }
 
@@ -125,7 +135,9 @@ export class CardDetailDialog implements OnDestroy {
     this.quantityAutosaveHandle = setTimeout(() => {
       this.quantityAutosaveHandle = null;
       if (this.editQuantity() === this.entry().row.quantity) return;
-      void this.saveEdit();
+      void this.saveEdit().then((success) => {
+        if (success) this.flashQuantitySaved();
+      });
     }, QUANTITY_AUTOSAVE_DEBOUNCE_MS);
   }
 
@@ -133,6 +145,12 @@ export class CardDetailDialog implements OnDestroy {
     if (!this.quantityAutosaveHandle) return;
     clearTimeout(this.quantityAutosaveHandle);
     this.quantityAutosaveHandle = null;
+  }
+
+  private flashQuantitySaved() {
+    this.quantityJustSaved.set(true);
+    if (this.quantitySavedFadeHandle) clearTimeout(this.quantitySavedFadeHandle);
+    this.quantitySavedFadeHandle = setTimeout(() => this.quantityJustSaved.set(false), QUANTITY_SAVED_BADGE_MS);
   }
 
   protected discardEdit() {
@@ -154,14 +172,16 @@ export class CardDetailDialog implements OnDestroy {
   /** Closing the dialog before the debounce fires abandons the pending autosave rather than saving behind the user's back after they've already navigated away - same "closing never saves on its own" rule the add-card dialog's own staged-list bug taught (see AddCardDialog.finishAndClose's doc). */
   ngOnDestroy(): void {
     this.cancelQuantityAutosave();
+    if (this.quantitySavedFadeHandle) clearTimeout(this.quantitySavedFadeHandle);
   }
 
-  async saveEdit() {
+  /** Returns whether the save succeeded, so the quantity autosave path knows when to flash the checkmark (see flashQuantitySaved). */
+  async saveEdit(): Promise<boolean> {
     this.cancelQuantityAutosave();
     const quantity = Math.trunc(this.editQuantity());
     if (!Number.isFinite(quantity) || quantity < 1) {
       this.saveError.set(this.translate.instant('cardDetail.invalidQuantity'));
-      return;
+      return false;
     }
 
     this.saving.set(true);
@@ -173,10 +193,12 @@ export class CardDetailDialog implements OnDestroy {
         language: this.editLanguage(),
       });
       this.updated.emit();
+      return true;
     } catch (error) {
       this.saveError.set(
         error instanceof Error ? error.message : this.translate.instant('cardDetail.saveFailed'),
       );
+      return false;
     } finally {
       this.saving.set(false);
     }
