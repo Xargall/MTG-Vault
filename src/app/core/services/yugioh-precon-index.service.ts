@@ -16,7 +16,7 @@ const BATCH_SIZE = 8;
  * starter decks. Kept as a separate small service rather than a shared
  * parametrized one because the indexing policy genuinely differs: MTG only
  * eagerly indexes 2 of its many precon types to bound cost; the whole
- * Yu-Gi-Oh precon catalog (~85 decks) is cheap enough to index in full.
+ * Yu-Gi-Oh precon catalog (~105 decks) is cheap enough to index in full.
  */
 @Injectable({ providedIn: 'root' })
 export class YugiohPreconIndexService {

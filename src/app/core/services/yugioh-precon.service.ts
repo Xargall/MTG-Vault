@@ -13,6 +13,22 @@ interface YgoCardSet {
 const CARD_SETS_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardsets.php';
 const CARD_INFO_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
 
+// Covers every preconstructed-deck product YGOPRODeck lists, not just the
+// two most common lines - verified live against the full cardsets.php
+// response (2026-10-30): Structure/Starter Decks, the multi-deck "Legendary
+// ... Decks" boxes (Yugi's Legendary Decks, Legendary Hero Decks, Legendary
+// Decks II, ...), Egyptian God Decks, Speed Duel Starter/Demo Decks, Demo
+// Decks and the foil Chronicles Decks all have "deck(s)" as a standalone
+// word in set_name; nothing else in the live set list does.
+function classifyPreconType(setName: string): string {
+  if (/legendary.*decks?\b/i.test(setName)) return 'Legendary Decks';
+  if (/egyptian god deck/i.test(setName)) return 'Egyptian God Deck';
+  if (/chronicles deck/i.test(setName)) return 'Chronicles Deck';
+  if (/demo deck/i.test(setName)) return 'Demo Deck';
+  if (/starter deck/i.test(setName)) return 'Starter Deck';
+  return 'Structure Deck';
+}
+
 // `set_code` is not a unique key across precon-style sets (e.g. a 2-player
 // starter box and its two individually-named half-decks can share one
 // product code) - `set_name` is verified unique and doubles as the exact
@@ -37,11 +53,11 @@ export class YugiohPreconService implements PreconDeckProvider {
     const sets: YgoCardSet[] = await response.json();
 
     return sets
-      .filter((set) => /\b(structure deck|starter deck)\b/i.test(set.set_name))
+      .filter((set) => /\bdecks?\b/i.test(set.set_name))
       .map((set) => ({
         fileName: set.set_name,
         name: set.set_name,
-        type: /starter deck/i.test(set.set_name) ? 'Starter Deck' : 'Structure Deck',
+        type: classifyPreconType(set.set_name),
         releaseDate: set.tcg_date ?? '',
         bannerImageUrl: set.set_image ?? null,
       }));
