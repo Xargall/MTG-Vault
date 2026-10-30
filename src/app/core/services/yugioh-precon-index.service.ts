@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 
 import { PreconIndexData } from '../models/precon.model';
-import { idbGet, idbGetAll, idbPut, openIndexedDb } from './indexed-db.util';
+import { idbClear, idbGet, idbGetAll, idbPut, openIndexedDb } from './indexed-db.util';
 import { YugiohPreconService } from './yugioh-precon.service';
 
 const DB_NAME = 'tcg-collector-yugioh-precons';
@@ -9,6 +9,15 @@ const DB_VERSION = 1;
 const STORE_DECKS = 'deck-index';
 const STORE_META = 'deck-index-meta';
 const BATCH_SIZE = 8;
+// Bumped whenever YugiohPreconService.getDeckIndexData's own parsing logic
+// changes in a way that invalidates already-cached entries, same reasoning
+// as DeckCardIndexService's SCHEMA_VERSION. v2: quantity went from a flat 1
+// per unique card to the real per-card copy count (counted via each card's
+// own card_sets entries) - an already-cached v1 entry has no way to know
+// the *parsing itself* changed, so it would otherwise keep under-reporting
+// quantities forever instead of getting refetched.
+const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION_KEY = 'schemaVersion';
 
 /**
  * Same purpose as DeckCardIndexService (background full-text index over
@@ -54,16 +63,25 @@ export class YugiohPreconIndexService {
     }
 
     if (db) {
-      const cached = await idbGetAll(db, STORE_DECKS);
-      for (const [key, value] of cached) {
-        this.entries.set(String(key), value as PreconIndexData);
-      }
-      this.indexedCount.set(this.entries.size);
+      const cachedSchemaVersion = await idbGet(db, STORE_META, SCHEMA_VERSION_KEY);
+      if (cachedSchemaVersion !== SCHEMA_VERSION) {
+        // Parsing itself changed since this cache was built - every entry
+        // is suspect, not just the ones that look incomplete, so start
+        // clean rather than mixing old- and new-shape entries together.
+        await idbClear(db, STORE_DECKS);
+        await idbPut(db, STORE_META, SCHEMA_VERSION_KEY, SCHEMA_VERSION);
+      } else {
+        const cached = await idbGetAll(db, STORE_DECKS);
+        for (const [key, value] of cached) {
+          this.entries.set(String(key), value as PreconIndexData);
+        }
+        this.indexedCount.set(this.entries.size);
 
-      const complete = await idbGet(db, STORE_META, 'complete');
-      if (complete) {
-        this.ready.set(true);
-        return;
+        const complete = await idbGet(db, STORE_META, 'complete');
+        if (complete) {
+          this.ready.set(true);
+          return;
+        }
       }
     }
 

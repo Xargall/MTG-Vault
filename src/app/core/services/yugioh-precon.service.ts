@@ -10,6 +10,12 @@ interface YgoCardSet {
   set_image: string;
 }
 
+interface YgoPreconCard {
+  id: number;
+  name: string;
+  card_sets?: Array<{ set_name: string }>;
+}
+
 const CARD_SETS_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardsets.php';
 const CARD_INFO_ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
 
@@ -82,13 +88,22 @@ export class YugiohPreconService implements PreconDeckProvider {
     if (!response.ok) {
       throw new Error(`Deck konnte nicht geladen werden (${response.status})`);
     }
-    const body: { data: Array<{ id: number; name: string }> } = await response.json();
+    const body: { data: YgoPreconCard[] } = await response.json();
 
     const names = body.data.map((card) => card.name);
-    // The API only reports which cards are in a set, not how many copies -
-    // every card is recorded once, so quantity is a documented
-    // approximation, not a measured value.
-    const cards = body.data.map((card) => ({ cardId: String(card.id), quantity: 1 }));
+    // `cardinfo.php?cardset=` lists every card in the set once, even when
+    // it physically appears several times (either several copies in one
+    // deck, or - for a multi-deck box like Yugi's Legendary Decks - spread
+    // across more than one of the box's sub-decks) - the real per-card
+    // copy count is how many of that card's own `card_sets` entries name
+    // this exact set (verified live, 2026-10-30: "Starter Deck: Yugi"
+    // reports 50 unique cards but 95 such entries, matching its documented
+    // 95-card real total; "Yugi's Legendary Decks" reports 105 unique names
+    // but 125, matching its three 41/42-card sub-decks combined).
+    const cards = body.data.map((card) => {
+      const quantity = card.card_sets?.filter((set) => set.set_name === fileName).length ?? 0;
+      return { cardId: String(card.id), quantity: quantity || 1 };
+    });
     const heroCardId = cards[0]?.cardId ?? null;
 
     return { names, heroCardId, commanderCardId: null, cards, skippedCount: 0 };
