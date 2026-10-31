@@ -138,8 +138,13 @@ export class AddCardDialog {
   // the top after every single card added while browsing a set.
   private savedScrollTop = 0;
 
+  // .dialog-panel lives in AppDialog's OWN template (dialog.html), with this
+  // component's whole template projected into it via <ng-content /> - from
+  // this component's host element, that makes it a descendant, not an
+  // ancestor, so closest() (which only walks upward) would never find it.
+  // querySelector() searches the subtree instead, which does.
   private getScrollContainer(): HTMLElement | null {
-    return this.hostEl.nativeElement.closest('.dialog-panel') as HTMLElement | null;
+    return this.hostEl.nativeElement.querySelector('.dialog-panel');
   }
 
   onQueryChange(value: string) {
