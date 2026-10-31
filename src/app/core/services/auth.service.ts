@@ -16,7 +16,18 @@ export class AuthService {
   readonly session = this.supabase.session;
   readonly isAuthenticated = computed(() => this.session() !== null);
 
-  readonly isGuest = computed(() => this.session()?.user.is_anonymous === true);
+  // shortcut: guest feature-gating is disabled here on purpose so every
+  // feature (the camera scanner above all - see demoScanGuard,
+  // CollectionOverview, AppShell, ProfilePage, UserMenu) can be exercised
+  // end-to-end while testing against a guest/anonymous session - that's the
+  // only session a browser-automation tool like Playwright ever gets here,
+  // since there's no real account to log into. The underlying Supabase
+  // session is still genuinely anonymous (RLS/auth.uid() work exactly the
+  // same); only the app's own "hide this from guests" checks are skipped.
+  // Do NOT carry this line into master - a real deploy still needs guests
+  // gated. Revert to `computed(() => this.session()?.user.is_anonymous === true)`
+  // before any dev -> master release PR.
+  readonly isGuest = computed(() => false);
 
   readonly guestExpiresAt = computed<Date | null>(() => {
     const user = this.session()?.user;
