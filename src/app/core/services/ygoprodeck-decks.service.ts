@@ -3,6 +3,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { SupabaseService } from './supabase.service';
 import { RequestQueue } from '../utils/request-queue';
+import { readTtlCache, writeTtlCache } from '../utils/ttl-cache';
 
 // A 403 here would mean YGOPRODeck itself started blocking the proxy's
 // requests - same defensive cooldown shape as MoxfieldService/EdhrecService,
@@ -22,33 +23,6 @@ const MIN_DELAY_MS = 1500;
 // reasoning/TTL as MoxfieldService's TOP_DECKS_CACHE_KEY.
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_KEY = 'mtg-vault-ygoprodeck-decks';
-
-interface DiskCacheEntry<T> {
-  data: Record<string, T>;
-  timestamp: number;
-}
-
-function readCache<T>(): Record<string, T> {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return {};
-    const { data, timestamp } = JSON.parse(raw) as DiskCacheEntry<T>;
-    if (Date.now() - timestamp >= CACHE_TTL_MS) return {};
-    return data;
-  } catch {
-    return {};
-  }
-}
-
-function writeCache<T>(data: Record<string, T>): void {
-  try {
-    const entry: DiskCacheEntry<T> = { data, timestamp: Date.now() };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(entry));
-  } catch {
-    // Storage full/unavailable (private browsing) - not fatal, just means
-    // the next session fetches fresh instead of from cache.
-  }
-}
 
 // The real `_sft_category` values the live `filter-format` <select> on
 // ygoprodeck.com/deck-search/ offers (confirmed live via browser network
@@ -196,7 +170,7 @@ export class YgoprodeckDecksService {
   getTopDecks(category: string): Promise<YgoTopDeck[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
-    this.diskCache ??= readCache<YgoTopDeck[]>();
+    this.diskCache ??= readTtlCache<Record<string, YgoTopDeck[]>>(CACHE_KEY, CACHE_TTL_MS, {});
     const fromDisk = this.diskCache[category];
     if (fromDisk) return Promise.resolve(fromDisk);
 
@@ -205,7 +179,7 @@ export class YgoprodeckDecksService {
       cached = this.loadTopDecks(category).then((decks) => {
         if (decks.length > 0 && this.diskCache) {
           this.diskCache[category] = decks;
-          writeCache(this.diskCache);
+          writeTtlCache(CACHE_KEY, this.diskCache);
         }
         return decks;
       });

@@ -26,6 +26,12 @@ import { YUGIOH_PRINT_CODE_PATTERN, YugiohApiService } from '../../core/services
 import { CollectorFinish } from '../../core/utils/set-code-parser';
 import { levenshtein } from '../../core/utils/string-similarity';
 import { CardTile } from '../../shared/cards/card-tile/card-tile';
+import {
+  adaptBackgroundEstimate,
+  applyContrastStretch,
+  evaluateGateTick,
+  sampleToBackgroundArray,
+} from './motion-gate';
 
 const MIN_CAPTURE_GAP_MS = 300;
 // Paced against GeminiVisionService's own ~10s retry interval - every 3rd
@@ -72,53 +78,6 @@ function extractYugiohLanguage(printCode: string): string {
 /** The specific printing's set_code to persist on the collection row (see 040_collection_set_code.sql) - null for every game but Yu-Gi-Oh!, and null even there when the resolved Card never carried one (e.g. a plain name-search result, not a scan/exact-code match). */
 function setCodeOf(card: Card): string | null {
   return card.game === 'yugioh' ? card.printCode : null;
-}
-
-/**
- * Percentile-clipped linear contrast stretch (a "levels"/auto-contrast
- * adjustment), applied in place to a crop's own pixel data. Does NOT
- * greyscale or binarize - it keeps full color, just remaps the crop's own
- * (often compressed) luminance range to span the full 0-255 - so Gemini
- * still gets a color image, but one where e.g. black print-code text on a
- * dark blue card frame (near-identical luminance, easy to read for a human
- * who sees the hue difference, hard for a compressed/downsampled photo) is
- * pulled apart instead of crushed together. Clipping to the 1st/99th
- * percentile (rather than the crop's literal min/max) keeps a single stray
- * bright/dark pixel from skewing the whole remap.
- */
-function applyContrastStretch(data: Uint8ClampedArray): void {
-  const pixelCount = data.length / 4;
-  if (pixelCount === 0) return;
-
-  const histogram = new Uint32Array(256);
-  for (let i = 0; i < data.length; i += 4) {
-    const luminance = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-    histogram[luminance]++;
-  }
-
-  const clipCount = pixelCount * 0.01;
-  let low = 0;
-  let cumulative = 0;
-  for (; low < 255; low++) {
-    cumulative += histogram[low];
-    if (cumulative >= clipCount) break;
-  }
-  let high = 255;
-  cumulative = 0;
-  for (; high > 0; high--) {
-    cumulative += histogram[high];
-    if (cumulative >= clipCount) break;
-  }
-  // Crop is already near-flat (blank/solid) - stretching further would just
-  // amplify noise, not reveal text that isn't there.
-  if (high <= low) return;
-
-  const scale = 255 / (high - low);
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = Math.max(0, Math.min(255, (data[i] - low) * scale));
-    data[i + 1] = Math.max(0, Math.min(255, (data[i + 1] - low) * scale));
-    data[i + 2] = Math.max(0, Math.min(255, (data[i + 2] - low) * scale));
-  }
 }
 
 /**
@@ -665,37 +624,25 @@ export class Scanner {
 
     const previous = this.lastGateSample;
     this.lastGateSample = sample;
-
     const pixelCount = sample.length / 4;
-    let mean = 0;
-    for (let i = 0; i < sample.length; i += 4) mean += sample[i];
-    mean /= pixelCount;
-
-    // See GATE_MIN_VARIANCE_YUGIOH/GATE_MIN_DIFF_FROM_BACKGROUND_YUGIOH's
-    // doc - only Yu-Gi-Oh!'s own partial-card framing needs the lower bar.
-    const isYugioh = this.gameService.currentSlug() === 'yugioh';
-    const minVariance = isYugioh ? GATE_MIN_VARIANCE_YUGIOH : GATE_MIN_VARIANCE;
-    const minDiffFromBackground = isYugioh ? GATE_MIN_DIFF_FROM_BACKGROUND_YUGIOH : GATE_MIN_DIFF_FROM_BACKGROUND;
-
-    let variance = 0;
-    for (let i = 0; i < sample.length; i += 4) variance += (sample[i] - mean) ** 2;
-    const hasContent = variance / pixelCount > minVariance;
 
     if (!previous) {
       // First frame of a fresh session (new stream, or a reset after the
       // last card) - nothing to diff against yet, but it's as good a guess
       // at "what empty looks like" as any, so seed the background estimate
       // from it rather than leaving it null until the next tick.
-      this.backgroundEstimate = this.sampleToBackgroundArray(sample, pixelCount);
+      this.backgroundEstimate = sampleToBackgroundArray(sample, pixelCount);
       return;
     }
 
-    let diffSum = 0;
-    for (let i = 0; i < sample.length; i += 4) diffSum += Math.abs(sample[i] - previous[i]);
-    const isStable = diffSum / pixelCount < GATE_STABILITY_THRESHOLD;
-
-    const diffFromBackground = this.diffFromBackground(sample, pixelCount);
-    const looksNew = diffFromBackground > minDiffFromBackground;
+    // See GATE_MIN_VARIANCE_YUGIOH/GATE_MIN_DIFF_FROM_BACKGROUND_YUGIOH's
+    // doc - only Yu-Gi-Oh!'s own partial-card framing needs the lower bar.
+    const isYugioh = this.gameService.currentSlug() === 'yugioh';
+    const { isStable, hasContent, looksNew } = evaluateGateTick(sample, previous, this.backgroundEstimate, {
+      stabilityThreshold: GATE_STABILITY_THRESHOLD,
+      minVariance: isYugioh ? GATE_MIN_VARIANCE_YUGIOH : GATE_MIN_VARIANCE,
+      minDiffFromBackground: isYugioh ? GATE_MIN_DIFF_FROM_BACKGROUND_YUGIOH : GATE_MIN_DIFF_FROM_BACKGROUND,
+    });
 
     if (!isStable || !hasContent || !looksNew) {
       this.gateStableTicks = 0;
@@ -704,7 +651,9 @@ export class Scanner {
       // moment, or a stable-but-unchanged busy background) - but freezes
       // the instant a stable, genuinely different object shows up, so a
       // real card never gets slowly blended into "what empty looks like".
-      if (isStable && !looksNew) this.adaptBackgroundEstimate(sample, pixelCount);
+      if (isStable && !looksNew) {
+        this.backgroundEstimate = adaptBackgroundEstimate(sample, pixelCount, this.backgroundEstimate, BACKGROUND_ADAPT_RATE);
+      }
       return;
     }
 
@@ -713,30 +662,6 @@ export class Scanner {
     if (this.geminiInFlight || this.hasGeminiKey() === false) return;
 
     void this.autoGeminiScan(videoEl);
-  }
-
-  private sampleToBackgroundArray(sample: Uint8ClampedArray, pixelCount: number): Float32Array {
-    const background = new Float32Array(pixelCount);
-    for (let i = 0; i < pixelCount; i++) background[i] = sample[i * 4];
-    return background;
-  }
-
-  /** Mean absolute per-pixel difference between the current sample and the running background estimate - 0 when there's no estimate yet (nothing to call "new" against). */
-  private diffFromBackground(sample: Uint8ClampedArray, pixelCount: number): number {
-    if (!this.backgroundEstimate) return 0;
-    let diffSum = 0;
-    for (let i = 0; i < pixelCount; i++) diffSum += Math.abs(sample[i * 4] - this.backgroundEstimate[i]);
-    return diffSum / pixelCount;
-  }
-
-  private adaptBackgroundEstimate(sample: Uint8ClampedArray, pixelCount: number): void {
-    if (!this.backgroundEstimate) {
-      this.backgroundEstimate = this.sampleToBackgroundArray(sample, pixelCount);
-      return;
-    }
-    for (let i = 0; i < pixelCount; i++) {
-      this.backgroundEstimate[i] += (sample[i * 4] - this.backgroundEstimate[i]) * BACKGROUND_ADAPT_RATE;
-    }
   }
 
   /** Small grayscale downsample used only for the gate's stability/variance check - deliberately tiny since it's read back with getImageData every tick. */

@@ -48,10 +48,6 @@ export class GameService {
     if (slug === 'yugioh') return this.yugiohPrecon;
     return null;
   });
-  // Every game supports *some* deck functionality now (own decks + manual
-  // import, see DeckImportDialog) - this just gates the Decks nav tab/route,
-  // not precon/community browsing specifically. Use hasPreconBrowsing for that.
-  readonly decksSupported = computed(() => true);
   /** Whether the active game has a precon/community deck provider to browse - Pokémon doesn't (no viable data source yet), so its Decks page only offers manual import. */
   readonly hasPreconBrowsing = computed(() => this.precon() !== null);
 

@@ -24,6 +24,8 @@
 import zlib from 'node:zlib';
 import readline from 'node:readline';
 
+import { BATCH_SIZE, upsertBatchWithRetry } from './supabase-batch-upsert.mjs';
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
@@ -33,12 +35,6 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 
 const BULK_DATA_ENDPOINT = 'https://api.scryfall.com/bulk-data';
 const USER_AGENT = 'TCGVault/1.0 (mathias-mayer.de)';
-// One upsert per this many parsed rows, rather than one tiny upsert per
-// card (network round-trip cost, ~120k+ times over) or a single upsert for
-// the whole file (holds up incremental progress and risks a huge rollback
-// on any mid-stream error) - same reasoning as WRITE_BATCH_SIZE in
-// MtgBulkDataService (the client's own equivalent local-cache sync).
-const BATCH_SIZE = 500;
 
 /**
  * Same field selection as the client's own MtgBulkDataService.trimBulkCard
@@ -118,43 +114,6 @@ function rowFromRawCard(raw) {
   };
 }
 
-async function upsertBatch(batch) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/scryfall_cards`, {
-    method: 'POST',
-    headers: {
-      apikey: SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates',
-    },
-    body: JSON.stringify(batch),
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`upsert failed (${response.status}): ${body}`);
-  }
-}
-
-// A batch that fails outright used to fail the whole run (skippedBatches > 0
-// below) - confirmed live on a run where the actual cause was a transient
-// 504 from PostgREST, not bad data, and the exact same batch would very
-// likely have gone through a few seconds later. Retry before giving up.
-const MAX_ATTEMPTS = 3;
-const RETRY_DELAY_MS = 2000;
-
-async function upsertBatchWithRetry(batch) {
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      await upsertBatch(batch);
-      return;
-    } catch (error) {
-      if (attempt === MAX_ATTEMPTS) throw error;
-      console.error(`Batch of ${batch.length} failed (attempt ${attempt}/${MAX_ATTEMPTS}), retrying:`, error.message);
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
-    }
-  }
-}
-
 async function main() {
   console.log('Fetching bulk-data listing...');
   const infoResponse = await fetch(BULK_DATA_ENDPOINT, { headers: { 'User-Agent': USER_AGENT } });
@@ -183,7 +142,7 @@ async function main() {
   const flush = async () => {
     if (batch.length === 0) return;
     try {
-      await upsertBatchWithRetry(batch);
+      await upsertBatchWithRetry('scryfall_cards', batch);
       total += batch.length;
     } catch (error) {
       console.error(`Batch of ${batch.length} failed, skipping:`, error.message);

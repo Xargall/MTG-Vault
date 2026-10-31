@@ -37,75 +37,7 @@ export function cleanOcrText(raw: string): string {
     .trim();
 }
 
-/** Tesseract regularly mis-reads German umlauts as plain-letter digraphs - undo the common cases before searching. */
-export function fixUmlauts(text: string): string {
-  return text
-    .replace(/\bii\b/gi, 'ü')
-    .replace(/ii([a-z])/gi, 'ü$1')
-    .replace(/([a-z])ii/gi, '$1ü')
-    .replace(/Ae/g, 'Ä')
-    .replace(/ae/g, 'ä')
-    .replace(/Oe/g, 'Ö')
-    .replace(/oe/g, 'ö')
-    .replace(/Ue/g, 'Ü')
-    .replace(/ue/g, 'ü');
-}
-
 export interface OcrLineLike {
   text: string;
   confidence: number;
-}
-
-const LINE_CONFIDENCE_THRESHOLD = 70;
-const MIN_LINE_LENGTH = 3;
-const HAS_LETTER_PATTERN = /\p{L}/u;
-
-// The card name always prints in one of the first lines, before the type
-// line - once any of these show up (a type-line word or an early rules-text
-// word, whichever comes first), everything from there on is rules text, not
-// the name, so it's excluded rather than fed into the "longest line" pick.
-const STOP_KEYWORDS = [
-  'Legendary',
-  'Creature',
-  'Instant',
-  'Sorcery',
-  'Enchantment',
-  'Artifact',
-  'Land',
-  'Planeswalker',
-  'Reichweite',
-  'Trampelschaden',
-  'Menace',
-  'Whenever',
-  'Immer wenn',
-  'Marke',
-  'Schaden',
-  'Ziel',
-  'Wahll',
-];
-
-/**
- * Picks the most plausible card-name line out of a whole card image's OCR
- * output: card names are printed as their own line, before the type line
- * and rules text, so this first cuts off everything from the first
- * type-line/rules-text keyword onward. Of what's left, confident lines
- * (Tesseract's per-line confidence, not the whole-image one) have any
- * stray parentheses stripped (OCR sometimes wraps the name in them), lines
- * with no letters at all or under 3 characters are dropped, and the
- * longest survivor is taken - the fullest name is more useful to search on
- * than a truncated fragment. Returns null if nothing survives.
- */
-export function extractNameFromLines(lines: OcrLineLike[]): string | null {
-  const stopIndex = lines.findIndex((line) => STOP_KEYWORDS.some((keyword) => line.text.includes(keyword)));
-  const candidateLines = stopIndex === -1 ? lines : lines.slice(0, stopIndex);
-
-  const candidates = candidateLines
-    .filter((line) => line.confidence > LINE_CONFIDENCE_THRESHOLD)
-    .map((line) => line.text.replace(/[()]/g, '').trim())
-    .filter((text) => text.length >= MIN_LINE_LENGTH && HAS_LETTER_PATTERN.test(text));
-
-  if (candidates.length === 0) return null;
-
-  const longest = candidates.reduce((best, current) => (current.length > best.length ? current : best));
-  return fixUmlauts(longest);
 }

@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { AverageDeckCard } from './edhrec.service';
 import { SupabaseService } from './supabase.service';
+import { readTtlCache, writeTtlCache } from '../utils/ttl-cache';
 
 // Same TTL/pattern as MoxfieldService's own localStorage cache - a format's
 // recent Challenge results barely change within a day, and every full fetch
@@ -17,33 +18,6 @@ const MAX_EVENTS_PER_FORMAT = 3;
 // How many decks to offer as recommendations - same list length as
 // MoxfieldService.TOP_DECK_COUNT for a consistent UX between sources.
 const TOP_DECK_COUNT = 24;
-
-interface MtgoCacheEntry<T> {
-  data: Record<string, T>;
-  timestamp: number;
-}
-
-function readMtgoCache<T>(key: string): Record<string, T> {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return {};
-    const { data, timestamp } = JSON.parse(raw) as MtgoCacheEntry<T>;
-    if (Date.now() - timestamp >= MTGO_CACHE_TTL_MS) return {};
-    return data;
-  } catch {
-    return {};
-  }
-}
-
-function writeMtgoCache<T>(key: string, data: Record<string, T>): void {
-  try {
-    const entry: MtgoCacheEntry<T> = { data, timestamp: Date.now() };
-    localStorage.setItem(key, JSON.stringify(entry));
-  } catch {
-    // Storage full/unavailable (private browsing) - not fatal, just means
-    // the next session fetches fresh instead of from cache.
-  }
-}
 
 // MTGO's own format slugs, matching mtgo.com's real event-page URLs (e.g.
 // ".../standard-challenge-32-...") - same six 60-card formats
@@ -114,7 +88,11 @@ export class MtgoService {
    * both in-memory and in localStorage for 24h.
    */
   getTopDecks(format: string): Promise<MtgoTopDeck[]> {
-    this.topDecksDiskCache ??= readMtgoCache<MtgoTopDeck[]>(TOP_DECKS_CACHE_KEY);
+    this.topDecksDiskCache ??= readTtlCache<Record<string, MtgoTopDeck[]>>(
+      TOP_DECKS_CACHE_KEY,
+      MTGO_CACHE_TTL_MS,
+      {},
+    );
     const fromDisk = this.topDecksDiskCache[format];
     if (fromDisk) return Promise.resolve(fromDisk);
 
@@ -123,7 +101,7 @@ export class MtgoService {
       cached = this.loadTopDecks(format).then((decks) => {
         if (decks.length > 0 && this.topDecksDiskCache) {
           this.topDecksDiskCache[format] = decks;
-          writeMtgoCache(TOP_DECKS_CACHE_KEY, this.topDecksDiskCache);
+          writeTtlCache(TOP_DECKS_CACHE_KEY, this.topDecksDiskCache);
         }
         return decks;
       });
@@ -137,7 +115,11 @@ export class MtgoService {
       events: [],
     }));
 
-    this.deckCardsDiskCache ??= readMtgoCache<AverageDeckCard[]>(`${TOP_DECKS_CACHE_KEY}-cards`);
+    this.deckCardsDiskCache ??= readTtlCache<Record<string, AverageDeckCard[]>>(
+      `${TOP_DECKS_CACHE_KEY}-cards`,
+      MTGO_CACHE_TTL_MS,
+      {},
+    );
     const result: MtgoTopDeck[] = [];
 
     for (const evt of events.slice(0, MAX_EVENTS_PER_FORMAT)) {
@@ -160,7 +142,7 @@ export class MtgoService {
       }
     }
 
-    if (this.deckCardsDiskCache) writeMtgoCache(`${TOP_DECKS_CACHE_KEY}-cards`, this.deckCardsDiskCache);
+    if (this.deckCardsDiskCache) writeTtlCache(`${TOP_DECKS_CACHE_KEY}-cards`, this.deckCardsDiskCache);
 
     return result.sort((a, b) => sortKey(a) - sortKey(b)).slice(0, TOP_DECK_COUNT);
   }
@@ -174,7 +156,11 @@ export class MtgoService {
    * (e.g. this id was never listed in the current session/cache window).
    */
   getDeckCards(id: string): Promise<AverageDeckCard[]> {
-    this.deckCardsDiskCache ??= readMtgoCache<AverageDeckCard[]>(`${TOP_DECKS_CACHE_KEY}-cards`);
+    this.deckCardsDiskCache ??= readTtlCache<Record<string, AverageDeckCard[]>>(
+      `${TOP_DECKS_CACHE_KEY}-cards`,
+      MTGO_CACHE_TTL_MS,
+      {},
+    );
     const fromDisk = this.deckCardsDiskCache[id];
     if (fromDisk) return Promise.resolve(fromDisk);
 

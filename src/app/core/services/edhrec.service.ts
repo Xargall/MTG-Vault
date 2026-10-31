@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { SupabaseService } from './supabase.service';
+import { readTtlCache, writeTtlCache } from '../utils/ttl-cache';
 
 // EDHREC's 403 (see edhrec-proxy) is presumably a temporary block on the
 // proxy's own outbound IP, not a per-user thing - same cool-off pattern as
@@ -93,33 +94,6 @@ interface EdhrecPageResponse {
 const SALT_CACHE_KEY = 'mtg-vault-saltiest-cards';
 const SALT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-interface SaltCacheEntry {
-  data: EdhrecSaltCard[];
-  timestamp: number;
-}
-
-function readSaltCache(): EdhrecSaltCard[] | null {
-  try {
-    const raw = localStorage.getItem(SALT_CACHE_KEY);
-    if (!raw) return null;
-    const { data, timestamp } = JSON.parse(raw) as SaltCacheEntry;
-    if (Date.now() - timestamp >= SALT_CACHE_TTL_MS) return null;
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-function writeSaltCache(data: EdhrecSaltCard[]): void {
-  try {
-    const entry: SaltCacheEntry = { data, timestamp: Date.now() };
-    localStorage.setItem(SALT_CACHE_KEY, JSON.stringify(entry));
-  } catch {
-    // Storage full/unavailable (private browsing) - not fatal, just means
-    // the next session fetches fresh instead of from cache.
-  }
-}
-
 // Same reasoning as the salt cache above - EDHREC's per-color-identity
 // popularity rankings don't meaningfully shift within a day, and fetching
 // all 32 of them is exactly the bulk cost getCommandersByColorIdentity
@@ -128,33 +102,6 @@ function writeSaltCache(data: EdhrecSaltCard[]): void {
 // shared cache entry keyed by identity slug, not 32 separate localStorage keys.
 const COMMANDER_LISTS_CACHE_KEY = 'mtg-vault-commander-lists';
 const COMMANDER_LISTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-
-interface CommanderListsCacheEntry {
-  data: Record<string, EdhrecCommanderHit[]>;
-  timestamp: number;
-}
-
-function readCommanderListsCache(): Record<string, EdhrecCommanderHit[]> {
-  try {
-    const raw = localStorage.getItem(COMMANDER_LISTS_CACHE_KEY);
-    if (!raw) return {};
-    const { data, timestamp } = JSON.parse(raw) as CommanderListsCacheEntry;
-    if (Date.now() - timestamp >= COMMANDER_LISTS_CACHE_TTL_MS) return {};
-    return data;
-  } catch {
-    return {};
-  }
-}
-
-function writeCommanderListsCache(data: Record<string, EdhrecCommanderHit[]>): void {
-  try {
-    const entry: CommanderListsCacheEntry = { data, timestamp: Date.now() };
-    localStorage.setItem(COMMANDER_LISTS_CACHE_KEY, JSON.stringify(entry));
-  } catch {
-    // Storage full/unavailable (private browsing) - not fatal, just means
-    // the next session fetches fresh instead of from cache.
-  }
-}
 
 const DIACRITICS_PATTERN = /[̀-ͯ]/g;
 
@@ -228,7 +175,11 @@ export class EdhrecService {
   getCommandersByColorIdentity(identity: string): Promise<EdhrecCommanderHit[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
-    this.commanderListsDiskCache ??= readCommanderListsCache();
+    this.commanderListsDiskCache ??= readTtlCache<Record<string, EdhrecCommanderHit[]>>(
+      COMMANDER_LISTS_CACHE_KEY,
+      COMMANDER_LISTS_CACHE_TTL_MS,
+      {},
+    );
     const fromDisk = this.commanderListsDiskCache[identity];
     if (fromDisk) return Promise.resolve(fromDisk);
 
@@ -241,7 +192,7 @@ export class EdhrecService {
       ).then((hits) => {
         if (hits.length > 0 && this.commanderListsDiskCache) {
           this.commanderListsDiskCache[identity] = hits;
-          writeCommanderListsCache(this.commanderListsDiskCache);
+          writeTtlCache(COMMANDER_LISTS_CACHE_KEY, this.commanderListsDiskCache);
         }
         return hits;
       });
@@ -272,13 +223,13 @@ export class EdhrecService {
   }
 
   private async loadSaltiestCards(): Promise<EdhrecSaltCard[]> {
-    const cached = readSaltCache();
+    const cached = readTtlCache<EdhrecSaltCard[] | null>(SALT_CACHE_KEY, SALT_CACHE_TTL_MS, null);
     if (cached) return cached;
 
     const cards = await this.fetchPage<EdhrecSaltCard>('pages/top/salt.json', (cardlists) =>
       (cardlists[0]?.cardviews ?? []).map((view) => ({ name: view.name, salt: view.salt ?? 0 })),
     );
-    if (cards.length > 0) writeSaltCache(cards);
+    if (cards.length > 0) writeTtlCache(SALT_CACHE_KEY, cards);
     return cards;
   }
 

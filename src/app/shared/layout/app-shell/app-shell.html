@@ -57,9 +57,7 @@
         {{ 'nav.overview' | translate }}
       </a>
       <a routerLink="/collection" routerLinkActive="is-active">{{ 'nav.collection' | translate }}</a>
-      @if (gameService.decksSupported()) {
-        <a routerLink="/decks" routerLinkActive="is-active">{{ 'nav.decks' | translate }}</a>
-      }
+      <a routerLink="/decks" routerLinkActive="is-active">{{ 'nav.decks' | translate }}</a>
       <a routerLink="/wishlist" routerLinkActive="is-active">{{ 'nav.wishlist' | translate }}</a>
     </nav>
   </header>
@@ -94,12 +92,10 @@
       <svg aria-hidden="true"><use href="#icon-nav-collection" /></svg>
       <span>{{ 'nav.collection' | translate }}</span>
     </a>
-    @if (gameService.decksSupported()) {
-      <a routerLink="/decks" routerLinkActive="is-active">
-        <svg aria-hidden="true"><use href="#icon-nav-decks" /></svg>
-        <span>{{ 'nav.decks' | translate }}</span>
-      </a>
-    }
+    <a routerLink="/decks" routerLinkActive="is-active">
+      <svg aria-hidden="true"><use href="#icon-nav-decks" /></svg>
+      <span>{{ 'nav.decks' | translate }}</span>
+    </a>
     <a routerLink="/wishlist" routerLinkActive="is-active">
       <svg aria-hidden="true"><use href="#icon-nav-wishlist" /></svg>
       <span>{{ 'nav.wishlist' | translate }}</span>
