@@ -348,7 +348,7 @@ export class AddCardDialog {
     }
   }
 
-  /** Sends every staged item to Supabase as one batch. Returns whether it succeeded, so finishAndClose() knows whether it's safe to actually close. */
+  /** Sends every staged item to Supabase as one batch. Returns whether every item succeeded, so finishAndClose() knows whether it's safe to actually close. */
   protected async commitAll(): Promise<boolean> {
     const items = this.pendingItems();
     if (items.length === 0) return true;
@@ -362,7 +362,7 @@ export class AddCardDialog {
     this.committing.set(true);
     this.commitError.set(null);
     try {
-      await this.collectionService.addCards(
+      const outcomes = await this.collectionService.addCards(
         items.map((item) => ({
           cardId: item.card.id,
           quantity: item.quantity,
@@ -377,11 +377,33 @@ export class AddCardDialog {
           setCode: item.card.game === 'yugioh' ? item.card.printCode : null,
         })),
       );
-      this.pendingItems.set([]);
-      this.savePendingItems([]);
+
+      // outcomes is in the same order as items (see CollectionService.
+      // addCards) - keeping only the cards that actually failed staged, not
+      // the whole batch, means a retry re-sends just those instead of
+      // adding a second copy of everything that already went through. A
+      // plain Promise.all used to make this all-or-nothing: one flaky card
+      // failed the whole batch while the others had already been written,
+      // and "try again" doubled every one of those.
+      const stillPending = items.filter((_, index) => outcomes[index].status === 'rejected');
+      this.pendingItems.set(stillPending);
+      this.savePendingItems(stillPending);
+
+      if (stillPending.length > 0) {
+        this.commitError.set(this.translate.instant('addCard.addAllFailed'));
+        // Some cards did make it in even though this report counts as a
+        // failure overall - the collection view behind the dialog still
+        // needs to reflect them.
+        if (stillPending.length < items.length) this.added.emit();
+        return false;
+      }
+
       this.added.emit();
       return true;
     } catch (error) {
+      // addCards() itself only throws for something outside any one card's
+      // own upsert (not logged in, no active game) - every item is still
+      // staged in that case, nothing here to filter out.
       this.commitError.set(
         error instanceof Error ? error.message : this.translate.instant('addCard.addAllFailed'),
       );

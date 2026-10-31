@@ -312,7 +312,7 @@ export class DeckService {
       condition: 'NM',
       oracleId: oracleIdByCardId.get(card.cardId) ?? null,
     }));
-    await this.collectionService.addCards(collectionInputs);
+    await this.collectionService.addCardsOrThrow(collectionInputs);
   }
 
   /**
@@ -352,7 +352,7 @@ export class DeckService {
     }
 
     if (collectionInputs.length > 0) {
-      await this.collectionService.addCards(collectionInputs);
+      await this.collectionService.addCardsOrThrow(collectionInputs);
     }
   }
 
@@ -410,12 +410,17 @@ export class DeckService {
         .filter((reduction) => reduction.quantity > 0);
     }
 
-    const { error } = await this.supabase.client.from('decks').delete().eq('id', deckId);
-    if (error) throw error;
-
+    // Reduce the collection first: if this fails partway (one card's update
+    // errors, the connection drops), the deck row is still there to retry
+    // deletion against. Deleting the deck row first used to leave the
+    // collection half-adjusted with nothing left to check it against or
+    // retry from if this step then failed.
     if (reductions.length > 0) {
       await this.collectionService.reduceQuantities(reductions);
     }
+
+    const { error } = await this.supabase.client.from('decks').delete().eq('id', deckId);
+    if (error) throw error;
   }
 
   /** Manually frees a card from another deck's commitment (see deck-stats.ts's "assigned elsewhere" - the deck-detail dialog's "Freigeben" button) - the freed deck itself keeps the card in its list (still shows on its card grid), just no longer counts against its own completeness/availability elsewhere. `cardIds` covers every printing of the card that deck happens to list (see getAssignedElsewhereDecks), not just one. */

@@ -1,13 +1,13 @@
 -- Consolidated schema snapshot for a FRESH Supabase project.
 --
 -- This is NOT a migration and does not replace supabase/sql/*.sql - that
--- folder is the real historical record (41 files, each with the actual
+-- folder is the real historical record (42 files, each with the actual
 -- "why" behind a decision: a live-reported bug, a performance fix, a
 -- reasoning trade-off) and stays exactly as-is for reference. Nothing here
 -- needs to run against the already-live project; that database already has
 -- every one of those migrations applied. This file exists purely so a NEW
 -- Supabase project (a second environment, local dev, disaster recovery)
--- can be set up by running ONE script instead of 41 in order.
+-- can be set up by running ONE script instead of 42 in order.
 --
 -- Two things below are NOT sourced from any file in supabase/sql/ at all,
 -- because they were made by hand in the Supabase Studio UI and never
@@ -97,12 +97,24 @@ create table if not exists collection_cards (
   -- The specific printing's set_code (Yu-Gi-Oh! only, e.g. "TN19-EN007") -
   -- null means "unknown/generic printing" for every other row.
   set_code text,
-  created_at timestamptz not null default now(),
-  constraint collection_cards_dedup_key
-    unique (user_id, game_id, card_id, foil, finish, language, set_code)
+  created_at timestamptz not null default now()
 );
 
 create index if not exists collection_cards_user_id_idx on collection_cards (user_id);
+
+-- A plain `unique (..., set_code)` constraint would let two rows both with
+-- set_code=null (the common case - every MTG row) coexist for the exact
+-- same user/game/card/foil/finish/language: Postgres treats two NULLs as
+-- not equal to each other in a unique constraint, so it wouldn't actually
+-- stop that duplicate. coalesce(set_code, '') folds both NULLs into the
+-- same value, so two null-set_code rows now correctly count as a clash,
+-- while a null-set_code row and a specific-print row still coalesce to
+-- different values and stay separate (needed - a known print must never
+-- silently merge into a pre-existing unknown-print stack) - see
+-- 042_collection_cards_dedup_coalesce_set_code.sql for the live migration
+-- and the duplicate-insert race this closes.
+create unique index if not exists collection_cards_dedup_key_idx
+  on collection_cards (user_id, game_id, card_id, foil, finish, language, (coalesce(set_code, '')));
 
 alter table collection_cards enable row level security;
 

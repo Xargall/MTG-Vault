@@ -68,6 +68,13 @@ export type AddCardResult =
   | { rowId: string; merged: true; previousQuantity: number }
   | { rowId: string; merged: false };
 
+// Discriminated on `status` so a caller can't read `result` off a rejected
+// outcome or `error` off a fulfilled one. One entry per input, same order -
+// see addCards' own doc on why this isn't just a thrown error.
+export type AddCardOutcome =
+  | { input: AddCardInput; status: 'fulfilled'; result: AddCardResult }
+  | { input: AddCardInput; status: 'rejected'; error: unknown };
+
 // Supabase's PostgREST caps an unbounded select at a project-configured max
 // row count (1000 by default) - a plain `.select(...)` on collection_cards
 // with no `.range()` silently truncated to that many rows instead of
@@ -244,8 +251,32 @@ export class CollectionService {
     return this.upsertOne(input);
   }
 
-  async addCards(inputs: AddCardInput[]): Promise<void> {
-    await Promise.all(inputs.map((input) => this.upsertOne(input)));
+  /**
+   * One upsertOne() call per input, run concurrently, but never all-or-
+   * nothing the way a plain Promise.all used to make it: if even one card
+   * in the batch fails (dropped connection, timeout), Promise.all rejects
+   * the whole thing while every card that already succeeded has already
+   * been written - the caller's only option was to retry the *entire*
+   * batch, which re-sent the already-written cards too and (since
+   * upsertOne() adds onto an existing row rather than replacing it) doubled
+   * their quantity. Reporting one outcome per input instead lets a caller
+   * (see AddCardDialog.commitAll()) re-stage only the ones that actually
+   * failed.
+   */
+  async addCards(inputs: AddCardInput[]): Promise<AddCardOutcome[]> {
+    const settled = await Promise.allSettled(inputs.map((input) => this.upsertOne(input)));
+    return settled.map((outcome, index) =>
+      outcome.status === 'fulfilled'
+        ? { input: inputs[index], status: 'fulfilled', result: outcome.value }
+        : { input: inputs[index], status: 'rejected', error: outcome.reason },
+    );
+  }
+
+  /** All-or-nothing convenience over addCards() for callers with no stage-and-retry UI of their own (deck grants, demo seeding) - same "throw on the first failure" behavior addCards() itself used to have, before it started reporting partial results instead of throwing. */
+  async addCardsOrThrow(inputs: AddCardInput[]): Promise<void> {
+    const outcomes = await this.addCards(inputs);
+    const failed = outcomes.find((outcome) => outcome.status === 'rejected');
+    if (failed?.status === 'rejected') throw failed.error;
   }
 
   private async upsertOne({
@@ -358,40 +389,75 @@ export class CollectionService {
     if (error) throw error;
   }
 
-  /** Reverses a prior addCards grant (see DeckService.deleteDeck) - takes `quantity` copies of each card back out of the collection, never below what's actually there. A card_id can be stacked across several rows (foil/finish variants); the nonfoil stack is drained first since that's what deck grants always add to. */
+  /**
+   * Reverses a prior addCards grant (see DeckService.deleteDeck) - takes
+   * `quantity` copies of each card back out of the collection, never below
+   * what's actually there. A card_id can be stacked across several rows
+   * (foil/finish variants); the nonfoil stack is drained first since that's
+   * what deck grants always add to.
+   *
+   * Fetches every relevant row for every card in ONE query instead of one
+   * query per card, and deletes every fully-drained row in one batched
+   * `.in()` call - a 100-card deck used to cost up to one select plus one
+   * write *per card*, which is noticeably slow (several seconds) even
+   * though it isn't wrong. Only a row left with leftover quantity still
+   * needs its own `.update()` (each needs a different new quantity, which a
+   * single Supabase call can't express per-row without raw SQL) - but
+   * that's at most one row per card, not every row.
+   */
   async reduceQuantities(cards: Array<{ cardId: string; quantity: number }>): Promise<void> {
     await this.gameService.ready;
     const gameId = this.gameService.currentGameId();
     if (!gameId) return;
 
-    for (const { cardId, quantity } of cards) {
+    const wanted = cards.filter(({ quantity }) => quantity > 0);
+    if (wanted.length === 0) return;
+    const cardIds = [...new Set(wanted.map(({ cardId }) => cardId))];
+
+    const { data: rows, error } = await this.supabase.client
+      .from('collection_cards')
+      .select('id, card_id, quantity, foil')
+      .eq('game_id', gameId)
+      .in('card_id', cardIds)
+      .returns<Array<{ id: string; card_id: string; quantity: number; foil: boolean }>>();
+    if (error) throw error;
+    if (!rows || rows.length === 0) return;
+
+    const rowsByCardId = new Map<string, Array<{ id: string; quantity: number; foil: boolean }>>();
+    for (const row of rows) {
+      const list = rowsByCardId.get(row.card_id);
+      if (list) list.push(row);
+      else rowsByCardId.set(row.card_id, [row]);
+    }
+
+    const toDelete: string[] = [];
+    const toUpdate: Array<{ id: string; quantity: number }> = [];
+    for (const { cardId, quantity } of wanted) {
       let remaining = quantity;
-      if (remaining <= 0) continue;
-
-      const { data: rows, error } = await this.supabase.client
-        .from('collection_cards')
-        .select('id, quantity, foil')
-        .eq('game_id', gameId)
-        .eq('card_id', cardId)
-        .returns<Array<{ id: string; quantity: number; foil: boolean }>>();
-      if (error) throw error;
-      if (!rows || rows.length === 0) continue;
-
-      const ordered = [...rows].sort((a, b) => Number(a.foil) - Number(b.foil));
+      const ordered = [...(rowsByCardId.get(cardId) ?? [])].sort((a, b) => Number(a.foil) - Number(b.foil));
       for (const row of ordered) {
         if (remaining <= 0) break;
         const take = Math.min(remaining, row.quantity);
         remaining -= take;
-        if (take === row.quantity) {
-          await this.deleteEntry(row.id);
-        } else {
-          const { error: updateError } = await this.supabase.client
-            .from('collection_cards')
-            .update({ quantity: row.quantity - take })
-            .eq('id', row.id);
-          if (updateError) throw updateError;
-        }
+        if (take === row.quantity) toDelete.push(row.id);
+        else toUpdate.push({ id: row.id, quantity: row.quantity - take });
       }
     }
+
+    if (toDelete.length > 0) {
+      const { error: deleteError } = await this.supabase.client.from('collection_cards').delete().in('id', toDelete);
+      if (deleteError) throw deleteError;
+    }
+    // Each targets a distinct row id, so there's nothing to serialize for -
+    // running them concurrently instead of one at a time is what actually
+    // delivers the "batch the writes" win this rewrite is for; a plain
+    // sequential loop here would still cost one round trip per partially-
+    // drained row, same as before.
+    await Promise.all(
+      toUpdate.map(async ({ id, quantity }) => {
+        const { error: updateError } = await this.supabase.client.from('collection_cards').update({ quantity }).eq('id', id);
+        if (updateError) throw updateError;
+      }),
+    );
   }
 }

@@ -162,7 +162,7 @@ export class DemoSeedService {
         oracleId: card.oracleId ?? null,
       }));
 
-      if (inputs.length > 0) await this.collectionService.addCards(inputs);
+      if (inputs.length > 0) await this.collectionService.addCardsOrThrow(inputs);
       return new Set(resolved.map((card) => card.id));
     } catch (error) {
       console.warn('Demo-Sammlung konnte nicht angelegt werden:', error);
