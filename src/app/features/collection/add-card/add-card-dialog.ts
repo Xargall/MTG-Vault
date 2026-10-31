@@ -5,7 +5,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
 import { Card } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
-import { yugiohPrintNumber } from '../../../core/services/yugioh-api.service';
+import { YUGIOH_PRINT_CODE_PATTERN, yugiohPrintNumber } from '../../../core/services/yugioh-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AppDialog } from '../../../shared/dialog/dialog';
 import { CollectionService } from '../collection.service';
@@ -162,9 +162,16 @@ export class AddCardDialog {
     }
   }
 
-  /** Normal name search still goes through selectName()'s "pick a print" step; typing an exact set code (MTG, e.g. "emn"), a bare set prefix (Yu-Gi-Oh!, e.g. "AMDE"), or an exact print code (Yu-Gi-Oh!, e.g. "LOB-DE001") already landed on one specific print, so this skips straight to it instead of making the user re-pick the same one. A Yu-Gi-Oh! result only ever carries a resolved printCode when it came from one of those two direct-hit searches (see YugiohApiService.searchCards) - the plain name search always returns printCode: null - so checking that field covers both cases without needing to re-parse the query here. */
+  /** Normal name search still goes through selectName()'s "pick a print" step; typing an exact set code (MTG, e.g. "emn"), a bare set prefix (Yu-Gi-Oh!, e.g. "AMDE"), or an exact print code (Yu-Gi-Oh!, e.g. "LOB-DE001") already landed on one specific print, so this skips straight to it instead of making the user re-pick the same one. A Yu-Gi-Oh! result only ever carries a resolved printCode when it came from one of those two direct-hit searches (see YugiohApiService.searchCards) - the plain name search always returns printCode: null - so checking that field covers both cases without needing to re-parse the query here.
+   *
+   * An exact print code is the one case among those where the search already named one specific card, not a set to browse - re-checking the query shape here (same YUGIOH_PRINT_CODE_PATTERN the search itself used to decide to resolve a single print) picks that case out for quickAdd() instead of still landing on the quantity/foil/condition/language form pre-filled with defaults nobody had to confirm. MTG has no searchCards() path that resolves to one exact print from the search box the same way (getCardBySetAndNumber exists but isn't wired to it - see deck-import-dialog.ts/scanner.ts for its actual callers), so this only ever fires for Yu-Gi-Oh!. */
   protected selectCard(card: Card) {
     const trimmed = this.query().trim();
+    if (card.game === 'yugioh' && YUGIOH_PRINT_CODE_PATTERN.test(trimmed)) {
+      this.quickAdd(card);
+      return;
+    }
+
     const isDirectHit =
       (card.game === 'mtg' && card.setCode.toLowerCase() === trimmed.toLowerCase()) ||
       (card.game === 'yugioh' && card.printCode != null);
@@ -176,6 +183,13 @@ export class AddCardDialog {
       this.directPrint.set(false);
       void this.selectName(card);
     }
+  }
+
+  /** Stages one copy (no foil, NM, default language) straight from an exact print-code search result - see selectCard's doc on why that query shape skips the quantity/foil/condition/language form entirely. Clears the search afterward so the next code can be typed right away, the same "picking it is the confirming action" shortcut the camera scanner already uses for its own one-copy-at-a-time adds. Anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form by searching the card's name instead of its print code. */
+  private quickAdd(card: Card): void {
+    this.stageItem(card, 1, false, 'NM', DEFAULT_CARD_LANGUAGE);
+    this.query.set('');
+    this.results.set([]);
   }
 
   /** The number printed on the card itself, for scanning a browsed set quickly (e.g. typing "DABL" lists every card with its number, instead of just name/art) - MTG's own collectorNumber, or (Yu-Gi-Oh!, only once a specific printing is known - see selectCard's doc on printCode) the number portion of printCode. Null for a Yu-Gi-Oh! result with no resolved printing yet (a plain name search), where there's no one specific number to show. */
@@ -228,10 +242,12 @@ export class AddCardDialog {
     const card = this.selectedCard();
     if (!card) return;
 
-    const quantity = this.quantity();
-    const foil = this.foil();
-    const condition = this.condition();
-    const language = this.language();
+    this.stageItem(card, this.quantity(), this.foil(), this.condition(), this.language());
+    this.backToSearch();
+  }
+
+  /** Shared by addToList() (the configured form) and quickAdd() (the print-code shortcut) - both just stage different quantity/foil/condition/language values under the same dedup-and-merge rule. */
+  private stageItem(card: Card, quantity: number, foil: boolean, condition: string, language: string): void {
     const key = this.pendingKey(card, foil, language);
 
     this.pendingItems.update((items) => {
@@ -250,8 +266,6 @@ export class AddCardDialog {
       return merged;
     });
     this.savePendingItems(this.pendingItems());
-
-    this.backToSearch();
   }
 
   protected removePending(tempId: number): void {
