@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
@@ -34,6 +44,8 @@ export class AddCardDialog {
   protected readonly gameService = inject(GameService);
   private readonly collectionService = inject(CollectionService);
   private readonly translate = inject(TranslateService);
+  private readonly hostEl = inject(ElementRef<HTMLElement>);
+  private readonly injector = inject(Injector);
 
   // Scoped per game, same as the collection itself - avoids a Yu-Gi-Oh!
   // draft reappearing while browsing MTG, or vice versa.
@@ -117,6 +129,19 @@ export class AddCardDialog {
   // instead of landing on an empty prints list that was never fetched.
   private readonly directPrint = signal(false);
 
+  // The scroll position of the whole dialog (AppDialog's own .dialog-panel
+  // scrolls, not results-grid - see dialog.scss) right before leaving the
+  // search results for the print-picker/detail-form views. Those views are
+  // usually shorter than a full results-grid, so the browser clamps
+  // scrollTop down to fit while they're shown; restoring the saved value in
+  // backToSearch() undoes that clamp instead of leaving the list stuck at
+  // the top after every single card added while browsing a set.
+  private savedScrollTop = 0;
+
+  private getScrollContainer(): HTMLElement | null {
+    return this.hostEl.nativeElement.closest('.dialog-panel') as HTMLElement | null;
+  }
+
   onQueryChange(value: string) {
     this.query.set(value);
 
@@ -172,6 +197,8 @@ export class AddCardDialog {
       return;
     }
 
+    this.savedScrollTop = this.getScrollContainer()?.scrollTop ?? 0;
+
     const isDirectHit =
       (card.game === 'mtg' && card.setCode.toLowerCase() === trimmed.toLowerCase()) ||
       (card.game === 'yugioh' && card.printCode != null);
@@ -185,11 +212,9 @@ export class AddCardDialog {
     }
   }
 
-  /** Stages one copy (no foil, NM, default language) straight from an exact print-code search result - see selectCard's doc on why that query shape skips the quantity/foil/condition/language form entirely. Clears the search afterward so the next code can be typed right away, the same "picking it is the confirming action" shortcut the camera scanner already uses for its own one-copy-at-a-time adds. Anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form by searching the card's name instead of its print code. */
+  /** Stages one copy (no foil, NM, default language) straight from an exact print-code search result - see selectCard's doc on why that query shape skips the quantity/foil/condition/language form entirely. Deliberately leaves the search query/results as they are instead of clearing them - the code is still what's typed in the box either way, and clearing it only costs an extra retype for anyone re-checking or correcting the same code. Anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form by searching the card's name instead of its print code. */
   private quickAdd(card: Card): void {
     this.stageItem(card, 1, false, 'NM', DEFAULT_CARD_LANGUAGE);
-    this.query.set('');
-    this.results.set([]);
   }
 
   /** The number printed on the card itself, for scanning a browsed set quickly (e.g. typing "DABL" lists every card with its number, instead of just name/art) - MTG's own collectorNumber, or (Yu-Gi-Oh!, only once a specific printing is known - see selectCard's doc on printCode) the number portion of printCode. Null for a Yu-Gi-Oh! result with no resolved printing yet (a plain name search), where there's no one specific number to show. */
@@ -219,6 +244,18 @@ export class AddCardDialog {
     this.prints.set([]);
     this.selectedCard.set(null);
     this.directPrint.set(false);
+
+    // Runs once the search view (and its full-height results-grid) is back
+    // in the DOM - restoring scrollTop any earlier, while the shorter
+    // print-picker/detail-form markup is still what's rendered, would just
+    // get clamped back down again (see savedScrollTop's doc).
+    afterNextRender(
+      () => {
+        const container = this.getScrollContainer();
+        if (container) container.scrollTop = this.savedScrollTop;
+      },
+      { injector: this.injector },
+    );
   }
 
   selectPrint(card: Card) {
