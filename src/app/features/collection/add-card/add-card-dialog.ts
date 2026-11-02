@@ -219,9 +219,19 @@ export class AddCardDialog {
   // from the same synchronous block that mutates the signal has no such
   // race.
   protected readonly pendingItems = signal<PendingAddItem[]>(this.loadPendingItems());
+  // What the header count shows - the total physical copies staged, not
+  // pendingItems().length (the number of distinct rows). Adding a second
+  // Dark Eruption on top of an already-staged one merges into the same row
+  // with quantity 2 (see stageItem's dedup) rather than a new row, so the
+  // row count alone silently stopped moving the moment that happened - the
+  // whole point of the number is "how many cards am I about to add".
+  protected readonly pendingCardCount = computed(() =>
+    this.pendingItems().reduce((sum, item) => sum + item.quantity, 0),
+  );
   protected readonly committing = signal(false);
   protected readonly commitError = signal<string | null>(null);
   private nextTempId = Math.max(-1, ...this.pendingItems().map((item) => item.tempId)) + 1;
+  private readonly pendingItemsList = viewChild<ElementRef<HTMLUListElement>>('pendingItemsList');
 
   private debounceHandle: ReturnType<typeof setTimeout> | null = null;
   // Aborts the previous search's actual request (not just its result) when
@@ -417,6 +427,21 @@ export class AddCardDialog {
       return merged;
     });
     this.savePendingItems(this.pendingItems());
+
+    // A newly staged card is always appended at the end (or, on a merge,
+    // left at its already-visible spot) - scrolling the (now capped-height,
+    // see .pending-items) list to the bottom keeps whichever one just got
+    // added in view instead of it silently landing below the fold.
+    // afterNextRender since the list (and, for the very first staged item,
+    // its whole container - @if (pendingItems().length > 0)) must already
+    // reflect this update in the DOM before scrollHeight means anything.
+    afterNextRender(
+      () => {
+        const el = this.pendingItemsList()?.nativeElement;
+        if (el) el.scrollTop = el.scrollHeight;
+      },
+      { injector: this.injector },
+    );
   }
 
   protected removePending(tempId: number): void {
