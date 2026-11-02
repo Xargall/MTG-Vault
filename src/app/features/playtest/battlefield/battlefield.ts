@@ -20,6 +20,7 @@ export class Battlefield {
   readonly positionChanged = output<{ instanceId: string; x: number; y: number }>();
   readonly sentToGraveyard = output<string>();
   readonly sentToExile = output<string>();
+  readonly tapToggled = output<string>();
 
   protected onDragEnded(instanceId: string, event: CdkDragEnd): void {
     const { x, y } = event.source.getFreeDragPosition();

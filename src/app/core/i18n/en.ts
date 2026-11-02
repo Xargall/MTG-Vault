@@ -732,7 +732,8 @@ export const en: typeof de = {
     newGame: 'New Game',
     turn: 'Turn {{count}}',
     nextTurn: 'Next',
-    creaturesBand: 'Creatures',
     landsBand: 'Lands',
+    tap: 'Tap',
+    untap: 'Untap',
   },
 };

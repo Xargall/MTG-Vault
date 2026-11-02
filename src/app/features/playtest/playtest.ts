@@ -154,7 +154,10 @@ export class Playtest {
     if (!card) return;
     this.hand.update((items) => items.filter((c) => c.instanceId !== payload.instanceId));
     const fallback = { x: clientX - rect.left, y: clientY - rect.top };
-    this.battlefield.update((items) => [...items, { ...card, ...(snapToBand(card.card, items, rect.height) ?? fallback) }]);
+    this.battlefield.update((items) => [
+      ...items,
+      { ...card, tapped: false, ...(snapToBand(card.card, items, rect.height) ?? fallback) },
+    ]);
   }
 
   protected onBattlefieldPositionChanged(payload: { instanceId: string; x: number; y: number }): void {
@@ -175,8 +178,14 @@ export class Playtest {
     const card = this.battlefield().find((c) => c.instanceId === instanceId);
     if (!card) return;
     this.battlefield.update((items) => items.filter((c) => c.instanceId !== instanceId));
-    const { x: _x, y: _y, ...instance } = card;
+    const { x: _x, y: _y, tapped: _tapped, ...instance } = card;
     target.update((items) => [instance, ...items]);
+  }
+
+  protected onTapToggled(instanceId: string): void {
+    this.battlefield.update((items) =>
+      items.map((c) => (c.instanceId === instanceId ? { ...c, tapped: !c.tapped } : c)),
+    );
   }
 
   protected onReturnFromGraveyard(): void {
@@ -201,13 +210,13 @@ export class Playtest {
     this.placeOnBattlefield(top);
   }
 
-  /** Shared by every "enters the battlefield from somewhere else" path (commander cast, graveyard/exile return) - snaps into its band (land/creature) the same way a hand drop does; falls back to a fixed top-left spot (there's no drop point to fall back to here, unlike onHandCardDropped's own pointer coordinates). */
+  /** Shared by every "enters the battlefield from somewhere else" path (commander cast, graveyard/exile return) - snaps into the lands band the same way a hand drop does; falls back to a fixed top-left spot (there's no drop point to fall back to here, unlike onHandCardDropped's own pointer coordinates). */
   private placeOnBattlefield(instance: PlaytestCardInstance): void {
     const rect = this.battlefieldHost()?.nativeElement.getBoundingClientRect();
     const fallback = { x: 20, y: 20 };
     this.battlefield.update((items) => [
       ...items,
-      { ...instance, ...(rect ? (snapToBand(instance.card, items, rect.height) ?? fallback) : fallback) },
+      { ...instance, tapped: false, ...(rect ? (snapToBand(instance.card, items, rect.height) ?? fallback) : fallback) },
     ]);
   }
 

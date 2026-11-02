@@ -66,9 +66,9 @@ describe('buildLibrary', () => {
 });
 
 describe('classifyBattlefieldBand', () => {
-  it('classifies a land and a creature, leaving everything else free-placed', () => {
+  it('classifies a land, leaving creatures and everything else free-placed', () => {
     expect(classifyBattlefieldBand(mtgCard('forest', 'Basic Land — Forest'))).toBe('land');
-    expect(classifyBattlefieldBand(mtgCard('bear', 'Creature — Bear'))).toBe('creature');
+    expect(classifyBattlefieldBand(mtgCard('bear', 'Creature — Bear'))).toBeNull();
     expect(classifyBattlefieldBand(mtgCard('bolt', 'Instant'))).toBeNull();
     expect(classifyBattlefieldBand({ game: 'yugioh', id: 'x', typeLine: undefined } as unknown as Card)).toBeNull();
   });

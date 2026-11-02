@@ -7,10 +7,11 @@ export interface PlaytestCardInstance {
   card: Card;
 }
 
-/** A battlefield copy also carries its free-drag position - see Battlefield's own cdkDragFreeDragPosition binding. */
+/** A battlefield copy also carries its free-drag position - see Battlefield's own cdkDragFreeDragPosition binding - and its tapped state (the MTG "used this" convention: rotated 90°, toggled by its own button - see Battlefield's tapToggled output). */
 export interface BattlefieldCard extends PlaytestCardInstance {
   x: number;
   y: number;
+  tapped: boolean;
 }
 
 /** Builds the shuffle-ready library from a saved deck: excludes MTG token cards (same predicate as DeckDetailDialog.mainCards - a token isn't a real card to draw into a goldfish hand) and pulls the commander out into its own slot when the deck has one, instead of shuffling it into the 99/100. commander_card_id is only ever set by a precon import (see DeckService.addPreconDeck) - an EDHREC or manually-imported Commander deck has no commander data to find here, so it just plays as an ordinary library with no Command Zone (a known v1 limitation, not a bug). */
@@ -39,26 +40,19 @@ export function buildLibrary(entry: DeckEntry): { library: PlaytestCardInstance[
   return { library, commander };
 }
 
-// Matches battlefield.scss's two divider lines exactly (both read off
-// `calc(100% - <bottomOffset>px)`) - no shared source of truth between the
-// CSS bands and this JS snap target between the two.
-const CREATURES_BAND_BOTTOM = 220;
-const LANDS_BAND_BOTTOM = 110;
 const BAND_CARD_WIDTH = 100;
 const BAND_CARD_GAP = 8;
 const BAND_ROW_PADDING = 10;
 
-export type BattlefieldBand = 'creature' | 'land' | null;
+export type BattlefieldBand = 'land' | null;
 
-/** Live-requested: snap a Land or Creature straight into its labeled band on drop, instead of leaving it exactly where the pointer released it - everything else (spells, sorceries, artifacts, anything non-MTG) keeps free placement, since there's no rules engine here to know what else deserves its own band. */
+/** Live-requested: snap a Land straight into the bottom half on drop, instead of leaving it exactly where the pointer released it. Only lands get a dedicated band (live-reported: a separate creature row cut dropped lands off at the bottom edge when the band was sized for the old 3-band layout) - creatures, spells, and everything else keep free placement in the open top half, since there's no rules engine here to know what else deserves its own band. */
 export function classifyBattlefieldBand(card: Card): BattlefieldBand {
-  if (card.game !== 'mtg') return null;
-  if (card.typeLine.includes('Land')) return 'land';
-  if (card.typeLine.includes('Creature')) return 'creature';
+  if (card.game === 'mtg' && card.typeLine.includes('Land')) return 'land';
   return null;
 }
 
-/** The snapped {x, y} for a card entering a band, or null when it has no band (free placement at the actual drop point applies instead). Appends to the end of whatever's already in that band, left to right - battlefieldHeight is the live battlefield surface's own rendered height (its bounding rect), so the bands stay correctly bottom-anchored at any viewport size. */
+/** The snapped {x, y} for a land entering the bottom band, or null when it has no band (free placement at the actual drop point applies instead). Appends to the end of the row, left to right - battlefieldHeight is the live battlefield surface's own rendered height (its bounding rect), so the band stays correctly anchored to the bottom half at any viewport size. Matches battlefield.scss's own 50% divider - no shared source of truth between the CSS split and this JS snap target. */
 export function snapToBand(
   card: Card,
   existingBattlefieldCards: { card: Card }[],
@@ -67,8 +61,7 @@ export function snapToBand(
   const band = classifyBattlefieldBand(card);
   if (!band) return null;
 
-  const bottomOffset = band === 'creature' ? CREATURES_BAND_BOTTOM : LANDS_BAND_BOTTOM;
-  const y = battlefieldHeight - bottomOffset + BAND_ROW_PADDING;
+  const y = battlefieldHeight / 2 + BAND_ROW_PADDING;
   const countInBand = existingBattlefieldCards.filter((c) => classifyBattlefieldBand(c.card) === band).length;
   const x = BAND_ROW_PADDING + countInBand * (BAND_CARD_WIDTH + BAND_CARD_GAP);
   return { x, y };

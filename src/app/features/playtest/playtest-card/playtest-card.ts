@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 
 import { Card } from '../../../core/models/card.model';
 import { PlaytestPreviewService } from '../playtest-preview.service';
@@ -22,14 +22,21 @@ export class PlaytestCard {
   readonly faceDown = input(false);
   /** Plays the signature page-turn draw move (see playtest-card.scss's .flipping animation) - the library's top card only, driven by Playtest.isDrawing(). */
   readonly flipping = input(false);
+  /** The MTG "tap" convention (rotated 90° - see Battlefield's own tap-toggle button) - composed with the live holo tilt below into one transform. */
+  readonly tapped = input(false);
 
   protected readonly imageLoaded = signal(false);
-  protected readonly tiltTransform = signal('');
+  private readonly tiltTransform = signal('');
+  protected readonly cardTransform = computed(() => (this.tapped() ? 'rotate(90deg) ' : '') + this.tiltTransform());
   protected readonly glareBackground = signal('');
 
   // Every thumbnail on the table is too small to read a card's own text -
-  // mouse-only (DESIGN.md: "Hover nur mit Maus"), never for the face-down
-  // library back (nothing to read there).
+  // click works on touch too (live-requested: hover alone doesn't reach
+  // touch devices), face-up only (nothing to read on the library back).
+  protected onClick(): void {
+    if (!this.faceDown()) this.previewService.show(this.card());
+  }
+
   protected onMouseEnter(): void {
     if (!this.faceDown()) this.previewService.show(this.card());
   }

@@ -76,6 +76,7 @@
       [cards]="battlefield()"
       [dropActive]="handDragActive()"
       (positionChanged)="onBattlefieldPositionChanged($event)"
+      (tapToggled)="onTapToggled($event)"
       (sentToGraveyard)="onSentToGraveyard($event)"
       (sentToExile)="onSentToExile($event)"
     />

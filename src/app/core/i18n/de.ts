@@ -733,7 +733,8 @@ export const de = {
     newGame: 'Neues Spiel',
     turn: 'Runde {{count}}',
     nextTurn: 'Weiter',
-    creaturesBand: 'Kreaturen',
     landsBand: 'Länder',
+    tap: 'Tappen',
+    untap: 'Enttappen',
   },
 };

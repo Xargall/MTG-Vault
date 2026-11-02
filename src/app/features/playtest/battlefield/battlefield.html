@@ -1,15 +1,23 @@
 <div class="battlefield-surface" [class.drop-active]="dropActive()">
-  <span class="battlefield-band-label battlefield-band-label--creatures" aria-hidden="true">{{ 'playtest.creaturesBand' | translate }}</span>
-  <span class="battlefield-band-label battlefield-band-label--lands" aria-hidden="true">{{ 'playtest.landsBand' | translate }}</span>
+  <span class="battlefield-band-label" aria-hidden="true">{{ 'playtest.landsBand' | translate }}</span>
   @for (card of cards(); track card.instanceId) {
     <div
       class="battlefield-card"
+      [class.tapped]="card.tapped"
       cdkDrag
       [cdkDragFreeDragPosition]="{ x: card.x, y: card.y }"
       (cdkDragEnded)="onDragEnded(card.instanceId, $event)"
     >
-      <app-playtest-card [card]="card.card" />
+      <app-playtest-card [card]="card.card" [tapped]="card.tapped" />
       <div class="battlefield-card-actions">
+        <button
+          type="button"
+          class="btn btn--ghost btn--sm battlefield-tap-toggle"
+          [class.active]="card.tapped"
+          (click)="tapToggled.emit(card.instanceId)"
+        >
+          {{ (card.tapped ? 'playtest.untap' : 'playtest.tap') | translate }}
+        </button>
         <button type="button" class="btn btn--ghost btn--sm" (click)="sentToGraveyard.emit(card.instanceId)">
           {{ 'playtest.graveyard' | translate }}
         </button>

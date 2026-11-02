@@ -1,7 +1,8 @@
 <div
   class="playtest-card-inner"
   [class.flipping]="flipping()"
-  [style.transform]="tiltTransform()"
+  [style.transform]="cardTransform()"
+  (click)="onClick()"
   (mouseenter)="onMouseEnter()"
   (mouseleave)="onMouseLeave()"
   (mousemove)="onMouseMove($event)"
