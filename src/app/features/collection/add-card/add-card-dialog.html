@@ -38,17 +38,27 @@
     }
 
     <!-- Plain live preview (no OCR/scanning) to help read a physical card's
-         tiny print code by eye - zoom + the device's own torch/flash. -->
+         tiny print code by eye - zoom + manual focus + the device's own
+         torch/flash. -->
     <div class="camera-preview">
       <div class="camera-preview-frame">
         @if (cameraError()) {
           <p class="state-message error camera-preview-error">{{ cameraError() }}</p>
         }
-        <video #cameraVideo class="camera-preview-video" [style.transform]="'scale(' + zoom() + ')'"></video>
+        <!-- Tap-to-focus - works on more devices than the manual slider
+             below, so it's always wired up regardless of
+             supportsManualFocus (see onVideoTap's doc). -->
+        <video
+          #cameraVideo
+          class="camera-preview-video"
+          [style.transform]="'scale(' + zoom() + ')'"
+          (click)="onVideoTap($event)"
+        ></video>
       </div>
       <div class="camera-preview-controls">
         <input
           type="range"
+          class="camera-zoom-slider"
           [attr.aria-label]="'addCard.zoomLabel' | translate"
           [min]="minZoom"
           [max]="maxZoom"
@@ -69,6 +79,18 @@
           </button>
         }
       </div>
+      @if (supportsManualFocus()) {
+        <input
+          type="range"
+          class="camera-focus-slider"
+          [attr.aria-label]="'addCard.focusLabel' | translate"
+          [attr.min]="focusRange().min"
+          [attr.max]="focusRange().max"
+          [attr.step]="focusRange().step"
+          [value]="focusDistance()"
+          (input)="onFocusDistanceChange($any($event.target).valueAsNumber)"
+        />
+      }
     </div>
   </div>
 

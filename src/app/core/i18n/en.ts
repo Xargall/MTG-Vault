@@ -208,6 +208,7 @@ export const en: typeof de = {
     cameraNoneFound: 'No camera found.',
     zoomLabel: 'Zoom',
     torchLabel: 'Flashlight',
+    focusLabel: 'Focus',
   },
   cardDetail: {
     title: 'Card Details',
