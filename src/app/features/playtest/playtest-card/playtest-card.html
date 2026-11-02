@@ -1,0 +1,28 @@
+<div
+  class="playtest-card-inner"
+  [class.flipping]="flipping()"
+  [style.transform]="cardTransform()"
+  (click)="onClick()"
+  (mouseenter)="onMouseEnter()"
+  (mouseleave)="onMouseLeave()"
+  (mousemove)="onMouseMove($event)"
+>
+  @if (faceDown()) {
+    <!-- The real MTG card back (see DESIGN.md's documented exception to its
+         own "no official brand art as decoration" rule) - for the "feeling"
+         of a physical table, deliberately chosen over an original motif. -->
+    <img class="card-back" src="/playtest/mtg-card-back.jpg" alt="" aria-hidden="true" />
+  } @else if (card().imageUrlSmall ?? card().imageUrl; as url) {
+    <img
+      class="card-face"
+      [class.skeleton-shimmer]="!imageLoaded()"
+      [src]="url"
+      [alt]="card().name"
+      loading="lazy"
+      (load)="imageLoaded.set(true)"
+    />
+    <div class="card-glare" [style.background]="glareBackground()" aria-hidden="true"></div>
+  } @else {
+    <div class="card-placeholder">{{ card().name }}</div>
+  }
+</div>

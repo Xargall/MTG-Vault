@@ -25,6 +25,13 @@
             }
           </span>
         </div>
+
+        @if (isMtgDeck()) {
+          <button type="button" class="btn btn--secondary btn--sm hero-playtest" (click)="startPlaytest()">
+            <svg aria-hidden="true"><use href="#icon-shuffle" /></svg>
+            {{ 'deckDetail.playtestButton' | translate }}
+          </button>
+        }
       </div>
     </div>
   </div>

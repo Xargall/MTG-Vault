@@ -1,0 +1,73 @@
+:host {
+  display: block;
+}
+
+.playtest-card-inner {
+  display: block;
+  position: relative;
+  // Smooths both the tap toggle's 90° turn (every device) and, on a fine
+  // pointer, the per-mousemove holo-tilt jumps into a continuous follow
+  // instead of a snap between samples - the holo tilt itself is still
+  // mouse-only (DESIGN.md: "Hover nur mit Maus"), only this transition is
+  // shared with the tap rotation.
+  transition: transform var(--dur-state) var(--ease-out);
+}
+
+.card-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-card);
+  pointer-events: none;
+}
+
+// The signature "page-turn" draw move (DESIGN.md's "blättern um") - a cheap
+// single-transform flip: scaleX passes through 0 (edge-on, invisible) at the
+// midpoint, which is exactly when Playtest.draw() swaps the card from
+// face-down to face-up underneath, so the content change itself is never
+// seen. 260ms here must stay in sync with DRAW_FLIP_FULL_MS in playtest.ts -
+// no shared source of truth between the two.
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes playtest-card-flip {
+    0%,
+    100% {
+      transform: scaleX(1);
+    }
+    50% {
+      transform: scaleX(0);
+    }
+  }
+
+  .playtest-card-inner.flipping {
+    animation: playtest-card-flip 260ms var(--ease-in-out);
+  }
+}
+
+.card-face {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: var(--radius-card);
+  object-fit: cover;
+  display: block;
+}
+
+.card-placeholder {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: var(--radius-card);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm);
+  text-align: center;
+}
+
+.card-back {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: var(--radius-card);
+  object-fit: cover;
+  display: block;
+}

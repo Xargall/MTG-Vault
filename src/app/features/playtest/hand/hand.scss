@@ -1,0 +1,88 @@
+:host {
+  display: block;
+  width: 100%;
+  // No overflow-x here, even though a very wide hand has no horizontal
+  // scroll fallback as a result (shortcut: a hand beyond ~15 cards can spill
+  // past the viewport edge with no way to reach it, upgrade to a dedicated
+  // scroll wrapper around .hand-row if that's ever reported). Root-caused
+  // via review (live-reported): CDK's cdkDrag (no cdkDragFreeDragPosition
+  // here, see hand.ts's own doc) moves the original element in place via
+  // transform, so a card dragged up toward the battlefield needs this host
+  // to not clip vertically - but per the CSS overflow spec, any overflow-x
+  // other than visible forces the computed overflow-y to auto too (never
+  // visible), so overflow-x: auto alone was still silently clipping every
+  // card dragged above this 150px-tall strip, even after removing an
+  // explicit overflow-y: hidden.
+}
+
+.hand-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  min-height: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.hand-card {
+  position: relative;
+  width: 90px;
+  flex-shrink: 0;
+  // Overlapping fan, same idea as cards held in-hand - a hand of more than a
+  // couple cards would otherwise overflow a fixed-height strip immediately.
+  margin-left: -28px;
+  cursor: grab;
+
+  &:first-child {
+    margin-left: 0;
+  }
+
+  transition: transform var(--dur-state) var(--ease-out);
+
+  // Live-requested: lift the hovered card out of the fan so its neighbours
+  // don't hide it - mouse only (DESIGN.md: "Hover nur mit Maus"), so a tap
+  // on touch never leaves a card stuck lifted.
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      z-index: 1;
+      transform: translateY(-20px);
+    }
+  }
+
+  &.cdk-drag-dragging {
+    z-index: 2;
+    cursor: grabbing;
+  }
+}
+
+.hand-card-discard {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  // 22px reads fine next to a 90px card on a mouse, but a real thumb needs
+  // DESIGN.md's --tap-min floor - grows on touch rather than failing it.
+  @media (pointer: coarse) {
+    width: var(--tap-min);
+    height: var(--tap-min);
+  }
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  &:hover {
+    color: var(--color-danger);
+  }
+}

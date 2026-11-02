@@ -1,0 +1,15 @@
+<div class="hand-row">
+  @for (item of cards(); track item.instanceId) {
+    <div class="hand-card" cdkDrag (cdkDragMoved)="onDragMoved($event)" (cdkDragEnded)="onDragEnded(item.instanceId, $event)">
+      <app-playtest-card [card]="item.card" />
+      <button
+        type="button"
+        class="hand-card-discard"
+        [attr.aria-label]="'playtest.discard' | translate"
+        (click)="cardDiscarded.emit(item.instanceId)"
+      >
+        <svg aria-hidden="true"><use href="#icon-close" /></svg>
+      </button>
+    </div>
+  }
+</div>

@@ -1,0 +1,81 @@
+:host {
+  display: block;
+  flex: 1;
+  min-height: 0;
+}
+
+.battlefield-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color var(--dur-state) var(--ease-out), box-shadow var(--dur-state) var(--ease-out);
+
+  // One divider at the midpoint - live-reported: the old fixed-220px/110px
+  // bands cut dropped lands off at the bottom edge (overflow: hidden) since
+  // a 100px-wide 5:7 card needs ~140px, more than the 110px band had. A
+  // literal 50/50 split always has room: top half creatures/spells/anything
+  // else (free placement, no rules engine behind it), bottom half lands
+  // (auto-snapped, see Playtest-library's snapToBand).
+  background-image: linear-gradient(to bottom, transparent calc(50% - 1px), var(--color-border) calc(50% - 1px), var(--color-border) calc(50% + 1px), transparent calc(50% + 1px));
+
+  &.drop-active {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px var(--glow-accent-strong);
+  }
+}
+
+.battlefield-band-label {
+  position: absolute;
+  left: var(--spacing-sm);
+  bottom: calc(50% + var(--spacing-sm));
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.battlefield-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100px;
+  cursor: grab;
+
+  &.cdk-drag-dragging {
+    z-index: 1;
+    cursor: grabbing;
+  }
+}
+
+// Tapped (live-requested MTG "tap" convention: used = rotated 90°
+// clockwise) - the rotation itself lives in PlaytestCard (composed with its
+// own holo-tilt transform, see playtest-card.ts), this just gives the
+// rotated card enough clearance from its neighbours so it doesn't overlap.
+.battlefield-card.tapped {
+  z-index: 1;
+  margin: 20px;
+}
+
+.battlefield-tap-toggle.active {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+// Stacked, not side-by-side - two .btn--sm buttons next to each other
+// wouldn't fit under a 100px-wide card without shrinking below the
+// pointer:coarse 44px tap-target floor .btn--sm itself already guarantees
+// (found in review: an earlier version overrode that floor to force a fit).
+.battlefield-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+
+  .btn {
+    width: 100%;
+  }
+}

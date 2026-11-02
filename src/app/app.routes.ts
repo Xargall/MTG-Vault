@@ -61,6 +61,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/scanner/scanner').then((m) => m.Scanner),
       },
       {
+        path: 'playtest',
+        loadComponent: () => import('./features/playtest/playtest').then((m) => m.Playtest),
+      },
+      {
         path: 'profile',
         loadComponent: () => import('./features/profile/profile').then((m) => m.Profile),
       },

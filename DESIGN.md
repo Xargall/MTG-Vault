@@ -308,7 +308,7 @@ Schwer, bedächtig und leise: Dinge drücken sich ein, setzen sich und blättern
 - **Do** neue Animationen hinter `prefers-reduced-motion: no-preference` stellen und unter 300ms halten. Einzige Ausnahme ist der einmalige Seitenaufbau.
 
 ### Don't:
-- **Don't** offizielle Marken-Optik nachbauen: keine Kartenrahmen, Logos, Mana- oder Energie-Symbole im Stil der Rechteinhaber als Dekoration und keine exakten Markenfarben von Wizards, Konami oder The Pokémon Company.
+- **Don't** offizielle Marken-Optik nachbauen: keine Kartenrahmen, Logos, Mana- oder Energie-Symbole im Stil der Rechteinhaber als Dekoration und keine exakten Markenfarben von Wizards, Konami oder The Pokémon Company. Bewusste Ausnahme: der Kartenrücken im Playtest-Board (`PlaytestCard`) zeigt das echte MTG-Kartenrücken-Bild (`public/playtest/mtg-card-back.jpg`) statt eines eigenen Motivs - fürs Spielgefühl, explizit vom Nutzer entschieden trotz des damit verbundenen Markenrechts-Risikos (privates, nicht-kommerzielles Projekt).
 - **Don't** Ornament (Goldfolie, Eckverzierungen, Glühen) in Listen, Formulare oder Kartengrids tragen.
 - **Don't** Farbwerte in Komponenten hart codieren. Einzige Ausnahme ist das reine Schwarz hinter dem Kamerabild im Scanner.
 - **Don't** Emoji oder Unicode-Glyphen als Icons verwenden, auch nicht in Übersetzungen. Icons kommen als monoline Gravur aus dem Sprite in `app.html`.
