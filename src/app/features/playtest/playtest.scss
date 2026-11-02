@@ -77,10 +77,11 @@
 // everywhere on the table are too small to read a card's own text.
 .playtest-preview {
   position: fixed;
-  right: var(--spacing-lg);
-  bottom: calc(150px + var(--spacing-lg));
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 10;
-  width: 280px;
+  width: 320px;
   pointer-events: none;
 
   img {

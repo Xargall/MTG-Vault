@@ -4,6 +4,22 @@
 
 .playtest-card-inner {
   display: block;
+  position: relative;
+
+  // Live-requested holo touch, deliberately subtle (a few degrees, not a
+  // full chroma foil) - mouse-only (DESIGN.md: "Hover nur mit Maus"), reset
+  // to flat the instant the pointer leaves. Smooths the per-mousemove jumps
+  // into a continuous tilt rather than a snap between samples.
+  @media (hover: hover) and (pointer: fine) {
+    transition: transform 80ms var(--ease-out);
+  }
+}
+
+.card-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-card);
+  pointer-events: none;
 }
 
 // The signature "page-turn" draw move (DESIGN.md's "blättern um") - a cheap

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Card } from '../../core/models/card.model';
-import { buildLibrary, shuffle } from './playtest-library';
+import { buildLibrary, classifyBattlefieldBand, shuffle, snapToBand } from './playtest-library';
 import { DeckCardRow, DeckEntry, DeckRow } from '../decks/deck.service';
 
 function mtgCard(id: string, typeLine = 'Creature'): Card {
@@ -62,6 +62,29 @@ describe('buildLibrary', () => {
 
     expect(commander).toBeNull();
     expect(library).toHaveLength(1);
+  });
+});
+
+describe('classifyBattlefieldBand', () => {
+  it('classifies a land and a creature, leaving everything else free-placed', () => {
+    expect(classifyBattlefieldBand(mtgCard('forest', 'Basic Land — Forest'))).toBe('land');
+    expect(classifyBattlefieldBand(mtgCard('bear', 'Creature — Bear'))).toBe('creature');
+    expect(classifyBattlefieldBand(mtgCard('bolt', 'Instant'))).toBeNull();
+    expect(classifyBattlefieldBand({ game: 'yugioh', id: 'x', typeLine: undefined } as unknown as Card)).toBeNull();
+  });
+});
+
+describe('snapToBand', () => {
+  it('stacks successive lands left to right within the lands band', () => {
+    const first = snapToBand(mtgCard('island-1', 'Land — Island'), [], 600);
+    const second = snapToBand(mtgCard('island-2', 'Land — Island'), [{ card: mtgCard('island-1', 'Land — Island') }], 600);
+
+    expect(first?.y).toBe(second?.y); // same row
+    expect(second!.x).toBeGreaterThan(first!.x); // next slot to the right
+  });
+
+  it('returns null for a card with no band, so the caller keeps the free drop position', () => {
+    expect(snapToBand(mtgCard('bolt', 'Instant'), [], 600)).toBeNull();
   });
 });
 

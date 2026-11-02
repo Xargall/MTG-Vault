@@ -17,7 +17,7 @@ import { DeckEntry } from '../decks/deck.service';
 import { Battlefield } from './battlefield/battlefield';
 import { Hand } from './hand/hand';
 import { PlaytestCard } from './playtest-card/playtest-card';
-import { BattlefieldCard, PlaytestCardInstance, buildLibrary, shuffle } from './playtest-library';
+import { BattlefieldCard, PlaytestCardInstance, buildLibrary, shuffle, snapToBand } from './playtest-library';
 import { PlaytestPreviewService } from './playtest-preview.service';
 import { PlaytestService } from './playtest.service';
 import { ZonePile } from './zone-pile/zone-pile';
@@ -153,7 +153,8 @@ export class Playtest {
     const card = this.hand().find((c) => c.instanceId === payload.instanceId);
     if (!card) return;
     this.hand.update((items) => items.filter((c) => c.instanceId !== payload.instanceId));
-    this.battlefield.update((items) => [...items, { ...card, x: clientX - rect.left, y: clientY - rect.top }]);
+    const fallback = { x: clientX - rect.left, y: clientY - rect.top };
+    this.battlefield.update((items) => [...items, { ...card, ...(snapToBand(card.card, items, rect.height) ?? fallback) }]);
   }
 
   protected onBattlefieldPositionChanged(payload: { instanceId: string; x: number; y: number }): void {
@@ -190,14 +191,24 @@ export class Playtest {
     const commander = this.commandZone();
     if (!commander) return;
     this.commandZone.set(null);
-    this.battlefield.update((items) => [...items, { ...commander, x: 20, y: 20 }]);
+    this.placeOnBattlefield(commander);
   }
 
   private returnTopToBattlefield(zone: WritableSignal<PlaytestCardInstance[]>): void {
     const [top, ...rest] = zone();
     if (!top) return;
     zone.set(rest);
-    this.battlefield.update((items) => [...items, { ...top, x: 20, y: 20 }]);
+    this.placeOnBattlefield(top);
+  }
+
+  /** Shared by every "enters the battlefield from somewhere else" path (commander cast, graveyard/exile return) - snaps into its band (land/creature) the same way a hand drop does; falls back to a fixed top-left spot (there's no drop point to fall back to here, unlike onHandCardDropped's own pointer coordinates). */
+  private placeOnBattlefield(instance: PlaytestCardInstance): void {
+    const rect = this.battlefieldHost()?.nativeElement.getBoundingClientRect();
+    const fallback = { x: 20, y: 20 };
+    this.battlefield.update((items) => [
+      ...items,
+      { ...instance, ...(rect ? (snapToBand(instance.card, items, rect.height) ?? fallback) : fallback) },
+    ]);
   }
 
   protected onLifeChange(value: number): void {

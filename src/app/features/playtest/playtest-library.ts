@@ -39,6 +39,41 @@ export function buildLibrary(entry: DeckEntry): { library: PlaytestCardInstance[
   return { library, commander };
 }
 
+// Matches battlefield.scss's two divider lines exactly (both read off
+// `calc(100% - <bottomOffset>px)`) - no shared source of truth between the
+// CSS bands and this JS snap target between the two.
+const CREATURES_BAND_BOTTOM = 220;
+const LANDS_BAND_BOTTOM = 110;
+const BAND_CARD_WIDTH = 100;
+const BAND_CARD_GAP = 8;
+const BAND_ROW_PADDING = 10;
+
+export type BattlefieldBand = 'creature' | 'land' | null;
+
+/** Live-requested: snap a Land or Creature straight into its labeled band on drop, instead of leaving it exactly where the pointer released it - everything else (spells, sorceries, artifacts, anything non-MTG) keeps free placement, since there's no rules engine here to know what else deserves its own band. */
+export function classifyBattlefieldBand(card: Card): BattlefieldBand {
+  if (card.game !== 'mtg') return null;
+  if (card.typeLine.includes('Land')) return 'land';
+  if (card.typeLine.includes('Creature')) return 'creature';
+  return null;
+}
+
+/** The snapped {x, y} for a card entering a band, or null when it has no band (free placement at the actual drop point applies instead). Appends to the end of whatever's already in that band, left to right - battlefieldHeight is the live battlefield surface's own rendered height (its bounding rect), so the bands stay correctly bottom-anchored at any viewport size. */
+export function snapToBand(
+  card: Card,
+  existingBattlefieldCards: { card: Card }[],
+  battlefieldHeight: number,
+): { x: number; y: number } | null {
+  const band = classifyBattlefieldBand(card);
+  if (!band) return null;
+
+  const bottomOffset = band === 'creature' ? CREATURES_BAND_BOTTOM : LANDS_BAND_BOTTOM;
+  const y = battlefieldHeight - bottomOffset + BAND_ROW_PADDING;
+  const countInBand = existingBattlefieldCards.filter((c) => classifyBattlefieldBand(c.card) === band).length;
+  const x = BAND_ROW_PADDING + countInBand * (BAND_CARD_WIDTH + BAND_CARD_GAP);
+  return { x, y };
+}
+
 /** Fisher-Yates - uniform shuffle, in place on a copy (the input array is never mutated). */
 export function shuffle<T>(items: T[]): T[] {
   const result = [...items];
