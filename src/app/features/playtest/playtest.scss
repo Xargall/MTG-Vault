@@ -216,6 +216,14 @@
 }
 
 .playtest-hand {
+  // Explicit stacking, not just DOM-order luck - found in review (live-
+  // reported): a card dragged up out of this strip toward the battlefield
+  // was rendering behind .playtest-battlefield's own opaque background,
+  // invisible until release. flex: 0 0 auto alone doesn't win paint order
+  // against a sibling ahead of it in source order once that card's own
+  // drag transform puts it on a competing stacking level.
+  position: relative;
+  z-index: 1;
   flex: 0 0 auto;
   height: 150px;
   background: var(--color-surface);

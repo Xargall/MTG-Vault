@@ -1,8 +1,18 @@
 :host {
   display: block;
   width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
+  // No overflow-x here, even though a very wide hand has no horizontal
+  // scroll fallback as a result (shortcut: a hand beyond ~15 cards can spill
+  // past the viewport edge with no way to reach it, upgrade to a dedicated
+  // scroll wrapper around .hand-row if that's ever reported). Root-caused
+  // via review (live-reported): CDK's cdkDrag (no cdkDragFreeDragPosition
+  // here, see hand.ts's own doc) moves the original element in place via
+  // transform, so a card dragged up toward the battlefield needs this host
+  // to not clip vertically - but per the CSS overflow spec, any overflow-x
+  // other than visible forces the computed overflow-y to auto too (never
+  // visible), so overflow-x: auto alone was still silently clipping every
+  // card dragged above this 150px-tall strip, even after removing an
+  // explicit overflow-y: hidden.
 }
 
 .hand-row {
