@@ -38,6 +38,27 @@
   pointer-events: none;
 }
 
+// Centered over the creature/spell half, not the old small top-strip
+// banner (live-reported: "geht arg unter") - a short-lived HUD callout, not
+// body copy, so it steps outside DESIGN.md's normal Label/Body sizes the
+// same documented way the real card-back image does.
+.battlefield-combat-reminder {
+  position: absolute;
+  inset: 0 0 50% 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-lg);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  z-index: 2;
+}
+
 .battlefield-card {
   position: absolute;
   top: 0;

@@ -40,6 +40,10 @@ const DEFAULT_LIFE = 40; // this app leans Commander-heavy (see its bracket syst
 // budget DESIGN.md's Motion section sets for "Ebenen" transitions.
 const DRAW_FLIP_HALF_MS = 130;
 const DRAW_FLIP_FULL_MS = 260;
+// Live-requested: the Kampf phase is just a reminder banner (see
+// PHASE_ORDER's own doc - no attacker/blocker logic here), so it doesn't
+// need a click to move past it - it reads and then gets out of the way.
+const COMBAT_REMINDER_MS = 4000;
 
 /** The playtest route (not a dialog - needs real screen space, same reasoning as /scan). Owns every gameplay signal itself: a game in progress has no reason to survive leaving the route (see PlaytestService's own doc). Reads its deck once from PlaytestService - a direct /playtest deep link with nothing handed off shows the "kein Deck ausgewählt" state instead. */
 @Component({
@@ -91,6 +95,7 @@ export class Playtest {
   protected readonly isDrawing = signal(false);
   protected readonly drawRevealed = signal(false);
   private readonly drawTimeouts: ReturnType<typeof setTimeout>[] = [];
+  private combatAdvanceTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private readonly battlefieldHost = viewChild('battlefieldHost', { read: ElementRef<HTMLElement> });
 
@@ -98,7 +103,10 @@ export class Playtest {
     const entry = this.deckEntry();
     if (entry) this.resetGame(entry);
 
-    inject(DestroyRef).onDestroy(() => this.drawTimeouts.forEach(clearTimeout));
+    inject(DestroyRef).onDestroy(() => {
+      this.drawTimeouts.forEach(clearTimeout);
+      this.clearCombatAdvanceTimeout();
+    });
   }
 
   private resetGame(entry: DeckEntry): void {
@@ -116,6 +124,7 @@ export class Playtest {
     this.landsPlayedThisTurn.set(0);
     this.deckedOut.set(false);
     this.commanderCastCount.set(0);
+    this.clearCombatAdvanceTimeout();
     this.drawStartingHand();
   }
 
@@ -134,8 +143,9 @@ export class Playtest {
     this.library.update(shuffle);
   }
 
-  /** Advances to the next phase (wrapping Ende -> Untap bumps the turn - see nextPhase). Untap and Draw are the only phases with an automatic effect; everything else is just a marker the player clicks through (see PHASE_ORDER's own doc on why - no combat sub-steps, no stack, no rules engine). */
+  /** Advances to the next phase (wrapping Ende -> Untap bumps the turn - see nextPhase). Untap and Draw are the only phases with an automatic effect; everything else is just a marker the player clicks through (see PHASE_ORDER's own doc on why - no combat sub-steps, no stack, no rules engine). Kampf additionally self-advances after COMBAT_REMINDER_MS - clearing any pending one first so a manual click before that timer fires doesn't leave a stale one armed to skip an extra phase later. */
   protected onNextPhase(): void {
+    this.clearCombatAdvanceTimeout();
     const { phase, turn } = nextPhase(this.phase(), this.turn());
     this.phase.set(phase);
     this.turn.set(turn);
@@ -148,7 +158,15 @@ export class Playtest {
       // already the opening 7, matching the paper-Magic "first player skips
       // their first draw step" convention.
       this.draw();
+    } else if (phase === 'combat') {
+      this.combatAdvanceTimeout = setTimeout(() => this.onNextPhase(), COMBAT_REMINDER_MS);
     }
+  }
+
+  private clearCombatAdvanceTimeout(): void {
+    if (this.combatAdvanceTimeout === null) return;
+    clearTimeout(this.combatAdvanceTimeout);
+    this.combatAdvanceTimeout = null;
   }
 
   /** Mid-drag position of a hand card, reported continuously (CDK's cdkDragMoved) - only used to toggle the battlefield's own drop-target highlight, not to decide the actual drop (onHandCardDropped re-checks the final point itself). */

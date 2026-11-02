@@ -48,11 +48,8 @@
     </div>
   </div>
 
-  @if (phase() === 'combat' || cleanupWarning() || deckedOut()) {
+  @if (cleanupWarning() || deckedOut()) {
     <div class="playtest-banners">
-      @if (phase() === 'combat') {
-        <p class="playtest-banner">{{ 'playtest.combatReminder' | translate }}</p>
-      }
       @if (cleanupWarning()) {
         <p class="playtest-banner playtest-banner--warning">{{ 'playtest.cleanupWarning' | translate: { count: hand().length } }}</p>
       }
@@ -64,32 +61,36 @@
 
   <div class="playtest-board">
     <div class="playtest-zones">
-      <button
-        type="button"
-        class="playtest-library"
-        [disabled]="library().length === 0"
-        (click)="draw()"
-      >
-        @if (topLibraryCard(); as top) {
-          <app-playtest-card [card]="top.card" [faceDown]="!isDrawing() || !drawRevealed()" [flipping]="isDrawing()" />
-        } @else {
-          <div class="zone-pile-empty" aria-hidden="true"></div>
-        }
-        <span class="zone-pile-count">{{ library().length }}</span>
-      </button>
-      <span class="zone-pile-label">{{ 'playtest.library' | translate }}</span>
+      <div class="playtest-zone">
+        <button
+          type="button"
+          class="playtest-library"
+          [disabled]="library().length === 0"
+          (click)="draw()"
+        >
+          @if (topLibraryCard(); as top) {
+            <app-playtest-card [card]="top.card" [faceDown]="!isDrawing() || !drawRevealed()" [flipping]="isDrawing()" />
+          } @else {
+            <div class="zone-pile-empty" aria-hidden="true"></div>
+          }
+          <span class="zone-pile-count">{{ library().length }}</span>
+        </button>
+        <span class="zone-pile-label">{{ 'playtest.library' | translate }}</span>
+      </div>
 
       <app-zone-pile [label]="'playtest.graveyard' | translate" [cards]="graveyard()" (primaryAction)="onReturnFromGraveyard()" />
       <app-zone-pile [label]="'playtest.exile' | translate" [cards]="exile()" (primaryAction)="onReturnFromExile()" />
 
       @if (commandZone(); as commander) {
-        <app-zone-pile [label]="'playtest.commandZone' | translate" [cards]="[commander]" (primaryAction)="onCastCommander()" />
-        @if (commanderCastCount() > 0) {
-          <!-- Commander tax is a cost, not something this feature can apply
-               without a mana system (see commanderCastCount's own doc) - just
-               the running count, the player adds +2 per cast themselves. -->
-          <span class="playtest-commander-tax">{{ 'playtest.commanderTax' | translate: { amount: commanderCastCount() * 2 } }}</span>
-        }
+        <div class="playtest-zone">
+          <app-zone-pile [label]="'playtest.commandZone' | translate" [cards]="[commander]" (primaryAction)="onCastCommander()" />
+          @if (commanderCastCount() > 0) {
+            <!-- Commander tax is a cost, not something this feature can apply
+                 without a mana system (see commanderCastCount's own doc) - just
+                 the running count, the player adds +2 per cast themselves. -->
+            <span class="playtest-commander-tax">{{ 'playtest.commanderTax' | translate: { amount: commanderCastCount() * 2 } }}</span>
+          }
+        </div>
       }
     </div>
 
@@ -98,6 +99,7 @@
       class="playtest-battlefield"
       [cards]="battlefield()"
       [dropActive]="handDragActive()"
+      [combatReminder]="phase() === 'combat' ? ('playtest.combatReminder' | translate) : null"
       (positionChanged)="onBattlefieldPositionChanged($event)"
       (tapToggled)="onTapToggled($event)"
       (sentToGraveyard)="onSentToGraveyard($event)"

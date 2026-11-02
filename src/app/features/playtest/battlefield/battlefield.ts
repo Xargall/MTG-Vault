@@ -17,6 +17,8 @@ export class Battlefield {
   readonly cards = input.required<BattlefieldCard[]>();
   /** True while a hand card is being dragged over this surface (see Playtest.onHandCardDragMoved) - highlights the drop target so dragging toward the battlefield gives feedback before release, not just after. */
   readonly dropActive = input(false);
+  /** Shown centered over the creature/spell half while set (live-reported: the old small top-strip banner "geht unter") - null hides it. */
+  readonly combatReminder = input<string | null>(null);
   readonly positionChanged = output<{ instanceId: string; x: number; y: number }>();
   readonly sentToGraveyard = output<string>();
   readonly sentToExile = output<string>();
