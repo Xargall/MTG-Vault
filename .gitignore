@@ -52,6 +52,7 @@ supabase/.temp
 # Agent skills (installed via npx skills)
 /.agents
 /.claude/skills
+/.claude/agents
 skills-lock.json
 
 # Impeccable (Copilot-layout install; .github/workflows stays tracked)

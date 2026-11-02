@@ -8,10 +8,12 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { Card } from '../../../core/models/card.model';
 import { CommanderSpellbookService } from '../../../core/services/commander-spellbook.service';
+import { PlaytestService } from '../../playtest/playtest.service';
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
 import { CardOwnedStatus, CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AppDialog } from '../../../shared/dialog/dialog';
@@ -77,6 +79,8 @@ export class DeckDetailDialog {
   private readonly wishlistService = inject(WishlistService);
   private readonly translate = inject(TranslateService);
   private readonly commanderSpellbookService = inject(CommanderSpellbookService);
+  private readonly router = inject(Router);
+  private readonly playtestService = inject(PlaytestService);
 
   /** The hero's own <h2> names the dialog (it runs `bare`, without the shared header). */
   protected readonly headingId = 'deck-detail-heading';
@@ -228,6 +232,13 @@ export class DeckDetailDialog {
 
   /** Gates the whole analysis section (mana curve/tempo/keyword synergy) below - all MTG-only, see deck-stats.ts's own section comment. An empty deck or a non-MTG one (Yu-Gi-Oh!/Pokémon) simply never shows it. */
   protected readonly isMtgDeck = computed(() => this.entry().cards.some((entry) => entry.card.game === 'mtg'));
+
+  /** Hands this deck's already-loaded DeckEntry off to the /playtest route (see PlaytestService's own doc on why no second fetch happens there) and leaves the dialog. */
+  protected startPlaytest(): void {
+    this.playtestService.startPlaytest(this.entry());
+    this.close.emit();
+    void this.router.navigate(['/playtest']);
+  }
 
   protected readonly manaCurve = computed<BarChartDatum[]>(() => getDeckManaCurve(this.entry().cards));
   protected readonly tempoBreakdown = computed<TempoBreakdown>(() => getDeckTempoBreakdown(this.entry().cards));

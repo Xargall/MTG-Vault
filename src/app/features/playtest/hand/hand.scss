@@ -1,0 +1,36 @@
+:host {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.hand-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  min-height: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.hand-card {
+  width: 90px;
+  flex-shrink: 0;
+  // Overlapping fan, same idea as cards held in-hand - a hand of more than a
+  // couple cards would otherwise overflow a fixed-height strip immediately.
+  margin-left: -28px;
+  cursor: grab;
+
+  &:first-child {
+    margin-left: 0;
+  }
+
+  &:hover {
+    z-index: 1;
+  }
+
+  &.cdk-drag-dragging {
+    z-index: 2;
+    cursor: grabbing;
+  }
+}

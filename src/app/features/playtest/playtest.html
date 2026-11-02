@@ -1,0 +1,79 @@
+@if (!deckEntry()) {
+  <div class="playtest-empty">
+    <p>{{ 'playtest.noDeckSelected' | translate }}</p>
+    <a class="btn btn--secondary" routerLink="/decks">{{ 'playtest.backToDecks' | translate }}</a>
+  </div>
+} @else {
+  <div class="playtest-topbar">
+    <a class="btn btn--ghost btn--sm btn--flush" routerLink="/decks">
+      <svg aria-hidden="true"><use href="#icon-chevron-left" /></svg>
+      {{ 'playtest.backToDecks' | translate }}
+    </a>
+    <span class="playtest-deck-name">{{ deckEntry()!.deck.name }}</span>
+
+    <div class="playtest-life">
+      <button type="button" class="btn btn--round btn--sm" (click)="onLifeChange(life() - 1)" [attr.aria-label]="'playtest.lifeDecrease' | translate">
+        <svg aria-hidden="true"><use href="#icon-minus" /></svg>
+      </button>
+      <input
+        type="number"
+        class="playtest-life-input"
+        [ngModel]="life()"
+        (ngModelChange)="onLifeChange($event)"
+        [attr.aria-label]="'playtest.life' | translate"
+      />
+      <button type="button" class="btn btn--round btn--sm" (click)="onLifeChange(life() + 1)" [attr.aria-label]="'playtest.lifeIncrease' | translate">
+        <svg aria-hidden="true"><use href="#icon-plus" /></svg>
+      </button>
+    </div>
+
+    <div class="playtest-actions">
+      <button type="button" class="btn btn--secondary btn--sm" (click)="onShuffle()">
+        <svg aria-hidden="true"><use href="#icon-shuffle" /></svg>
+        {{ 'playtest.shuffle' | translate }}
+      </button>
+      <button type="button" class="btn btn--secondary btn--sm" (click)="onMulligan()">{{ 'playtest.mulligan' | translate }}</button>
+      <button type="button" class="btn btn--ghost btn--sm" (click)="onNewGame()">
+        <svg aria-hidden="true"><use href="#icon-reset" /></svg>
+        {{ 'playtest.newGame' | translate }}
+      </button>
+    </div>
+  </div>
+
+  <div class="playtest-board">
+    <div class="playtest-zones">
+      <button
+        type="button"
+        class="playtest-library"
+        [disabled]="library().length === 0"
+        (click)="draw()"
+      >
+        @if (topLibraryCard(); as top) {
+          <app-playtest-card [card]="top.card" [faceDown]="!isDrawing() || !drawRevealed()" [flipping]="isDrawing()" />
+        } @else {
+          <div class="zone-pile-empty" aria-hidden="true"></div>
+        }
+        <span class="zone-pile-count">{{ library().length }}</span>
+      </button>
+      <span class="zone-pile-label">{{ 'playtest.library' | translate }}</span>
+
+      <app-zone-pile [label]="'playtest.graveyard' | translate" [cards]="graveyard()" (primaryAction)="onReturnFromGraveyard()" />
+      <app-zone-pile [label]="'playtest.exile' | translate" [cards]="exile()" (primaryAction)="onReturnFromExile()" />
+
+      @if (commandZone(); as commander) {
+        <app-zone-pile [label]="'playtest.commandZone' | translate" [cards]="[commander]" (primaryAction)="onCastCommander()" />
+      }
+    </div>
+
+    <app-battlefield
+      #battlefieldHost
+      class="playtest-battlefield"
+      [cards]="battlefield()"
+      (positionChanged)="onBattlefieldPositionChanged($event)"
+      (sentToGraveyard)="onSentToGraveyard($event)"
+      (sentToExile)="onSentToExile($event)"
+    />
+  </div>
+
+  <app-hand class="playtest-hand" [cards]="hand()" (cardDropped)="onHandCardDropped($event)" />
+}

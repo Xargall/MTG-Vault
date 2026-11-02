@@ -1,0 +1,7 @@
+<div class="hand-row">
+  @for (item of cards(); track item.instanceId) {
+    <div class="hand-card" cdkDrag (cdkDragEnded)="onDragEnded(item.instanceId, $event)">
+      <app-playtest-card [card]="item.card" />
+    </div>
+  }
+</div>

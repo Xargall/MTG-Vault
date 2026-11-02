@@ -1,0 +1,20 @@
+<div class="battlefield-surface">
+  @for (card of cards(); track card.instanceId) {
+    <div
+      class="battlefield-card"
+      cdkDrag
+      [cdkDragFreeDragPosition]="{ x: card.x, y: card.y }"
+      (cdkDragEnded)="onDragEnded(card.instanceId, $event)"
+    >
+      <app-playtest-card [card]="card.card" />
+      <div class="battlefield-card-actions">
+        <button type="button" class="btn btn--ghost btn--sm" (click)="sentToGraveyard.emit(card.instanceId)">
+          {{ 'playtest.graveyard' | translate }}
+        </button>
+        <button type="button" class="btn btn--ghost btn--sm" (click)="sentToExile.emit(card.instanceId)">
+          {{ 'playtest.exile' | translate }}
+        </button>
+      </div>
+    </div>
+  }
+</div>
