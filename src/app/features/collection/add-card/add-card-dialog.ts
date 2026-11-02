@@ -17,7 +17,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
 import { Card } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
-import { YUGIOH_PRINT_CODE_PATTERN, yugiohPrintNumber } from '../../../core/services/yugioh-api.service';
+import { yugiohPrintNumber } from '../../../core/services/yugioh-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AppDialog } from '../../../shared/dialog/dialog';
 import { CollectionService } from '../collection.service';
@@ -241,10 +241,6 @@ export class AddCardDialog {
   // running in the background adds to the load a fast typist throws at
   // Supabase at once.
   private abortController: AbortController | null = null;
-  // Set when a search result was reached by typing an exact set code (see
-  // selectCard) - lets backToPrints() know to skip straight back to search
-  // instead of landing on an empty prints list that was never fetched.
-  private readonly directPrint = signal(false);
 
   // The scroll position of the whole dialog (AppDialog's own .dialog-panel
   // scrolls, not results-grid - see dialog.scss) right before leaving the
@@ -309,32 +305,22 @@ export class AddCardDialog {
     }
   }
 
-  /** Normal name search still goes through selectName()'s "pick a print" step; typing an exact set code (MTG, e.g. "emn"), a bare set prefix (Yu-Gi-Oh!, e.g. "AMDE"), or an exact print code (Yu-Gi-Oh!, e.g. "LOB-DE001") already landed on one specific print, so this skips straight to it instead of making the user re-pick the same one. A Yu-Gi-Oh! result only ever carries a resolved printCode when it came from one of those two direct-hit searches (see YugiohApiService.searchCards) - the plain name search always returns printCode: null - so checking that field covers both cases without needing to re-parse the query here.
-   *
-   * An exact print code is the one case among those where the search already named one specific card, not a set to browse - re-checking the query shape here (same YUGIOH_PRINT_CODE_PATTERN the search itself used to decide to resolve a single print) picks that case out for quickAdd() instead of still landing on the quantity/foil/condition/language form pre-filled with defaults nobody had to confirm. MTG has no searchCards() path that resolves to one exact print from the search box the same way (getCardBySetAndNumber exists but isn't wired to it - see deck-import-dialog.ts/scanner.ts for its actual callers), so this only ever fires for Yu-Gi-Oh!. */
-  protected selectCard(card: Card) {
+  /** Normal name search still goes through selectName()'s "pick a print" step. A search that already landed on one specific print - an exact set code (MTG, e.g. "emn"), a bare set prefix (Yu-Gi-Oh!, e.g. "AMDE"), or an exact print code (Yu-Gi-Oh!, e.g. "LOB-DE001") - instead stages that card straight away (quickAdd: 1x, non-foil, NM, default language) without opening the quantity/foil/condition/language form or leaving the results grid at all. Browsing a whole set this way is a click-through-the-grid flow (see cardNumber's doc) - stopping to confirm defaults nobody asked to change, and losing the scroll position/staying card to a form round trip, on every single card defeated that; anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form, by searching the card's name instead. A Yu-Gi-Oh! result only ever carries a resolved printCode when it came from one of those two direct-hit searches (see YugiohApiService.searchCards) - the plain name search always returns printCode: null - so checking that field alone covers both cases without needing to re-parse the query here. MTG has no searchCards() path that resolves to one exact print from the search box the same way (getCardBySetAndNumber exists but isn't wired to it - see deck-import-dialog.ts/scanner.ts for its actual callers), so its own direct-hit case is set-code-only. */
+  protected selectCard(card: Card): void {
     const trimmed = this.query().trim();
-    if (card.game === 'yugioh' && YUGIOH_PRINT_CODE_PATTERN.test(trimmed)) {
+    const isDirectHit =
+      (card.game === 'mtg' && card.setCode.toLowerCase() === trimmed.toLowerCase()) ||
+      (card.game === 'yugioh' && card.printCode != null);
+    if (isDirectHit) {
       this.quickAdd(card);
       return;
     }
 
     this.savedScrollTop = this.getScrollContainer()?.scrollTop ?? 0;
-
-    const isDirectHit =
-      (card.game === 'mtg' && card.setCode.toLowerCase() === trimmed.toLowerCase()) ||
-      (card.game === 'yugioh' && card.printCode != null);
-    if (isDirectHit) {
-      this.directPrint.set(true);
-      this.selectedName.set(card.name);
-      this.selectPrint(card);
-    } else {
-      this.directPrint.set(false);
-      void this.selectName(card);
-    }
+    void this.selectName(card);
   }
 
-  /** Stages one copy (no foil, NM, default language) straight from an exact print-code search result - see selectCard's doc on why that query shape skips the quantity/foil/condition/language form entirely. Deliberately leaves the search query/results as they are instead of clearing them - the code is still what's typed in the box either way, and clearing it only costs an extra retype for anyone re-checking or correcting the same code. Anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form by searching the card's name instead of its print code. */
+  /** Stages one copy (no foil, NM, default language) straight from any direct-hit search result (an exact print code, or a set/prefix browse - see selectCard's doc) without opening the quantity/foil/condition/language form or leaving the results grid. Deliberately leaves the search query/results as they are instead of clearing them - the code is still what's typed in the box either way, and clearing it only costs an extra retype for anyone re-checking or correcting the same code, or re-finding the same set while clicking through it card by card. Anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form by searching the card's name instead of its print code. */
   private quickAdd(card: Card): void {
     this.stageItem(card, 1, false, 'NM', DEFAULT_CARD_LANGUAGE);
     this.searchInput()?.nativeElement.focus();
@@ -366,7 +352,6 @@ export class AddCardDialog {
     this.selectedName.set(null);
     this.prints.set([]);
     this.selectedCard.set(null);
-    this.directPrint.set(false);
 
     // Runs once the search view (and its full-height results-grid) is back
     // in the DOM - restoring scrollTop any earlier, while the shorter
@@ -391,10 +376,6 @@ export class AddCardDialog {
   }
 
   backToPrints() {
-    if (this.directPrint()) {
-      this.backToSearch();
-      return;
-    }
     this.selectedCard.set(null);
   }
 
