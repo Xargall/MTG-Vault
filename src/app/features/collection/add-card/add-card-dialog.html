@@ -83,34 +83,40 @@
       autofocus
     />
 
-    <!-- While a new search runs, the previous results stay in place (dimmed)
-         instead of collapsing to a status line - the sheet doesn't jump on
-         every keystroke. -->
-    @if (searching() && results().length === 0) {
-      <p class="state-message">{{ 'addCard.searching' | translate }}</p>
-    } @else if (searchError()) {
-      <div class="search-error" role="alert">
-        <p class="state-message error">{{ searchError() }}</p>
-        <button type="button" class="btn btn--secondary btn--sm" (click)="retrySearch()">
-          {{ 'addCard.retry' | translate }}
-        </button>
-      </div>
-    } @else if (!searching() && query().trim() && results().length === 0) {
-      <p class="state-message">{{ 'addCard.noCardsFound' | translate }}</p>
-    } @else {
-      <div class="results-grid" [class.is-stale]="searching()" [attr.aria-busy]="searching()">
-        @for (card of results(); track card.id) {
-          <button type="button" class="result-item" (click)="selectCard(card)">
-            <app-card-tile [card]="card" />
-            @if (cardNumber(card)) {
-              <span class="card-number">#{{ cardNumber(card) }}</span>
-            }
-            <span class="print-meta">{{ card.setName }}<!--
-              --> @if (card.rarity) { · {{ card.rarity }} }</span>
+    <!-- Reserves the same vertical space across every search state (idle,
+         searching, error, no-results, results) - the dialog used to grow and
+         shrink on every keystroke, collapsing to almost nothing on an empty
+         or no-match query, then jumping back open once results arrived. -->
+    <div class="search-results-area">
+      @if (searching() && results().length === 0) {
+        <p class="state-message">{{ 'addCard.searching' | translate }}</p>
+      } @else if (searchError()) {
+        <div class="search-error" role="alert">
+          <p class="state-message error">{{ searchError() }}</p>
+          <button type="button" class="btn btn--secondary btn--sm" (click)="retrySearch()">
+            {{ 'addCard.retry' | translate }}
           </button>
-        }
-      </div>
-    }
+        </div>
+      } @else if (!searching() && query().trim() && results().length === 0) {
+        <p class="state-message">{{ 'addCard.noCardsFound' | translate }}</p>
+      } @else {
+        <!-- While a new search runs, the previous results stay in place
+             (dimmed) instead of collapsing to a status line - no jump on
+             every keystroke while results are already showing. -->
+        <div class="results-grid" [class.is-stale]="searching()" [attr.aria-busy]="searching()">
+          @for (card of results(); track card.id) {
+            <button type="button" class="result-item" (click)="selectCard(card)">
+              <app-card-tile [card]="card" />
+              @if (cardNumber(card)) {
+                <span class="card-number">#{{ cardNumber(card) }}</span>
+              }
+              <span class="print-meta">{{ card.setName }}<!--
+                --> @if (card.rarity) { · {{ card.rarity }} }</span>
+            </button>
+          }
+        </div>
+      }
+    </div>
   } @else if (!selectedCard()) {
     <div class="prints-view">
       <button type="button" class="btn btn--ghost btn--sm btn--flush" (click)="backToSearch()">
