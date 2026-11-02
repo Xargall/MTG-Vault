@@ -8,6 +8,7 @@ import {
   inject,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -53,6 +54,12 @@ export class AddCardDialog {
 
   readonly close = output<void>();
   readonly added = output<void>();
+
+  // Native HTML `autofocus` only fires once, on first paint - it doesn't
+  // refocus the input after it's hidden/shown again by the @if in the
+  // template (print-picker/detail-form <-> search), so returning to the
+  // search view after staging a card needs an explicit focus() call.
+  private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
   protected readonly conditions = CONDITIONS;
   protected readonly languageOptions = CARD_LANGUAGE_OPTIONS;
@@ -220,6 +227,7 @@ export class AddCardDialog {
   /** Stages one copy (no foil, NM, default language) straight from an exact print-code search result - see selectCard's doc on why that query shape skips the quantity/foil/condition/language form entirely. Deliberately leaves the search query/results as they are instead of clearing them - the code is still what's typed in the box either way, and clearing it only costs an extra retype for anyone re-checking or correcting the same code. Anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form by searching the card's name instead of its print code. */
   private quickAdd(card: Card): void {
     this.stageItem(card, 1, false, 'NM', DEFAULT_CARD_LANGUAGE);
+    this.searchInput()?.nativeElement.focus();
   }
 
   /** The number printed on the card itself, for scanning a browsed set quickly (e.g. typing "DABL" lists every card with its number, instead of just name/art) - MTG's own collectorNumber, or (Yu-Gi-Oh!, only once a specific printing is known - see selectCard's doc on printCode) the number portion of printCode. Null for a Yu-Gi-Oh! result with no resolved printing yet (a plain name search), where there's no one specific number to show. */
@@ -258,6 +266,7 @@ export class AddCardDialog {
       () => {
         const container = this.getScrollContainer();
         if (container) container.scrollTop = this.savedScrollTop;
+        this.searchInput()?.nativeElement.focus();
       },
       { injector: this.injector },
     );

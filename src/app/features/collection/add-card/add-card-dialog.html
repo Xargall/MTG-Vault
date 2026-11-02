@@ -38,6 +38,7 @@
 
   @if (!selectedName()) {
     <input
+      #searchInput
       type="text"
       class="search-input"
       [placeholder]="searchPlaceholderKey() | translate"
