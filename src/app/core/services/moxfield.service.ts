@@ -4,6 +4,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 import { AverageDeckCard } from './edhrec.service';
 import { SupabaseService } from './supabase.service';
 import { RequestQueue } from '../utils/request-queue';
+import { readTtlCache, writeTtlCache } from '../utils/ttl-cache';
 
 // Same reasoning as EdhrecService's own cooldown - a 403 from the proxy
 // means Moxfield itself blocked the outbound request (bot/hotlink
@@ -28,33 +29,6 @@ const MOXFIELD_MIN_DELAY_MS = 1000;
 // repeat the same ~25-request fetch.
 const MOXFIELD_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const TOP_DECKS_CACHE_KEY = 'mtg-vault-moxfield-top-decks';
-
-interface MoxfieldCacheEntry<T> {
-  data: Record<string, T>;
-  timestamp: number;
-}
-
-function readMoxfieldCache<T>(key: string): Record<string, T> {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return {};
-    const { data, timestamp } = JSON.parse(raw) as MoxfieldCacheEntry<T>;
-    if (Date.now() - timestamp >= MOXFIELD_CACHE_TTL_MS) return {};
-    return data;
-  } catch {
-    return {};
-  }
-}
-
-function writeMoxfieldCache<T>(key: string, data: Record<string, T>): void {
-  try {
-    const entry: MoxfieldCacheEntry<T> = { data, timestamp: Date.now() };
-    localStorage.setItem(key, JSON.stringify(entry));
-  } catch {
-    // Storage full/unavailable (private browsing) - not fatal, just means
-    // the next session fetches fresh instead of from cache.
-  }
-}
 
 // Moxfield's own format slugs, exactly as they appear in a real deck's
 // "format" field (confirmed live: "modern") - not guessed, but the other
@@ -134,7 +108,11 @@ export class MoxfieldService {
   getTopDecks(format: string): Promise<MoxfieldTopDeck[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
-    this.topDecksDiskCache ??= readMoxfieldCache<MoxfieldTopDeck[]>(TOP_DECKS_CACHE_KEY);
+    this.topDecksDiskCache ??= readTtlCache<Record<string, MoxfieldTopDeck[]>>(
+      TOP_DECKS_CACHE_KEY,
+      MOXFIELD_CACHE_TTL_MS,
+      {},
+    );
     const fromDisk = this.topDecksDiskCache[format];
     if (fromDisk) return Promise.resolve(fromDisk);
 
@@ -143,7 +121,7 @@ export class MoxfieldService {
       cached = this.loadTopDecks(format).then((decks) => {
         if (decks.length > 0 && this.topDecksDiskCache) {
           this.topDecksDiskCache[format] = decks;
-          writeMoxfieldCache(TOP_DECKS_CACHE_KEY, this.topDecksDiskCache);
+          writeTtlCache(TOP_DECKS_CACHE_KEY, this.topDecksDiskCache);
         }
         return decks;
       });
@@ -175,7 +153,11 @@ export class MoxfieldService {
   getDeckCards(publicId: string): Promise<AverageDeckCard[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
 
-    this.deckCardsDiskCache ??= readMoxfieldCache<AverageDeckCard[]>(`${TOP_DECKS_CACHE_KEY}-cards`);
+    this.deckCardsDiskCache ??= readTtlCache<Record<string, AverageDeckCard[]>>(
+      `${TOP_DECKS_CACHE_KEY}-cards`,
+      MOXFIELD_CACHE_TTL_MS,
+      {},
+    );
     const fromDisk = this.deckCardsDiskCache[publicId];
     if (fromDisk) return Promise.resolve(fromDisk);
 
@@ -184,7 +166,7 @@ export class MoxfieldService {
       cached = this.loadDeckCards(publicId).then((cards) => {
         if (cards.length > 0 && this.deckCardsDiskCache) {
           this.deckCardsDiskCache[publicId] = cards;
-          writeMoxfieldCache(`${TOP_DECKS_CACHE_KEY}-cards`, this.deckCardsDiskCache);
+          writeTtlCache(`${TOP_DECKS_CACHE_KEY}-cards`, this.deckCardsDiskCache);
         }
         return cards;
       });

@@ -1,43 +1,80 @@
 <app-dialog [heading]="'addCard.title' | translate" maxWidth="720px" (closeRequest)="close.emit()">
 
-  @if (pendingItems().length > 0) {
-    <div class="pending-list">
-      <div class="pending-list-header">
-        <span>{{ 'addCard.pendingCount' | translate: { count: pendingItems().length } }}</span>
-        <div class="pending-list-actions">
-          <button type="button" class="btn btn--ghost btn--sm" [disabled]="committing()" (click)="clearPendingItems()">
-            {{ 'addCard.clearList' | translate }}
-          </button>
-          <button type="button" class="btn btn--primary btn--sm" [disabled]="committing()" (click)="finishAndClose()">
-            {{ 'addCard.addAll' | translate }}
-          </button>
-        </div>
-      </div>
-      <ul class="pending-items">
-        @for (item of pendingItems(); track item.tempId) {
-          <li>
-            <span class="pending-item-name">{{ item.card.name }}</span>
-            <span class="pending-item-qty">×{{ item.quantity }}</span>
-            @if (item.foil) { <span class="pending-item-foil">✨</span> }
-            <button
-              type="button"
-              class="pending-item-remove"
-              [attr.aria-label]="'addCard.removeFromList' | translate"
-              (click)="removePending(item.tempId)"
-            >
-              <svg aria-hidden="true"><use href="#icon-close" /></svg>
+  <div class="top-row">
+    @if (pendingItems().length > 0) {
+      <div class="pending-list">
+        <div class="pending-list-header">
+          <span>{{ 'addCard.pendingCount' | translate: { count: pendingItems().length } }}</span>
+          <div class="pending-list-actions">
+            <button type="button" class="btn btn--ghost btn--sm" [disabled]="committing()" (click)="clearPendingItems()">
+              {{ 'addCard.clearList' | translate }}
             </button>
-          </li>
+            <button type="button" class="btn btn--primary btn--sm" [disabled]="committing()" (click)="finishAndClose()">
+              {{ 'addCard.addAll' | translate }}
+            </button>
+          </div>
+        </div>
+        <ul class="pending-items">
+          @for (item of pendingItems(); track item.tempId) {
+            <li>
+              <span class="pending-item-name">{{ item.card.name }}</span>
+              <span class="pending-item-qty">×{{ item.quantity }}</span>
+              @if (item.foil) { <span class="pending-item-foil">✨</span> }
+              <button
+                type="button"
+                class="pending-item-remove"
+                [attr.aria-label]="'addCard.removeFromList' | translate"
+                (click)="removePending(item.tempId)"
+              >
+                <svg aria-hidden="true"><use href="#icon-close" /></svg>
+              </button>
+            </li>
+          }
+        </ul>
+        @if (commitError()) {
+          <p class="state-message error">{{ commitError() }}</p>
         }
-      </ul>
-      @if (commitError()) {
-        <p class="state-message error">{{ commitError() }}</p>
-      }
+      </div>
+    }
+
+    <!-- Plain live preview (no OCR/scanning) to help read a physical card's
+         tiny print code by eye - zoom + the device's own torch/flash. -->
+    <div class="camera-preview">
+      <div class="camera-preview-frame">
+        @if (cameraError()) {
+          <p class="state-message error camera-preview-error">{{ cameraError() }}</p>
+        }
+        <video #cameraVideo class="camera-preview-video" [style.transform]="'scale(' + zoom() + ')'"></video>
+      </div>
+      <div class="camera-preview-controls">
+        <input
+          type="range"
+          [attr.aria-label]="'addCard.zoomLabel' | translate"
+          [min]="minZoom"
+          [max]="maxZoom"
+          [step]="zoomStep"
+          [ngModel]="zoom()"
+          (ngModelChange)="onZoomChange($event)"
+        />
+        @if (torchSupported()) {
+          <button
+            type="button"
+            class="camera-torch-toggle"
+            [class.active]="torchOn()"
+            [attr.aria-label]="'addCard.torchLabel' | translate"
+            [attr.aria-pressed]="torchOn()"
+            (click)="toggleTorch()"
+          >
+            💡
+          </button>
+        }
+      </div>
     </div>
-  }
+  </div>
 
   @if (!selectedName()) {
     <input
+      #searchInput
       type="text"
       class="search-input"
       [placeholder]="searchPlaceholderKey() | translate"

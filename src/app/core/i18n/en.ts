@@ -204,6 +204,10 @@ export const en: typeof de = {
     removeFromList: 'Remove from list',
     addFailed: 'Card could not be added.',
     addAllFailed: 'Cards could not be added.',
+    cameraPermissionDenied: 'Camera access denied. Please allow it in your browser settings.',
+    cameraNoneFound: 'No camera found.',
+    zoomLabel: 'Zoom',
+    torchLabel: 'Flashlight',
   },
   cardDetail: {
     title: 'Card Details',

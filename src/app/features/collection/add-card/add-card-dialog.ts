@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -8,6 +9,7 @@ import {
   inject,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -22,6 +24,19 @@ import { CollectionService } from '../collection.service';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.1;
+
+// Torch isn't in TS's bundled MediaTrackCapabilities/-ConstraintSet types yet,
+// though Chromium-based browsers on Android support it (same situation as
+// scanner.ts's own FocusCapableTrackCapabilities).
+interface TorchCapableTrackCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+}
+interface TorchConstraintSet extends MediaTrackConstraintSet {
+  torch?: boolean;
+}
 
 /** One card staged for a batch add - see pendingItems' doc. */
 interface PendingAddItem {
@@ -46,6 +61,7 @@ export class AddCardDialog {
   private readonly translate = inject(TranslateService);
   private readonly hostEl = inject(ElementRef<HTMLElement>);
   private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
 
   // Scoped per game, same as the collection itself - avoids a Yu-Gi-Oh!
   // draft reappearing while browsing MTG, or vice versa.
@@ -53,6 +69,97 @@ export class AddCardDialog {
 
   readonly close = output<void>();
   readonly added = output<void>();
+
+  // Native HTML `autofocus` only fires once, on first paint - it doesn't
+  // refocus the input after it's hidden/shown again by the @if in the
+  // template (print-picker/detail-form <-> search), so returning to the
+  // search view after staging a card needs an explicit focus() call.
+  private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
+
+  // Plain live camera preview, no scanning/OCR - a loupe to read a physical
+  // card's print code by eye (digital zoom + the device's own torch/flash),
+  // next to the search box rather than instead of it. See the Scanner
+  // feature (scanner.ts) for the actual OCR-driven camera flow.
+  private readonly cameraVideo = viewChild<ElementRef<HTMLVideoElement>>('cameraVideo');
+  private cameraStream: MediaStream | null = null;
+  private cameraTrack: MediaStreamTrack | null = null;
+  protected readonly cameraError = signal<string | null>(null);
+  protected readonly torchSupported = signal(false);
+  protected readonly torchOn = signal(false);
+  protected readonly zoom = signal(MIN_ZOOM);
+  protected readonly minZoom = MIN_ZOOM;
+  protected readonly maxZoom = MAX_ZOOM;
+  protected readonly zoomStep = ZOOM_STEP;
+
+  constructor() {
+    afterNextRender(() => void this.startCamera());
+    this.destroyRef.onDestroy(() => this.cameraStream?.getTracks().forEach((track) => track.stop()));
+  }
+
+  private async startCamera(): Promise<void> {
+    const videoEl = this.cameraVideo()?.nativeElement;
+    if (!videoEl) return;
+
+    // Prefer a USB camera over built-in/virtual ones, same as the Scanner
+    // feature (scanner.ts's startCamera) - typically much higher resolution,
+    // and already the user's own setup for reading print codes. Labels are
+    // only populated once permission has already been granted at least once
+    // for this origin - if not, this just finds nothing and falls back to
+    // the default (facingMode) camera below.
+    let preferredDeviceId: string | null = null;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const usbCamera = devices.filter((d) => d.kind === 'videoinput').find((d) => d.label.toLowerCase().includes('usb'));
+      preferredDeviceId = usbCamera?.deviceId ?? null;
+    } catch {
+      // enumerateDevices() failing just means no auto-preference - carry on.
+    }
+
+    try {
+      this.cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: preferredDeviceId ? { exact: preferredDeviceId } : undefined,
+          facingMode: preferredDeviceId ? undefined : { ideal: 'environment' },
+        },
+        audio: false,
+      });
+    } catch (error) {
+      this.cameraError.set(
+        error instanceof DOMException && error.name === 'NotFoundError'
+          ? this.translate.instant('addCard.cameraNoneFound')
+          : this.translate.instant('addCard.cameraPermissionDenied'),
+      );
+      return;
+    }
+
+    videoEl.muted = true;
+    videoEl.playsInline = true;
+    videoEl.srcObject = this.cameraStream;
+    await videoEl.play();
+
+    this.cameraTrack = this.cameraStream.getVideoTracks()[0] ?? null;
+    try {
+      const capabilities = this.cameraTrack?.getCapabilities?.() as TorchCapableTrackCapabilities | undefined;
+      this.torchSupported.set(!!capabilities?.torch);
+    } catch {
+      this.torchSupported.set(false);
+    }
+  }
+
+  protected async toggleTorch(): Promise<void> {
+    if (!this.cameraTrack || !this.torchSupported()) return;
+    const next = !this.torchOn();
+    try {
+      await this.cameraTrack.applyConstraints({ advanced: [{ torch: next } as TorchConstraintSet] });
+      this.torchOn.set(next);
+    } catch {
+      // Device advertised torch support but rejected the constraint - not critical.
+    }
+  }
+
+  protected onZoomChange(value: number): void {
+    this.zoom.set(value);
+  }
 
   protected readonly conditions = CONDITIONS;
   protected readonly languageOptions = CARD_LANGUAGE_OPTIONS;
@@ -220,6 +327,7 @@ export class AddCardDialog {
   /** Stages one copy (no foil, NM, default language) straight from an exact print-code search result - see selectCard's doc on why that query shape skips the quantity/foil/condition/language form entirely. Deliberately leaves the search query/results as they are instead of clearing them - the code is still what's typed in the box either way, and clearing it only costs an extra retype for anyone re-checking or correcting the same code. Anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form by searching the card's name instead of its print code. */
   private quickAdd(card: Card): void {
     this.stageItem(card, 1, false, 'NM', DEFAULT_CARD_LANGUAGE);
+    this.searchInput()?.nativeElement.focus();
   }
 
   /** The number printed on the card itself, for scanning a browsed set quickly (e.g. typing "DABL" lists every card with its number, instead of just name/art) - MTG's own collectorNumber, or (Yu-Gi-Oh!, only once a specific printing is known - see selectCard's doc on printCode) the number portion of printCode. Null for a Yu-Gi-Oh! result with no resolved printing yet (a plain name search), where there's no one specific number to show. */
@@ -258,6 +366,7 @@ export class AddCardDialog {
       () => {
         const container = this.getScrollContainer();
         if (container) container.scrollTop = this.savedScrollTop;
+        this.searchInput()?.nativeElement.focus();
       },
       { injector: this.injector },
     );

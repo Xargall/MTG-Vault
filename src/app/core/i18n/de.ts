@@ -202,6 +202,10 @@ export const de = {
     removeFromList: 'Aus Liste entfernen',
     addFailed: 'Karte konnte nicht hinzugefügt werden.',
     addAllFailed: 'Karten konnten nicht hinzugefügt werden.',
+    cameraPermissionDenied: 'Kamerazugriff verweigert. Bitte in den Browser-Einstellungen erlauben.',
+    cameraNoneFound: 'Keine Kamera gefunden.',
+    zoomLabel: 'Zoom',
+    torchLabel: 'Taschenlampe',
   },
   cardDetail: {
     title: 'Kartendetails',

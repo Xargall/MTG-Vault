@@ -8,6 +8,8 @@
 //
 // Run: SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/sync-ygoprodeck-cards.mjs
 
+import { BATCH_SIZE, MAX_ATTEMPTS, RETRY_DELAY_MS, upsertBatchWithRetry } from './supabase-batch-upsert.mjs';
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
@@ -35,9 +37,6 @@ const CARD_INFO_BY_SET_PARAM = 'cardset';
 // YgoprodeckDecksService's own MIN_DELAY_MS for the live deck-browser API,
 // just a plain sequential script rather than a per-user rate limiter.
 const SET_FETCH_DELAY_MS = 400;
-const BATCH_SIZE = 500;
-const MAX_ATTEMPTS = 3;
-const RETRY_DELAY_MS = 2000;
 
 /** Same field selection as YugiohApiService.toCard() - the first card_sets entry backs set_name/rarity, matching what the client already showed from live data. */
 function cardRowFromRaw(raw) {
@@ -170,36 +169,6 @@ async function fetchAllPrintCodeRows(knownCardIds) {
     console.log(`Found ${extraCardRowsById.size} card id(s) present in set data but missing from misc=yes.`);
   }
   return { printCodeRows: [...printCodeRowsByCode.values()], extraCardRows: [...extraCardRowsById.values()] };
-}
-
-async function upsertBatch(table, batch) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: {
-      apikey: SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates',
-    },
-    body: JSON.stringify(batch),
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`upsert into ${table} failed (${response.status}): ${body}`);
-  }
-}
-
-async function upsertBatchWithRetry(table, batch) {
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      await upsertBatch(table, batch);
-      return;
-    } catch (error) {
-      if (attempt === MAX_ATTEMPTS) throw error;
-      console.error(`Batch of ${batch.length} into ${table} failed (attempt ${attempt}/${MAX_ATTEMPTS}), retrying:`, error.message);
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
-    }
-  }
 }
 
 async function flushInBatches(table, rows) {
