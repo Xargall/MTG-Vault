@@ -1,5 +1,8 @@
 <div class="battlefield-surface" [class.drop-active]="dropActive()">
   <span class="battlefield-band-label" aria-hidden="true">{{ 'playtest.landsBand' | translate }}</span>
+  @if (combatReminder(); as text) {
+    <p class="battlefield-combat-reminder" aria-live="polite">{{ text }}</p>
+  }
   @for (card of cards(); track card.instanceId) {
     <div
       class="battlefield-card"
