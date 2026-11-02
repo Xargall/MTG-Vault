@@ -100,9 +100,27 @@ export class AddCardDialog {
     const videoEl = this.cameraVideo()?.nativeElement;
     if (!videoEl) return;
 
+    // Prefer a USB camera over built-in/virtual ones, same as the Scanner
+    // feature (scanner.ts's startCamera) - typically much higher resolution,
+    // and already the user's own setup for reading print codes. Labels are
+    // only populated once permission has already been granted at least once
+    // for this origin - if not, this just finds nothing and falls back to
+    // the default (facingMode) camera below.
+    let preferredDeviceId: string | null = null;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const usbCamera = devices.filter((d) => d.kind === 'videoinput').find((d) => d.label.toLowerCase().includes('usb'));
+      preferredDeviceId = usbCamera?.deviceId ?? null;
+    } catch {
+      // enumerateDevices() failing just means no auto-preference - carry on.
+    }
+
     try {
       this.cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: {
+          deviceId: preferredDeviceId ? { exact: preferredDeviceId } : undefined,
+          facingMode: preferredDeviceId ? undefined : { ideal: 'environment' },
+        },
         audio: false,
       });
     } catch (error) {
