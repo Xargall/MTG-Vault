@@ -17,7 +17,7 @@ import { DeckEntry } from '../decks/deck.service';
 import { Battlefield } from './battlefield/battlefield';
 import { Hand } from './hand/hand';
 import { PlaytestCard } from './playtest-card/playtest-card';
-import { BattlefieldCard, PlaytestCardInstance, buildLibrary, shuffle, snapToBand } from './playtest-library';
+import { BattlefieldCard, Phase, PlaytestCardInstance, buildLibrary, nextPhase, shuffle, snapToBand } from './playtest-library';
 import { PlaytestPreviewService } from './playtest-preview.service';
 import { PlaytestService } from './playtest.service';
 import { ZonePile } from './zone-pile/zone-pile';
@@ -54,6 +54,7 @@ export class Playtest {
   protected readonly commandZone = signal<PlaytestCardInstance | null>(null);
   protected readonly life = signal(DEFAULT_LIFE);
   protected readonly turn = signal(1);
+  protected readonly phase = signal<Phase>('untap');
   // Highlights the battlefield while a hand card is being dragged over it
   // (see Hand's own cardDragMoved output) - CDK's drag preview already
   // follows the cursor, but gave no feedback on whether *this* drop would
@@ -85,6 +86,7 @@ export class Playtest {
     this.exile.set([]);
     this.life.set(DEFAULT_LIFE);
     this.turn.set(1);
+    this.phase.set('untap');
     this.drawStartingHand();
   }
 
@@ -103,8 +105,20 @@ export class Playtest {
     this.library.update(shuffle);
   }
 
-  protected onNextTurn(): void {
-    this.turn.update((t) => t + 1);
+  /** Advances to the next phase (wrapping Ende -> Untap bumps the turn - see nextPhase). Untap and Draw are the only phases with an automatic effect; everything else is just a marker the player clicks through (see PHASE_ORDER's own doc on why - no combat sub-steps, no stack, no rules engine). */
+  protected onNextPhase(): void {
+    const { phase, turn } = nextPhase(this.phase(), this.turn());
+    this.phase.set(phase);
+    this.turn.set(turn);
+
+    if (phase === 'untap') {
+      this.battlefield.update((items) => items.map((c) => ({ ...c, tapped: false })));
+    } else if (phase === 'draw' && turn > 1) {
+      // Turn 1 never auto-draws - the starting hand (drawStartingHand) is
+      // already the opening 7, matching the paper-Magic "first player skips
+      // their first draw step" convention.
+      this.draw();
+    }
   }
 
   /** Mid-drag position of a hand card, reported continuously (CDK's cdkDragMoved) - only used to toggle the battlefield's own drop-target highlight, not to decide the actual drop (onHandCardDropped re-checks the final point itself). */

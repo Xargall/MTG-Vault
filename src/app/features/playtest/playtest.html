@@ -12,8 +12,8 @@
     <span class="playtest-deck-name">{{ deckEntry()!.deck.name }}</span>
 
     <div class="playtest-turn">
-      <span>{{ 'playtest.turn' | translate: { count: turn() } }}</span>
-      <button type="button" class="btn btn--secondary btn--sm" (click)="onNextTurn()">{{ 'playtest.nextTurn' | translate }}</button>
+      <span>{{ 'playtest.turn' | translate: { count: turn() } }} · {{ 'playtest.phase.' + phase() | translate }}</span>
+      <button type="button" class="btn btn--secondary btn--sm" (click)="onNextPhase()">{{ 'playtest.nextPhase' | translate }}</button>
     </div>
 
     <div class="playtest-life">

@@ -67,6 +67,17 @@ export function snapToBand(
   return { x, y };
 }
 
+/** A basic MTG turn structure, simplified to the steps a solo goldfish session actually benefits from - no combat sub-steps (declare attackers/blockers/damage), no stack, no legality checks, since none of that is this feature's job (see the plan doc: no rules engine). Untap and Draw are the only steps with an automatic effect (see Playtest.advancePhase) - the rest are just where-am-I markers the player clicks through. */
+export const PHASE_ORDER = ['untap', 'upkeep', 'draw', 'main1', 'combat', 'main2', 'end'] as const;
+export type Phase = (typeof PHASE_ORDER)[number];
+
+/** The next {phase, turn} after "Weiter" - wraps from the last phase back to the first and bumps the turn counter, pure so it's testable without the component's DOM/timer plumbing. */
+export function nextPhase(phase: Phase, turn: number): { phase: Phase; turn: number } {
+  const index = PHASE_ORDER.indexOf(phase);
+  const isLastPhase = index === PHASE_ORDER.length - 1;
+  return isLastPhase ? { phase: PHASE_ORDER[0], turn: turn + 1 } : { phase: PHASE_ORDER[index + 1], turn };
+}
+
 /** Fisher-Yates - uniform shuffle, in place on a copy (the input array is never mutated). */
 export function shuffle<T>(items: T[]): T[] {
   const result = [...items];

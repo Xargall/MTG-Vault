@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Card } from '../../core/models/card.model';
-import { buildLibrary, classifyBattlefieldBand, shuffle, snapToBand } from './playtest-library';
+import { PHASE_ORDER, buildLibrary, classifyBattlefieldBand, nextPhase, shuffle, snapToBand } from './playtest-library';
 import { DeckCardRow, DeckEntry, DeckRow } from '../decks/deck.service';
 
 function mtgCard(id: string, typeLine = 'Creature'): Card {
@@ -85,6 +85,22 @@ describe('snapToBand', () => {
 
   it('returns null for a card with no band, so the caller keeps the free drop position', () => {
     expect(snapToBand(mtgCard('bolt', 'Instant'), [], 600)).toBeNull();
+  });
+});
+
+describe('nextPhase', () => {
+  it('advances through every phase without touching the turn number', () => {
+    let state: { phase: (typeof PHASE_ORDER)[number]; turn: number } = { phase: 'untap', turn: 1 };
+    for (let i = 1; i < PHASE_ORDER.length; i++) {
+      state = nextPhase(state.phase, state.turn);
+      expect(state.phase).toBe(PHASE_ORDER[i]);
+      expect(state.turn).toBe(1);
+    }
+  });
+
+  it('wraps from the last phase back to the first and bumps the turn', () => {
+    const result = nextPhase('end', 3);
+    expect(result).toEqual({ phase: 'untap', turn: 4 });
   });
 });
 
