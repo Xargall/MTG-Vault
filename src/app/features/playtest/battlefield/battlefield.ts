@@ -15,6 +15,8 @@ import { BattlefieldCard } from '../playtest-library';
 })
 export class Battlefield {
   readonly cards = input.required<BattlefieldCard[]>();
+  /** True while a hand card is being dragged over this surface (see Playtest.onHandCardDragMoved) - highlights the drop target so dragging toward the battlefield gives feedback before release, not just after. */
+  readonly dropActive = input(false);
   readonly positionChanged = output<{ instanceId: string; x: number; y: number }>();
   readonly sentToGraveyard = output<string>();
   readonly sentToExile = output<string>();

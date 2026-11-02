@@ -13,6 +13,35 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   overflow: hidden;
+  transition: border-color var(--dur-state) var(--ease-out), box-shadow var(--dur-state) var(--ease-out);
+
+  // Two guide bands (creatures / lands), purely visual - no drop logic by
+  // type anywhere (see Playtest's plan doc: no rules engine), just a
+  // conventional table layout so the player has somewhere to put things by
+  // habit, same as a real table. Spells/everything else: the open area above.
+  background-image: linear-gradient(to bottom, transparent calc(100% - 220px), var(--color-border) calc(100% - 220px), var(--color-border) calc(100% - 218px), transparent calc(100% - 218px)),
+    linear-gradient(to bottom, transparent calc(100% - 110px), var(--color-border) calc(100% - 110px), var(--color-border) calc(100% - 108px), transparent calc(100% - 108px));
+
+  &.drop-active {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px var(--glow-accent-strong);
+  }
+}
+
+.battlefield-band-label {
+  position: absolute;
+  left: var(--spacing-sm);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+
+  &--creatures {
+    bottom: 222px;
+  }
+
+  &--lands {
+    bottom: 112px;
+  }
 }
 
 .battlefield-card {

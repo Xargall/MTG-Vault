@@ -18,6 +18,7 @@ import { Battlefield } from './battlefield/battlefield';
 import { Hand } from './hand/hand';
 import { PlaytestCard } from './playtest-card/playtest-card';
 import { BattlefieldCard, PlaytestCardInstance, buildLibrary, shuffle } from './playtest-library';
+import { PlaytestPreviewService } from './playtest-preview.service';
 import { PlaytestService } from './playtest.service';
 import { ZonePile } from './zone-pile/zone-pile';
 
@@ -40,8 +41,10 @@ const DRAW_FLIP_FULL_MS = 260;
 })
 export class Playtest {
   private readonly playtestService = inject(PlaytestService);
+  private readonly previewService = inject(PlaytestPreviewService);
 
   protected readonly deckEntry = this.playtestService.deckEntry;
+  protected readonly previewCard = this.previewService.hoveredCard;
 
   protected readonly library = signal<PlaytestCardInstance[]>([]);
   protected readonly hand = signal<PlaytestCardInstance[]>([]);
@@ -50,6 +53,13 @@ export class Playtest {
   protected readonly exile = signal<PlaytestCardInstance[]>([]);
   protected readonly commandZone = signal<PlaytestCardInstance | null>(null);
   protected readonly life = signal(DEFAULT_LIFE);
+  protected readonly turn = signal(1);
+  // Highlights the battlefield while a hand card is being dragged over it
+  // (see Hand's own cardDragMoved output) - CDK's drag preview already
+  // follows the cursor, but gave no feedback on whether *this* drop would
+  // actually register as playing the card (live-reported: "ich sehe nicht,
+  // wohin ich die ziehe").
+  protected readonly handDragActive = signal(false);
 
   protected readonly topLibraryCard = computed(() => this.library()[0] ?? null);
   protected readonly isDrawing = signal(false);
@@ -74,6 +84,7 @@ export class Playtest {
     this.graveyard.set([]);
     this.exile.set([]);
     this.life.set(DEFAULT_LIFE);
+    this.turn.set(1);
     this.drawStartingHand();
   }
 
@@ -90,6 +101,21 @@ export class Playtest {
 
   protected onShuffle(): void {
     this.library.update(shuffle);
+  }
+
+  protected onNextTurn(): void {
+    this.turn.update((t) => t + 1);
+  }
+
+  /** Mid-drag position of a hand card, reported continuously (CDK's cdkDragMoved) - only used to toggle the battlefield's own drop-target highlight, not to decide the actual drop (onHandCardDropped re-checks the final point itself). */
+  protected onHandCardDragMoved(payload: { clientX: number; clientY: number }): void {
+    const rect = this.battlefieldHost()?.nativeElement.getBoundingClientRect();
+    if (!rect) {
+      this.handDragActive.set(false);
+      return;
+    }
+    const { clientX, clientY } = payload;
+    this.handDragActive.set(clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom);
   }
 
   /** Puts the whole hand back, reshuffles, draws 7 again - repeatable, no London-mulligan partial-hand logic (see plan doc: out of scope for v1). */
@@ -118,6 +144,7 @@ export class Playtest {
 
   /** A card dragged out of hand only actually gets played if it's dropped over the battlefield's own bounds - otherwise CDK's default "spring back to the fan" behavior already handles "you didn't play it" (see hand.ts's own doc), so this silently no-ops rather than needing an explicit rejection path. */
   protected onHandCardDropped(payload: { instanceId: string; clientX: number; clientY: number }): void {
+    this.handDragActive.set(false);
     const rect = this.battlefieldHost()?.nativeElement.getBoundingClientRect();
     if (!rect) return;
     const { clientX, clientY } = payload;

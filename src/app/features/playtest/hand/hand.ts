@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDragEnd, CdkDragMove } from '@angular/cdk/drag-drop';
 
 import { PlaytestCard } from '../playtest-card/playtest-card';
 import { PlaytestCardInstance } from '../playtest-library';
@@ -15,6 +15,13 @@ import { PlaytestCardInstance } from '../playtest-library';
 export class Hand {
   readonly cards = input.required<PlaytestCardInstance[]>();
   readonly cardDropped = output<{ instanceId: string; clientX: number; clientY: number }>();
+  /** Fires continuously during a drag (not just on drop) - lets the parent show a live drop-target highlight instead of only finding out whether the drop worked after releasing. */
+  readonly cardDragMoved = output<{ clientX: number; clientY: number }>();
+
+  protected onDragMoved(event: CdkDragMove): void {
+    const point = event.pointerPosition;
+    this.cardDragMoved.emit({ clientX: point.x, clientY: point.y });
+  }
 
   protected onDragEnded(instanceId: string, event: CdkDragEnd): void {
     const point = event.dropPoint;

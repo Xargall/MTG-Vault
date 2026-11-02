@@ -11,6 +11,11 @@
     </a>
     <span class="playtest-deck-name">{{ deckEntry()!.deck.name }}</span>
 
+    <div class="playtest-turn">
+      <span>{{ 'playtest.turn' | translate: { count: turn() } }}</span>
+      <button type="button" class="btn btn--secondary btn--sm" (click)="onNextTurn()">{{ 'playtest.nextTurn' | translate }}</button>
+    </div>
+
     <div class="playtest-life">
       <button type="button" class="btn btn--round btn--sm" (click)="onLifeChange(life() - 1)" [attr.aria-label]="'playtest.lifeDecrease' | translate">
         <svg aria-hidden="true"><use href="#icon-minus" /></svg>
@@ -69,11 +74,23 @@
       #battlefieldHost
       class="playtest-battlefield"
       [cards]="battlefield()"
+      [dropActive]="handDragActive()"
       (positionChanged)="onBattlefieldPositionChanged($event)"
       (sentToGraveyard)="onSentToGraveyard($event)"
       (sentToExile)="onSentToExile($event)"
     />
   </div>
 
-  <app-hand class="playtest-hand" [cards]="hand()" (cardDropped)="onHandCardDropped($event)" />
+  <app-hand
+    class="playtest-hand"
+    [cards]="hand()"
+    (cardDragMoved)="onHandCardDragMoved($event)"
+    (cardDropped)="onHandCardDropped($event)"
+  />
+
+  @if (previewCard(); as preview) {
+    <div class="playtest-preview" aria-hidden="true">
+      <img [src]="preview.imageUrl ?? ''" [alt]="preview.name" />
+    </div>
+  }
 }

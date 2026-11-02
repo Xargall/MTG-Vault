@@ -731,5 +731,9 @@ export const de = {
     shuffle: 'Mischen',
     mulligan: 'Mulligan',
     newGame: 'Neues Spiel',
+    turn: 'Runde {{count}}',
+    nextTurn: 'Weiter',
+    creaturesBand: 'Kreaturen',
+    landsBand: 'Länder',
   },
 };

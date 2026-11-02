@@ -730,5 +730,9 @@ export const en: typeof de = {
     shuffle: 'Shuffle',
     mulligan: 'Mulligan',
     newGame: 'New Game',
+    turn: 'Turn {{count}}',
+    nextTurn: 'Next',
+    creaturesBand: 'Creatures',
+    landsBand: 'Lands',
   },
 };

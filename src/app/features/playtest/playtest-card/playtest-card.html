@@ -1,4 +1,9 @@
-<div class="playtest-card-inner" [class.flipping]="flipping()">
+<div
+  class="playtest-card-inner"
+  [class.flipping]="flipping()"
+  (mouseenter)="onMouseEnter()"
+  (mouseleave)="onMouseLeave()"
+>
   @if (faceDown()) {
     <!-- The real MTG card back (see DESIGN.md's documented exception to its
          own "no official brand art as decoration" rule) - for the "feeling"

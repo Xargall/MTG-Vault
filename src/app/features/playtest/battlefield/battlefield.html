@@ -1,4 +1,6 @@
-<div class="battlefield-surface">
+<div class="battlefield-surface" [class.drop-active]="dropActive()">
+  <span class="battlefield-band-label battlefield-band-label--creatures" aria-hidden="true">{{ 'playtest.creaturesBand' | translate }}</span>
+  <span class="battlefield-band-label battlefield-band-label--lands" aria-hidden="true">{{ 'playtest.landsBand' | translate }}</span>
   @for (card of cards(); track card.instanceId) {
     <div
       class="battlefield-card"
