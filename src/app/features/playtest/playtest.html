@@ -13,6 +13,9 @@
 
     <div class="playtest-turn">
       <span>{{ 'playtest.turn' | translate: { count: turn() } }} · {{ 'playtest.phase.' + phase() | translate }}</span>
+      <span class="playtest-lands-count" [class.over]="landsPlayedThisTurn() > 1">
+        {{ 'playtest.landsPlayed' | translate: { count: landsPlayedThisTurn() } }}
+      </span>
       <button type="button" class="btn btn--secondary btn--sm" (click)="onNextPhase()">{{ 'playtest.nextPhase' | translate }}</button>
     </div>
 
@@ -45,6 +48,20 @@
     </div>
   </div>
 
+  @if (phase() === 'combat' || cleanupWarning() || deckedOut()) {
+    <div class="playtest-banners">
+      @if (phase() === 'combat') {
+        <p class="playtest-banner">{{ 'playtest.combatReminder' | translate }}</p>
+      }
+      @if (cleanupWarning()) {
+        <p class="playtest-banner playtest-banner--warning">{{ 'playtest.cleanupWarning' | translate: { count: hand().length } }}</p>
+      }
+      @if (deckedOut()) {
+        <p class="playtest-banner playtest-banner--warning">{{ 'playtest.deckedOut' | translate }}</p>
+      }
+    </div>
+  }
+
   <div class="playtest-board">
     <div class="playtest-zones">
       <button
@@ -67,6 +84,12 @@
 
       @if (commandZone(); as commander) {
         <app-zone-pile [label]="'playtest.commandZone' | translate" [cards]="[commander]" (primaryAction)="onCastCommander()" />
+        @if (commanderCastCount() > 0) {
+          <!-- Commander tax is a cost, not something this feature can apply
+               without a mana system (see commanderCastCount's own doc) - just
+               the running count, the player adds +2 per cast themselves. -->
+          <span class="playtest-commander-tax">{{ 'playtest.commanderTax' | translate: { amount: commanderCastCount() * 2 } }}</span>
+        }
       }
     </div>
 
@@ -87,6 +110,7 @@
     [cards]="hand()"
     (cardDragMoved)="onHandCardDragMoved($event)"
     (cardDropped)="onHandCardDropped($event)"
+    (cardDiscarded)="onDiscardFromHand($event)"
   />
 
   @if (previewCard(); as preview) {

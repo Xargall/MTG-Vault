@@ -91,6 +91,39 @@
   }
 }
 
+.playtest-lands-count {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+
+  // Not enforced (see Playtest.landsPlayedThisTurn's own doc) - just a
+  // color cue once the conventional one-per-turn is exceeded.
+  &.over {
+    color: var(--color-danger);
+  }
+}
+
+.playtest-banners {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-sm) var(--spacing-md) 0;
+}
+
+.playtest-banner {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+
+  &--warning {
+    color: var(--color-danger);
+  }
+}
+
+.playtest-commander-tax {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
 .playtest-actions {
   display: flex;
   align-items: center;

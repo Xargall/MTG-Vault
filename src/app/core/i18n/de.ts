@@ -745,5 +745,11 @@ export const de = {
     landsBand: 'Länder',
     tap: 'Tappen',
     untap: 'Enttappen',
+    discard: 'Abwerfen',
+    landsPlayed: '{{count}} Land gespielt',
+    combatReminder: 'Kampfphase — denk an mögliche Blocker!',
+    cleanupWarning: '{{count}} Handkarten — am Ende der Runde auf 7 abwerfen.',
+    deckedOut: 'Bibliothek leer — du hättest hier verloren.',
+    commanderTax: 'Commander-Steuer: +{{amount}}',
   },
 };

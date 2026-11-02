@@ -17,12 +17,22 @@ import { DeckEntry } from '../decks/deck.service';
 import { Battlefield } from './battlefield/battlefield';
 import { Hand } from './hand/hand';
 import { PlaytestCard } from './playtest-card/playtest-card';
-import { BattlefieldCard, Phase, PlaytestCardInstance, buildLibrary, nextPhase, shuffle, snapToBand } from './playtest-library';
+import {
+  BattlefieldCard,
+  Phase,
+  PlaytestCardInstance,
+  STARTING_HAND_SIZE,
+  buildLibrary,
+  classifyBattlefieldBand,
+  mulligan,
+  nextPhase,
+  shuffle,
+  snapToBand,
+} from './playtest-library';
 import { PlaytestPreviewService } from './playtest-preview.service';
 import { PlaytestService } from './playtest.service';
 import { ZonePile } from './zone-pile/zone-pile';
 
-const STARTING_HAND_SIZE = 7;
 const DEFAULT_LIFE = 40; // this app leans Commander-heavy (see its bracket system)
 // The signature "page-turn" draw move (see DESIGN.md's Motion section,
 // "blättern um") - half reveals the face at the midpoint, full removes the
@@ -55,6 +65,21 @@ export class Playtest {
   protected readonly life = signal(DEFAULT_LIFE);
   protected readonly turn = signal(1);
   protected readonly phase = signal<Phase>('untap');
+  protected readonly mulliganCount = signal(0);
+  // Not enforced anywhere (same "assist, don't police" stance as every
+  // other structural rule here) - just a visible count so a one-land-per-
+  // turn overrun is the player's own call, not a silent miss.
+  protected readonly landsPlayedThisTurn = signal(0);
+  // Sticky once true (not cleared by New Game until it's actually called) -
+  // "you'd have lost here" stays true for the rest of this session's
+  // reading, it doesn't un-happen if play continues past it.
+  protected readonly deckedOut = signal(false);
+  // Commander tax is a cost (+2 generic per previous cast), not a rules
+  // check this feature can enforce without a mana system - this only counts
+  // how many times the commander's been cast, the player applies the +2×N
+  // themselves if they're paying attention to it.
+  protected readonly commanderCastCount = signal(0);
+  protected readonly cleanupWarning = computed(() => this.phase() === 'end' && this.hand().length > STARTING_HAND_SIZE);
   // Highlights the battlefield while a hand card is being dragged over it
   // (see Hand's own cardDragMoved output) - CDK's drag preview already
   // follows the cursor, but gave no feedback on whether *this* drop would
@@ -87,6 +112,10 @@ export class Playtest {
     this.life.set(DEFAULT_LIFE);
     this.turn.set(1);
     this.phase.set('untap');
+    this.mulliganCount.set(0);
+    this.landsPlayedThisTurn.set(0);
+    this.deckedOut.set(false);
+    this.commanderCastCount.set(0);
     this.drawStartingHand();
   }
 
@@ -113,6 +142,7 @@ export class Playtest {
 
     if (phase === 'untap') {
       this.battlefield.update((items) => items.map((c) => ({ ...c, tapped: false })));
+      this.landsPlayedThisTurn.set(0);
     } else if (phase === 'draw' && turn > 1) {
       // Turn 1 never auto-draws - the starting hand (drawStartingHand) is
       // already the opening 7, matching the paper-Magic "first player skips
@@ -132,16 +162,21 @@ export class Playtest {
     this.handDragActive.set(clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom);
   }
 
-  /** Puts the whole hand back, reshuffles, draws 7 again - repeatable, no London-mulligan partial-hand logic (see plan doc: out of scope for v1). */
+  /** A real London Mulligan (see playtest-library.ts's own mulligan()) - each call keeps one fewer card, putting the rest on the bottom of the library, not just a flat reshuffle-and-redraw-7. */
   protected onMulligan(): void {
-    this.library.update((lib) => shuffle([...lib, ...this.hand()]));
-    this.hand.set([]);
-    this.drawStartingHand();
+    const { library, hand } = mulligan(this.library(), this.hand(), this.mulliganCount());
+    this.library.set(library);
+    this.hand.set(hand);
+    this.mulliganCount.update((n) => n + 1);
   }
 
-  /** The one signature-move draw action - see DRAW_FLIP_*_MS's doc. Clicking the library mid-flip is a no-op (isDrawing guards it) rather than queuing, so a flipped card always finishes its own animation before the next one starts. */
+  /** The one signature-move draw action - see DRAW_FLIP_*_MS's doc. Clicking the library mid-flip is a no-op (isDrawing guards it) rather than queuing, so a flipped card always finishes its own animation before the next one starts. An empty library sets deckedOut instead of just silently doing nothing - drawing from an empty library is a loss in real Magic, worth surfacing even though this feature doesn't actually end the session over it. */
   protected draw(): void {
-    if (this.isDrawing() || this.library().length === 0) return;
+    if (this.isDrawing()) return;
+    if (this.library().length === 0) {
+      this.deckedOut.set(true);
+      return;
+    }
     this.isDrawing.set(true);
     this.drawRevealed.set(false);
     this.drawTimeouts.push(
@@ -172,6 +207,15 @@ export class Playtest {
       ...items,
       { ...card, tapped: false, ...(snapToBand(card.card, items, rect.height) ?? fallback) },
     ]);
+    if (classifyBattlefieldBand(card.card) === 'land') this.landsPlayedThisTurn.update((n) => n + 1);
+  }
+
+  /** The hand's own discard button (live-requested alongside the end-of-turn cleanup hint - there was no way to discard from hand at all before this). */
+  protected onDiscardFromHand(instanceId: string): void {
+    const card = this.hand().find((c) => c.instanceId === instanceId);
+    if (!card) return;
+    this.hand.update((items) => items.filter((c) => c.instanceId !== instanceId));
+    this.graveyard.update((items) => [card, ...items]);
   }
 
   protected onBattlefieldPositionChanged(payload: { instanceId: string; x: number; y: number }): void {
@@ -215,6 +259,7 @@ export class Playtest {
     if (!commander) return;
     this.commandZone.set(null);
     this.placeOnBattlefield(commander);
+    this.commanderCastCount.update((n) => n + 1);
   }
 
   private returnTopToBattlefield(zone: WritableSignal<PlaytestCardInstance[]>): void {

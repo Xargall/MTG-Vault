@@ -1,6 +1,8 @@
 import { Card } from '../../core/models/card.model';
 import { DeckEntry } from '../decks/deck.service';
 
+export const STARTING_HAND_SIZE = 7;
+
 /** One physical copy of a card on the playtest table - a basic land staged ×17 needs 17 independently draggable/zone-movable identities, which Card.id alone (shared across every copy) can't provide. */
 export interface PlaytestCardInstance {
   instanceId: string;
@@ -76,6 +78,19 @@ export function nextPhase(phase: Phase, turn: number): { phase: Phase; turn: num
   const index = PHASE_ORDER.indexOf(phase);
   const isLastPhase = index === PHASE_ORDER.length - 1;
   return isLastPhase ? { phase: PHASE_ORDER[0], turn: turn + 1 } : { phase: PHASE_ORDER[index + 1], turn };
+}
+
+/** A real London Mulligan: shuffle hand back in, draw a fresh 7, then put one card per mulligan already taken on the bottom of the library (the Nth mulligan keeps 7-N cards). There's no card-selection UI here (that's a bigger interaction than this feature's scope), so which cards go to the bottom isn't the player's choice - always the last ones of the freshly drawn 7, in draw order. mulliganCount is the count *before* this call (0 for the first mulligan) - Playtest increments it itself so the signal update and this pure calculation don't race. */
+export function mulligan(
+  library: PlaytestCardInstance[],
+  hand: PlaytestCardInstance[],
+  mulliganCount: number,
+): { library: PlaytestCardInstance[]; hand: PlaytestCardInstance[] } {
+  const combined = shuffle([...library, ...hand]);
+  const drawn = combined.slice(0, STARTING_HAND_SIZE);
+  const rest = combined.slice(STARTING_HAND_SIZE);
+  const keep = Math.max(0, STARTING_HAND_SIZE - (mulliganCount + 1));
+  return { library: [...rest, ...drawn.slice(keep)], hand: drawn.slice(0, keep) };
 }
 
 /** Fisher-Yates - uniform shuffle, in place on a copy (the input array is never mutated). */

@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import { Card } from '../../core/models/card.model';
-import { PHASE_ORDER, buildLibrary, classifyBattlefieldBand, nextPhase, shuffle, snapToBand } from './playtest-library';
+import {
+  PHASE_ORDER,
+  PlaytestCardInstance,
+  buildLibrary,
+  classifyBattlefieldBand,
+  mulligan,
+  nextPhase,
+  shuffle,
+  snapToBand,
+} from './playtest-library';
 import { DeckCardRow, DeckEntry, DeckRow } from '../decks/deck.service';
 
 function mtgCard(id: string, typeLine = 'Creature'): Card {
@@ -101,6 +110,29 @@ describe('nextPhase', () => {
   it('wraps from the last phase back to the first and bumps the turn', () => {
     const result = nextPhase('end', 3);
     expect(result).toEqual({ phase: 'untap', turn: 4 });
+  });
+});
+
+describe('mulligan', () => {
+  function pile(n: number): PlaytestCardInstance[] {
+    return Array.from({ length: n }, (_, i) => ({ instanceId: `c${i}`, card: mtgCard(`c${i}`) }));
+  }
+
+  it('the first mulligan draws a fresh 7 but keeps only 6, putting 1 back on the bottom', () => {
+    const { library, hand } = mulligan(pile(33), pile(7), 0);
+    expect(hand).toHaveLength(6);
+    expect(library).toHaveLength(34); // 40 total, minus the 6 kept
+  });
+
+  it('the second mulligan keeps 5, putting 2 back on the bottom', () => {
+    const { library, hand } = mulligan(pile(33), pile(7), 1);
+    expect(hand).toHaveLength(5);
+    expect(library).toHaveLength(35);
+  });
+
+  it('never keeps a negative hand once mulligans exceed the starting hand size', () => {
+    const { hand } = mulligan(pile(33), pile(7), 7);
+    expect(hand).toHaveLength(0);
   });
 });
 

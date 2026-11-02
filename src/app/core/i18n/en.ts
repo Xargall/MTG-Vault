@@ -744,5 +744,11 @@ export const en: typeof de = {
     landsBand: 'Lands',
     tap: 'Tap',
     untap: 'Untap',
+    discard: 'Discard',
+    landsPlayed: '{{count}} land played',
+    combatReminder: 'Combat phase — remember you may need to block!',
+    cleanupWarning: '{{count}} cards in hand — discard to 7 by end of turn.',
+    deckedOut: 'Library empty — you would have lost here.',
+    commanderTax: 'Commander tax: +{{amount}}',
   },
 };
