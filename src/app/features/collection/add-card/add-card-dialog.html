@@ -4,7 +4,7 @@
     @if (pendingItems().length > 0) {
       <div class="pending-list">
         <div class="pending-list-header">
-          <span>{{ 'addCard.pendingCount' | translate: { count: pendingItems().length } }}</span>
+          <span>{{ 'addCard.pendingCount' | translate: { count: pendingCardCount() } }}</span>
           <div class="pending-list-actions">
             <button type="button" class="btn btn--ghost btn--sm" [disabled]="committing()" (click)="clearPendingItems()">
               {{ 'addCard.clearList' | translate }}
@@ -14,7 +14,7 @@
             </button>
           </div>
         </div>
-        <ul class="pending-items">
+        <ul class="pending-items" #pendingItemsList>
           @for (item of pendingItems(); track item.tempId) {
             <li>
               <span class="pending-item-name">{{ item.card.name }}</span>

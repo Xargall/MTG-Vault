@@ -102,8 +102,13 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 25vh;
+  // ~7 rows before it scrolls - was 25vh (room for many more), which both
+  // pushed the dialog's own height up with it and buried the just-staged
+  // card (always appended at the end - see AddCardDialog.stageItem) below
+  // the fold with no indication there was more to scroll to.
+  max-height: 190px;
   overflow-y: auto;
+  scroll-behavior: smooth;
 
   li {
     display: flex;
@@ -152,14 +157,19 @@
   }
 }
 
-// Reserves the same height (55vh) across every search state - idle/
-// searching/error/no-results all show a single centered message here
-// instead of the collapsed-to-nothing box that used to make the dialog
-// visibly grow and shrink on every keystroke.
+// Reserves the same height across every search state - idle/searching/
+// error/no-results all show a single centered message here instead of the
+// collapsed-to-nothing box that used to make the dialog visibly grow and
+// shrink on every keystroke. 40vh rather than the full 55vh results-grid
+// used to allow - with the pending-list/camera-preview row and the search
+// input above it, 55vh routinely pushed the whole dialog (AppDialog's own
+// max-height: 85vh) into its own outer scroll on top of this area's and
+// pending-items' already-scrollable insides - three nested scroll
+// containers at once, in practice (reported) less usable than one.
 .search-results-area {
   display: flex;
   flex-direction: column;
-  min-height: 55vh;
+  min-height: 40vh;
 
   > .state-message,
   > .search-error {
@@ -172,7 +182,7 @@
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   align-content: start;
   gap: var(--spacing-md);
-  max-height: 55vh;
+  max-height: 40vh;
   overflow-y: auto;
   padding: 6px;
 
