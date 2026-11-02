@@ -206,6 +206,7 @@ export const de = {
     cameraNoneFound: 'Keine Kamera gefunden.',
     zoomLabel: 'Zoom',
     torchLabel: 'Taschenlampe',
+    focusLabel: 'Fokus',
   },
   cardDetail: {
     title: 'Kartendetails',

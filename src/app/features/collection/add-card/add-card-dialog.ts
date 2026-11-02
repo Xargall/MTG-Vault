@@ -38,6 +38,26 @@ interface TorchConstraintSet extends MediaTrackConstraintSet {
   torch?: boolean;
 }
 
+// Manual focus / points-of-interest aren't in TS's bundled DOM types either -
+// same shape as scanner.ts's own copy of these (duplicated rather than
+// shared since the two components don't otherwise depend on each other).
+interface FocusCapableTrackCapabilities extends MediaTrackCapabilities {
+  focusMode?: string[];
+  // Real devices report their own min/max/step (e.g. 10-100), not a
+  // normalized 0-1 range, so the slider bounds must come from here.
+  focusDistance?: { min: number; max: number; step?: number };
+}
+interface FocusConstraintSet extends MediaTrackConstraintSet {
+  focusMode?: string;
+  focusDistance?: number;
+  pointsOfInterest?: { x: number; y: number }[];
+}
+interface FocusRange {
+  min: number;
+  max: number;
+  step: number;
+}
+
 /** One card staged for a batch add - see pendingItems' doc. */
 interface PendingAddItem {
   tempId: number;
@@ -83,6 +103,13 @@ export class AddCardDialog {
   private readonly cameraVideo = viewChild<ElementRef<HTMLVideoElement>>('cameraVideo');
   private cameraStream: MediaStream | null = null;
   private cameraTrack: MediaStreamTrack | null = null;
+  // Set by the destroy hook below, checked right after the (slow, user-
+  // permission-gated) getUserMedia call resolves - a dialog closed while
+  // that call was still pending used to leave its camera stream running
+  // forever: the destroy hook ran first (cameraStream was still null, so it
+  // had nothing to stop), and the stream that showed up afterward was never
+  // stopped by anything. Found in review (ponytail-review, 2026-11-02).
+  private destroyed = false;
   protected readonly cameraError = signal<string | null>(null);
   protected readonly torchSupported = signal(false);
   protected readonly torchOn = signal(false);
@@ -90,10 +117,16 @@ export class AddCardDialog {
   protected readonly minZoom = MIN_ZOOM;
   protected readonly maxZoom = MAX_ZOOM;
   protected readonly zoomStep = ZOOM_STEP;
+  protected readonly supportsManualFocus = signal(false);
+  protected readonly focusRange = signal<FocusRange>({ min: 0, max: 1, step: 0.05 });
+  protected readonly focusDistance = signal(0.5);
 
   constructor() {
     afterNextRender(() => void this.startCamera());
-    this.destroyRef.onDestroy(() => this.cameraStream?.getTracks().forEach((track) => track.stop()));
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+      this.cameraStream?.getTracks().forEach((track) => track.stop());
+    });
   }
 
   private async startCamera(): Promise<void> {
@@ -114,9 +147,11 @@ export class AddCardDialog {
     } catch {
       // enumerateDevices() failing just means no auto-preference - carry on.
     }
+    if (this.destroyed) return;
 
+    let stream: MediaStream;
     try {
-      this.cameraStream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         video: {
           deviceId: preferredDeviceId ? { exact: preferredDeviceId } : undefined,
           facingMode: preferredDeviceId ? undefined : { ideal: 'environment' },
@@ -132,17 +167,41 @@ export class AddCardDialog {
       return;
     }
 
+    // The dialog closed while getUserMedia was still waiting on the
+    // browser's permission prompt - see destroyed's doc. Stop the stream
+    // this call just opened instead of handing it to a dead component.
+    if (this.destroyed) {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+
+    this.cameraStream = stream;
     videoEl.muted = true;
     videoEl.playsInline = true;
-    videoEl.srcObject = this.cameraStream;
+    videoEl.srcObject = stream;
     await videoEl.play();
 
-    this.cameraTrack = this.cameraStream.getVideoTracks()[0] ?? null;
+    this.cameraTrack = stream.getVideoTracks()[0] ?? null;
     try {
-      const capabilities = this.cameraTrack?.getCapabilities?.() as TorchCapableTrackCapabilities | undefined;
+      const capabilities = this.cameraTrack?.getCapabilities?.() as
+        | (TorchCapableTrackCapabilities & FocusCapableTrackCapabilities)
+        | undefined;
       this.torchSupported.set(!!capabilities?.torch);
+
+      // Manual focus is only supported on some Chromium-based browsers
+      // (mainly Android Chrome/Edge) - show the slider only when the active
+      // device actually advertises it, nothing/no error otherwise. Same
+      // detection as scanner.ts's own startCamera.
+      const supportsManual = !!capabilities?.focusMode?.includes('manual');
+      this.supportsManualFocus.set(supportsManual);
+      if (supportsManual && capabilities?.focusDistance) {
+        const { min, max, step } = capabilities.focusDistance;
+        this.focusRange.set({ min, max, step: step || (max - min) / 20 || 1 });
+        this.focusDistance.set((min + max) / 2);
+      }
     } catch {
       this.torchSupported.set(false);
+      this.supportsManualFocus.set(false);
     }
   }
 
@@ -159,6 +218,36 @@ export class AddCardDialog {
 
   protected onZoomChange(value: number): void {
     this.zoom.set(value);
+  }
+
+  protected async onFocusDistanceChange(value: number): Promise<void> {
+    this.focusDistance.set(value);
+    if (!this.cameraTrack) return;
+    try {
+      await this.cameraTrack.applyConstraints({
+        advanced: [{ focusMode: 'manual', focusDistance: value } as FocusConstraintSet],
+      });
+    } catch {
+      // Device advertised manual focus support but rejected the constraint - not critical.
+    }
+  }
+
+  // Tap-to-focus: works on more devices than the manual slider, so it's
+  // always wired up regardless of supportsManualFocus - browsers that don't
+  // support pointsOfInterest just reject the constraint, silently ignored.
+  // Same approach as scanner.ts's own onVideoTap.
+  protected async onVideoTap(event: MouseEvent): Promise<void> {
+    if (!this.cameraTrack) return;
+    const target = event.currentTarget as HTMLVideoElement;
+    if (!target.clientWidth || !target.clientHeight) return;
+
+    const x = event.offsetX / target.clientWidth;
+    const y = event.offsetY / target.clientHeight;
+    try {
+      await this.cameraTrack.applyConstraints({ advanced: [{ pointsOfInterest: [{ x, y }] } as FocusConstraintSet] });
+    } catch {
+      // Tap-to-focus isn't supported everywhere - fail silently, no error UI.
+    }
   }
 
   protected readonly conditions = CONDITIONS;
@@ -391,10 +480,12 @@ export class AddCardDialog {
   /** Shared by addToList() (the configured form) and quickAdd() (the print-code shortcut) - both just stage different quantity/foil/condition/language values under the same dedup-and-merge rule. */
   private stageItem(card: Card, quantity: number, foil: boolean, condition: string, language: string): void {
     const key = this.pendingKey(card, foil, language);
+    let appended = false;
 
     this.pendingItems.update((items) => {
       const index = items.findIndex((item) => this.pendingKey(item.card, item.foil, item.language) === key);
       if (index === -1) {
+        appended = true;
         return [...items, { tempId: this.nextTempId++, card, quantity, foil, condition, language }];
       }
       // Same dedup key CollectionService.upsertOne() would merge into one
@@ -409,20 +500,25 @@ export class AddCardDialog {
     });
     this.savePendingItems(this.pendingItems());
 
-    // A newly staged card is always appended at the end (or, on a merge,
-    // left at its already-visible spot) - scrolling the (now capped-height,
-    // see .pending-items) list to the bottom keeps whichever one just got
-    // added in view instead of it silently landing below the fold.
+    // Only when truly new - a newly staged card is appended at the end, so
+    // scrolling the (now capped-height, see .pending-items) list to the
+    // bottom keeps it in view instead of it silently landing below the
+    // fold. A merge (a second copy of an already-staged card) leaves its
+    // row exactly where it already was (see above) - scrolling to the
+    // bottom here too used to yank the view away from that row toward
+    // whatever happened to be last instead (found in review, 2026-11-02).
     // afterNextRender since the list (and, for the very first staged item,
     // its whole container - @if (pendingItems().length > 0)) must already
     // reflect this update in the DOM before scrollHeight means anything.
-    afterNextRender(
-      () => {
-        const el = this.pendingItemsList()?.nativeElement;
-        if (el) el.scrollTop = el.scrollHeight;
-      },
-      { injector: this.injector },
-    );
+    if (appended) {
+      afterNextRender(
+        () => {
+          const el = this.pendingItemsList()?.nativeElement;
+          if (el) el.scrollTop = el.scrollHeight;
+        },
+        { injector: this.injector },
+      );
+    }
   }
 
   protected removePending(tempId: number): void {
