@@ -88,6 +88,16 @@ async function proxyBulkFile(req: Request, path: string, search: string): Promis
     headers.set('Content-Type', response.headers.get('content-type') ?? 'application/gzip');
     const contentLength = response.headers.get('content-length');
     if (contentLength) headers.set('Content-Length', contentLength);
+    // Scryfall mints a new, timestamped jsonl_download_uri every time it
+    // regenerates the bulk file - this exact URL's bytes never change, so
+    // it's safe to cache hard. Without this, Supabase's edge CDN never
+    // cached a single byte of this route (confirmed live: "Cached Egress"
+    // sat at 0.00GB all month) - every one of this file's ~77MB downloads,
+    // from every device/session, was a full, uncached egress hit. A day of
+    // heavy scanner/camera testing across several cold sessions (fresh
+    // IndexedDB each time) is exactly what turned into the 2.18GB Functions
+    // Egress spike on 2026-11-02.
+    headers.set('Cache-Control', 'public, max-age=604800, immutable');
 
     return new Response(response.body, { status: response.status, headers });
   } catch (error) {
