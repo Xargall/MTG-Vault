@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { TranslatePipe } from '@ngx-translate/core';
 
@@ -24,8 +24,17 @@ export class Battlefield {
   readonly sentToExile = output<string>();
   readonly tapToggled = output<string>();
 
+  /** Which card's action row is pinned open on a touch device (no hover to reveal it otherwise) - see .battlefield-card-actions in the stylesheet. Mouse users get hover instead and never need this. */
+  protected readonly selectedInstanceId = signal<string | null>(null);
+
   protected onDragEnded(instanceId: string, event: CdkDragEnd): void {
     const { x, y } = event.source.getFreeDragPosition();
     this.positionChanged.emit({ instanceId, x, y });
+  }
+
+  /** Stops the click from bubbling to the surface's own click handler (which clears the selection) - tapping a card selects it, tapping empty table clears it. */
+  protected selectCard(instanceId: string, event: MouseEvent): void {
+    event.stopPropagation();
+    this.selectedInstanceId.set(instanceId);
   }
 }

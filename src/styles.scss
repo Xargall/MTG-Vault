@@ -241,11 +241,12 @@ body {
   --scrim: color-mix(in oklab, var(--color-bg) 65%, transparent);
   --scrim-strong: color-mix(in oklab, var(--color-bg) 92%, transparent);
 
-  // Space the fixed bottom tab bar takes on phones (see app-shell.scss) -
-  // anything pinned to the bottom edge (page end, toasts) clears it.
+  // Space the fixed bottom tab bar takes on phones and tablets (see
+  // app-shell.scss) - anything pinned to the bottom edge (page end, toasts)
+  // clears it.
   --tabbar-offset: 0px;
 
-  @media (max-width: 640px) {
+  @media (max-width: 1024px) {
     --tabbar-offset: calc(3.5rem + env(safe-area-inset-bottom));
   }
 }

@@ -46,15 +46,17 @@ const BAND_CARD_WIDTH = 100;
 const BAND_CARD_GAP = 8;
 const BAND_ROW_PADDING = 10;
 
-export type BattlefieldBand = 'land' | null;
+export type BattlefieldBand = 'land' | 'creature' | null;
 
-/** Live-requested: snap a Land straight into the bottom half on drop, instead of leaving it exactly where the pointer released it. Only lands get a dedicated band (live-reported: a separate creature row cut dropped lands off at the bottom edge when the band was sized for the old 3-band layout) - creatures, spells, and everything else keep free placement in the open top half, since there's no rules engine here to know what else deserves its own band. */
+/** Live-requested: snap a Land straight into the bottom half on drop, instead of leaving it exactly where the pointer released it - creatures snap the same way into the top half (live-requested, 2026-11-03: free placement there "sieht doof aus"). Spells and everything else that only ever passes through the battlefield keep free placement, since there's no rules engine here to know what else deserves its own band. */
 export function classifyBattlefieldBand(card: Card): BattlefieldBand {
-  if (card.game === 'mtg' && card.typeLine.includes('Land')) return 'land';
+  if (card.game !== 'mtg') return null;
+  if (card.typeLine.includes('Land')) return 'land';
+  if (card.typeLine.includes('Creature')) return 'creature';
   return null;
 }
 
-/** The snapped {x, y} for a land entering the bottom band, or null when it has no band (free placement at the actual drop point applies instead). Appends to the end of the row, left to right - battlefieldHeight is the live battlefield surface's own rendered height (its bounding rect), so the band stays correctly anchored to the bottom half at any viewport size. Matches battlefield.scss's own 50% divider - no shared source of truth between the CSS split and this JS snap target. */
+/** The snapped {x, y} for a land/creature entering its band, or null when it has no band (free placement at the actual drop point applies instead). Appends to the end of its row, left to right - battlefieldHeight is the live battlefield surface's own rendered height (its bounding rect), so each band stays correctly anchored to its half at any viewport size. Matches battlefield.scss's own 50% divider - no shared source of truth between the CSS split and this JS snap target. */
 export function snapToBand(
   card: Card,
   existingBattlefieldCards: { card: Card }[],
@@ -63,7 +65,7 @@ export function snapToBand(
   const band = classifyBattlefieldBand(card);
   if (!band) return null;
 
-  const y = battlefieldHeight / 2 + BAND_ROW_PADDING;
+  const y = band === 'land' ? battlefieldHeight / 2 + BAND_ROW_PADDING : BAND_ROW_PADDING;
   const countInBand = existingBattlefieldCards.filter((c) => classifyBattlefieldBand(c.card) === band).length;
   const x = BAND_ROW_PADDING + countInBand * (BAND_CARD_WIDTH + BAND_CARD_GAP);
   return { x, y };

@@ -1,5 +1,6 @@
-<div class="battlefield-surface" [class.drop-active]="dropActive()">
-  <span class="battlefield-band-label" aria-hidden="true">{{ 'playtest.landsBand' | translate }}</span>
+<div class="battlefield-surface" [class.drop-active]="dropActive()" (click)="selectedInstanceId.set(null)">
+  <span class="battlefield-band-label battlefield-band-label--creatures" aria-hidden="true">{{ 'playtest.creaturesBand' | translate }}</span>
+  <span class="battlefield-band-label battlefield-band-label--lands" aria-hidden="true">{{ 'playtest.landsBand' | translate }}</span>
   @if (combatReminder(); as text) {
     <p class="battlefield-combat-reminder" aria-live="polite">{{ text }}</p>
   }
@@ -7,25 +8,42 @@
     <div
       class="battlefield-card"
       [class.tapped]="card.tapped"
+      [class.is-selected]="selectedInstanceId() === card.instanceId"
       cdkDrag
       [cdkDragFreeDragPosition]="{ x: card.x, y: card.y }"
       (cdkDragEnded)="onDragEnded(card.instanceId, $event)"
+      (click)="selectCard(card.instanceId, $event)"
     >
       <app-playtest-card [card]="card.card" [tapped]="card.tapped" />
+      <!-- Icon-only, hidden until hover (mouse) or tap-to-select (touch) -
+           three permanently-visible text buttons under every 100px card
+           both crowded the table and didn't read as buttons (feedback,
+           2026-11-03). -->
       <div class="battlefield-card-actions">
         <button
           type="button"
-          class="btn btn--ghost btn--sm battlefield-tap-toggle"
+          class="battlefield-card-action"
           [class.active]="card.tapped"
+          [attr.aria-label]="(card.tapped ? 'playtest.untap' : 'playtest.tap') | translate"
           (click)="tapToggled.emit(card.instanceId)"
         >
-          {{ (card.tapped ? 'playtest.untap' : 'playtest.tap') | translate }}
+          <svg aria-hidden="true"><use href="#icon-tap" /></svg>
         </button>
-        <button type="button" class="btn btn--ghost btn--sm" (click)="sentToGraveyard.emit(card.instanceId)">
-          {{ 'playtest.graveyard' | translate }}
+        <button
+          type="button"
+          class="battlefield-card-action"
+          [attr.aria-label]="'playtest.graveyard' | translate"
+          (click)="sentToGraveyard.emit(card.instanceId)"
+        >
+          <svg aria-hidden="true"><use href="#icon-graveyard" /></svg>
         </button>
-        <button type="button" class="btn btn--ghost btn--sm" (click)="sentToExile.emit(card.instanceId)">
-          {{ 'playtest.exile' | translate }}
+        <button
+          type="button"
+          class="battlefield-card-action"
+          [attr.aria-label]="'playtest.exile' | translate"
+          (click)="sentToExile.emit(card.instanceId)"
+        >
+          <svg aria-hidden="true"><use href="#icon-exile" /></svg>
         </button>
       </div>
     </div>

@@ -743,6 +743,7 @@ export const de = {
       end: 'Ende',
     },
     landsBand: 'Länder',
+    creaturesBand: 'Kreaturen & Zauber',
     tap: 'Tappen',
     untap: 'Enttappen',
     discard: 'Abwerfen',

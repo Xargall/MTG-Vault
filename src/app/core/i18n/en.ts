@@ -742,6 +742,7 @@ export const en: typeof de = {
       end: 'End',
     },
     landsBand: 'Lands',
+    creaturesBand: 'Creatures & Spells',
     tap: 'Tap',
     untap: 'Untap',
     discard: 'Discard',

@@ -75,9 +75,9 @@ describe('buildLibrary', () => {
 });
 
 describe('classifyBattlefieldBand', () => {
-  it('classifies a land, leaving creatures and everything else free-placed', () => {
+  it('classifies lands into the bottom band and creatures into the top band, leaving everything else free-placed', () => {
     expect(classifyBattlefieldBand(mtgCard('forest', 'Basic Land — Forest'))).toBe('land');
-    expect(classifyBattlefieldBand(mtgCard('bear', 'Creature — Bear'))).toBeNull();
+    expect(classifyBattlefieldBand(mtgCard('bear', 'Creature — Bear'))).toBe('creature');
     expect(classifyBattlefieldBand(mtgCard('bolt', 'Instant'))).toBeNull();
     expect(classifyBattlefieldBand({ game: 'yugioh', id: 'x', typeLine: undefined } as unknown as Card)).toBeNull();
   });
@@ -90,6 +90,16 @@ describe('snapToBand', () => {
 
     expect(first?.y).toBe(second?.y); // same row
     expect(second!.x).toBeGreaterThan(first!.x); // next slot to the right
+  });
+
+  it('stacks successive creatures left to right within the top band, above the lands band', () => {
+    const land = snapToBand(mtgCard('island-1', 'Land — Island'), [], 600);
+    const first = snapToBand(mtgCard('bear-1', 'Creature — Bear'), [], 600);
+    const second = snapToBand(mtgCard('bear-2', 'Creature — Bear'), [{ card: mtgCard('bear-1', 'Creature — Bear') }], 600);
+
+    expect(first?.y).toBe(second?.y); // same row
+    expect(second!.x).toBeGreaterThan(first!.x); // next slot to the right
+    expect(first!.y).toBeLessThan(land!.y); // creatures band sits above the lands band
   });
 
   it('returns null for a card with no band, so the caller keeps the free drop position', () => {
