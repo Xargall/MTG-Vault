@@ -117,17 +117,35 @@ export class PokemonApiService implements CardApiService {
     return raw.filter((c): c is TcgdexRawCard => c !== null).map((c) => this.toCard(c));
   }
 
-  /** Every TCGdex set (id + display name), for the set-filter dropdown next to Pokémon's search box - memoized for the service's lifetime, the list doesn't change within a session and is small enough (~155 entries) to just keep around. */
+  /** Every TCGdex set (id + display name), for the set-filter dropdown next to Pokémon's search box - memoized for the service's lifetime, the list doesn't change within a session and is small enough (~220 entries) to just keep around. */
   async getSets(): Promise<PokemonSetOption[]> {
     return (this.setsPromise ??= this.fetchSets());
   }
 
+  /**
+   * Merges TCGdex's German and English set LISTS, not just individual card
+   * images - confirmed live (2026-11-03): the German `/sets` list is
+   * missing 65 entire sets the English one has, overwhelmingly older
+   * promos/trainer-kits/POP series and every single McDonald's Collection
+   * year (0 of 12 in German, reported live as "die McDonalds Sets sind
+   * nicht in der Setauflistung"). English fills the gaps; German still
+   * wins by id wherever both exist, so the dropdown stays German-named for
+   * everything that actually has a German release.
+   */
   private async fetchSets(): Promise<PokemonSetOption[]> {
     try {
-      const response = await fetch(`${API_BASE}/sets`);
-      if (!response.ok) return [];
-      const raw: { id: string; name: string; symbol?: string }[] = await response.json();
-      return raw
+      const [deResponse, enResponse] = await Promise.all([
+        fetch(`${API_BASE}/sets`),
+        fetch(`${FALLBACK_IMAGE_API_BASE}/sets`),
+      ]);
+      const de: { id: string; name: string; symbol?: string }[] = deResponse.ok ? await deResponse.json() : [];
+      const en: { id: string; name: string; symbol?: string }[] = enResponse.ok ? await enResponse.json() : [];
+
+      const byId = new Map<string, { id: string; name: string; symbol?: string }>();
+      for (const s of en) byId.set(s.id, s);
+      for (const s of de) byId.set(s.id, s); // German overrides where it exists
+
+      return [...byId.values()]
         .map((s) => ({ id: s.id, name: s.name, symbolUrl: toSetSymbolUrl(s.symbol) }))
         .sort((a, b) => a.name.localeCompare(b.name, 'de'));
     } catch {
