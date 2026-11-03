@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 
 import { Card, PokemonCard, PokemonSupertype } from '../models/card.model';
 import { cleanOcrText, similarity } from '../utils/string-similarity';
+import { readTtlCache, writeTtlCache } from '../utils/ttl-cache';
 import { CardApiService, CardIdentification } from './card-api.interface';
 
 const IDENTIFY_CONFIDENCE_THRESHOLD = 0.8;
@@ -35,6 +36,16 @@ interface TcgdexRawCard {
   localId: string;
   name: string;
   image?: string;
+  // Set only when NEITHER TCGdex locale has an image at all (e.g. every
+  // McDonald's Collection card, confirmed live 2026-11-03 - reported as
+  // "ohne Bilder sieht es wirklich sch*** aus") - already a complete,
+  // ready-to-use URL from pokemontcg.io, unlike `image` above (a TCGdex
+  // base path that still needs /high.webp or /low.webp appended - see
+  // toCard()). Kept as its own field rather than overloading `image`
+  // itself specifically so that suffix never gets appended to it by
+  // mistake.
+  fallbackImageUrl?: string;
+  fallbackImageUrlSmall?: string;
   category: PokemonSupertype;
   rarity?: string;
   set?: { name: string; cardCount?: { official?: number }; symbol?: string };
@@ -60,6 +71,79 @@ const API_BASE = 'https://api.tcgdex.net/v2/de';
 // is only ever consulted for the one `image` field, and only when the
 // German response left it empty.
 const FALLBACK_IMAGE_API_BASE = 'https://api.tcgdex.net/v2/en';
+// Last-resort image source for a card neither TCGdex locale has a scan of
+// at all (confirmed live: TCGdex has zero images, in any language, for any
+// McDonald's Collection year) - pokemontcg.io is CORS-open (confirmed live,
+// same as TCGdex, no proxy needed) and has real art for these. Its own set
+// ids ("mcd21") share no naming scheme with TCGdex's ("2021swsh"), but its
+// English set *names* are identical strings to TCGdex's own English set
+// names - matching on `set.name` + the card's own local number needs no
+// hand-maintained id-mapping table, and works for any future gap, not only
+// the McDonald's sets found live.
+const POKEMONTCGIO_API_BASE = 'https://api.pokemontcg.io/v2';
+// pokemontcg.io's free/unauthenticated tier is noticeably flaky - confirmed
+// live (2026-11-03): a bare 500/502 with no Retry-After on an outright
+// majority of requests, even for a trivial query, in one run only
+// succeeding on the 4th attempt. A short gap between tries rather than
+// hammering it back-to-back; worst case here (every attempt fails) is
+// exactly today's placeholder icon, never an error a user sees, so a few
+// hundred ms of extra latency on an already-rare path costs nothing
+// compared to leaving the fallback mostly ineffective. Only ever consulted
+// as this last-resort fallback, never for a card TCGdex already has
+// pictured.
+const POKEMONTCGIO_RETRY_ATTEMPTS = 5;
+const POKEMONTCGIO_RETRY_DELAY_MS = 300;
+// Without this, EVERY render of a collection full of imageless cards (the
+// exact scenario reported live: a grid of McDonald's cards) would redo this
+// same flaky multi-retry lookup from scratch on every page load, since
+// toCard()/fetchDetail() runs again each time - confirmed live: with several
+// such cards on screen, that stalled the page's own network-idle long past
+// a normal load. One PokemonCard id never changes which (if any) image it
+// resolves to, so this is safe to treat as effectively permanent - 7 days
+// (not forever) only so a temporary pokemontcg.io outage gets retried
+// eventually instead of a bad day calcifying into a permanent miss.
+const POKEMON_IMAGE_FALLBACK_CACHE_KEY = 'tcg-collector-pokemon-image-fallback';
+const POKEMON_IMAGE_FALLBACK_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+type PokemonImageFallback = { large?: string; small?: string } | null;
+
+/**
+ * `null` - a real, clean response came back with zero matches (genuinely
+ * not in pokemontcg.io's database either). `undefined` - every attempt
+ * errored or never returned a usable response (outright confirmed live,
+ * 2026-11-03: a sustained bad patch where ~9 of 10 lookups never got a
+ * clean response even across all POKEMONTCGIO_RETRY_ATTEMPTS). The caller
+ * must NOT treat these the same - caching an outage-caused `undefined` as
+ * a permanent miss would turn "pokemontcg.io is down right now" into "this
+ * card has no image" for the cache's whole 7-day TTL (see
+ * resolvePokemonTcgIoImage).
+ */
+async function fetchPokemonTcgIoImage(
+  setName: string,
+  localId: string,
+): Promise<{ large?: string; small?: string } | null | undefined> {
+  const url = new URL(`${POKEMONTCGIO_API_BASE}/cards`);
+  // Quotes inside the set name itself would break the query syntax - no
+  // real Pokémon set name has ever contained one, but stripping is cheap
+  // insurance against a malformed query silently matching nothing.
+  url.searchParams.set('q', `set.name:"${setName.replace(/"/g, '')}" number:${localId}`);
+
+  for (let attempt = 0; attempt < POKEMONTCGIO_RETRY_ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, POKEMONTCGIO_RETRY_DELAY_MS));
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      const body: { data?: { images?: { large?: string; small?: string } }[] } = await response.json();
+      if (!body.data) continue; // malformed/unexpected shape - not a clean answer, keep retrying
+      if (body.data.length === 0) return null; // clean, confirmed: no such card there
+      const images = body.data[0].images;
+      if (images) return images;
+    } catch {
+      // retry
+    }
+  }
+  return undefined;
+}
 
 /**
  * A set's `symbol` field comes back as e.g.
@@ -93,6 +177,11 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item
 @Injectable({ providedIn: 'root' })
 export class PokemonApiService implements CardApiService {
   private setsPromise: Promise<PokemonSetOption[]> | null = null;
+  // In-memory mirror of localStorage, lazily loaded once - avoids
+  // re-parsing localStorage on every single imageless card (see
+  // POKEMON_IMAGE_FALLBACK_CACHE_KEY's own doc), same pattern as
+  // EdhrecService/MoxfieldService's own disk caches.
+  private imageFallbackDiskCache: Record<string, PokemonImageFallback> | null = null;
 
   /**
    * `setId`, when given, narrows the search to that one TCGdex set
@@ -214,7 +303,54 @@ export class PokemonApiService implements CardApiService {
     if (!response.ok) return null;
     const raw: TcgdexRawCard = await response.json();
     if (!raw.image) raw.image = await this.fetchFallbackImage(id);
+    if (!raw.image && raw.set?.name && raw.localId) {
+      // Never awaited here - see resolvePokemonTcgIoImage's own doc on why
+      // this card's own hydration can't block on it. A cache hit (already
+      // resolved by an earlier card/session) still applies immediately.
+      const cached = this.getImageFallbackCache()[raw.id];
+      if (cached !== undefined) {
+        raw.fallbackImageUrl = cached?.large;
+        raw.fallbackImageUrlSmall = cached?.small;
+      } else {
+        void this.resolvePokemonTcgIoImage(raw.id, raw.set.name, raw.localId);
+      }
+    }
     return raw;
+  }
+
+  private getImageFallbackCache(): Record<string, PokemonImageFallback> {
+    return (this.imageFallbackDiskCache ??= readTtlCache(
+      POKEMON_IMAGE_FALLBACK_CACHE_KEY,
+      POKEMON_IMAGE_FALLBACK_CACHE_TTL_MS,
+      {},
+    ));
+  }
+
+  /**
+   * Resolves (and caches) pokemontcg.io's fallback image for one card, but
+   * deliberately isn't awaited by its only caller (fetchDetail) - up to
+   * POKEMONTCGIO_RETRY_ATTEMPTS retries against a confirmed-flaky upstream
+   * (see fetchPokemonTcgIoImage's doc) would otherwise block that card's
+   * own hydration, and by extension a whole collection grid's render, on
+   * every page load for anyone owning several imageless cards (confirmed
+   * live: exactly the McDonald's-heavy collection reported 2026-11-03
+   * stalled the page's network-idle well past a normal load). Writing the
+   * result to the shared localStorage cache here means it has no visible
+   * effect on the CURRENT render - the card already rendered with its
+   * placeholder icon by the time this resolves - but the next time this id
+   * is hydrated (next reload, or reopening the add-card dialog) picks up
+   * the real image from cache instantly, no retries needed again. An
+   * inconclusive result (see fetchPokemonTcgIoImage's doc on `undefined`)
+   * is never written here at all - leaving no cache entry means the next
+   * encounter just retries in the background again, instead of a bad
+   * outage window calcifying into a week of permanent-looking misses.
+   */
+  private async resolvePokemonTcgIoImage(id: string, setName: string, localId: string): Promise<void> {
+    const images = await fetchPokemonTcgIoImage(setName, localId);
+    if (images === undefined) return;
+    const cache = this.getImageFallbackCache();
+    cache[id] = images;
+    writeTtlCache(POKEMON_IMAGE_FALLBACK_CACHE_KEY, cache);
   }
 
   /** See FALLBACK_IMAGE_API_BASE's doc comment - only ever asked for when the German response itself had no image. Best-effort: any failure here just leaves the card imageless, same as before this fallback existed. */
@@ -241,13 +377,16 @@ export class PokemonApiService implements CardApiService {
       name: raw.name,
       oracleName: raw.name,
       localizedName: null,
-      imageUrl: raw.image ? `${raw.image}/high.webp` : null,
+      imageUrl: raw.image ? `${raw.image}/high.webp` : (raw.fallbackImageUrl ?? null),
       // TCGdex's documented quality suffixes are "low"/"high" - same base
       // URL, smaller variant for the grid thumbnail (see card-tile.html).
       // Not live-verified against a real response the way MTG/Yu-Gi-Oh were
       // (Pokémon decks are still pending, see CLAUDE.md) - worth a quick
-      // sanity check once Pokémon sees real usage.
-      imageUrlSmall: raw.image ? `${raw.image}/low.webp` : null,
+      // sanity check once Pokémon sees real usage. The pokemontcg.io
+      // fallback's own "small" variant is already a complete, differently-
+      // sized URL (no suffix to append) - fall back to its "large" one
+      // rather than leave the thumbnail imageless when only that exists.
+      imageUrlSmall: raw.image ? `${raw.image}/low.webp` : (raw.fallbackImageUrlSmall ?? raw.fallbackImageUrl ?? null),
       setName: raw.set?.name ?? null,
       rarity: raw.rarity ?? null,
       prices: {
