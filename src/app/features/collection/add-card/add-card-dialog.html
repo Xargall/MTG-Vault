@@ -1,45 +1,13 @@
 <app-dialog [heading]="'addCard.title' | translate" maxWidth="720px" (closeRequest)="close.emit()">
 
   <div class="top-row">
-    @if (pendingItems().length > 0) {
-      <div class="pending-list">
-        <div class="pending-list-header">
-          <span>{{ 'addCard.pendingCount' | translate: { count: pendingCardCount() } }}</span>
-          <div class="pending-list-actions">
-            <button type="button" class="btn btn--ghost btn--sm" [disabled]="committing()" (click)="clearPendingItems()">
-              {{ 'addCard.clearList' | translate }}
-            </button>
-            <button type="button" class="btn btn--primary btn--sm" [disabled]="committing()" (click)="finishAndClose()">
-              {{ 'addCard.addAll' | translate }}
-            </button>
-          </div>
-        </div>
-        <ul class="pending-items" #pendingItemsList>
-          @for (item of pendingItems(); track item.tempId) {
-            <li>
-              <span class="pending-item-name">{{ item.card.name }}</span>
-              <span class="pending-item-qty">×{{ item.quantity }}</span>
-              @if (item.foil) { <span class="pending-item-foil">✨</span> }
-              <button
-                type="button"
-                class="pending-item-remove"
-                [attr.aria-label]="'addCard.removeFromList' | translate"
-                (click)="removePending(item.tempId)"
-              >
-                <svg aria-hidden="true"><use href="#icon-close" /></svg>
-              </button>
-            </li>
-          }
-        </ul>
-        @if (commitError()) {
-          <p class="state-message error">{{ commitError() }}</p>
-        }
-      </div>
-    }
-
-    <!-- Plain live preview (no OCR/scanning) to help read a physical card's
-         tiny print code by eye - zoom + manual focus + the device's own
-         torch/flash. -->
+    <!-- Always first in DOM, regardless of the pending list below - was
+         second, so the preview sat alone on the left until the first staged
+         card made the pending list appear before it and bump it rightward
+         (confusing jump, feedback 2026-11-03). Pinned left now; the pending
+         list only ever appears/disappears to its right. Plain live preview
+         (no OCR/scanning) to help read a physical card's tiny print code by
+         eye - zoom + manual focus + the device's own torch/flash. -->
     <div class="camera-preview">
       <div class="camera-preview-frame">
         @if (cameraError()) {
@@ -92,6 +60,42 @@
         />
       }
     </div>
+
+    @if (pendingItems().length > 0) {
+      <div class="pending-list">
+        <div class="pending-list-header">
+          <span>{{ 'addCard.pendingCount' | translate: { count: pendingCardCount() } }}</span>
+          <div class="pending-list-actions">
+            <button type="button" class="btn btn--ghost btn--sm" [disabled]="committing()" (click)="clearPendingItems()">
+              {{ 'addCard.clearList' | translate }}
+            </button>
+            <button type="button" class="btn btn--primary btn--sm" [disabled]="committing()" (click)="finishAndClose()">
+              {{ 'addCard.addAll' | translate }}
+            </button>
+          </div>
+        </div>
+        <ul class="pending-items" #pendingItemsList>
+          @for (item of pendingItems(); track item.tempId) {
+            <li>
+              <span class="pending-item-name">{{ item.card.name }}</span>
+              <span class="pending-item-qty">×{{ item.quantity }}</span>
+              @if (item.foil) { <span class="pending-item-foil">✨</span> }
+              <button
+                type="button"
+                class="pending-item-remove"
+                [attr.aria-label]="'addCard.removeFromList' | translate"
+                (click)="removePending(item.tempId)"
+              >
+                <svg aria-hidden="true"><use href="#icon-close" /></svg>
+              </button>
+            </li>
+          }
+        </ul>
+        @if (commitError()) {
+          <p class="state-message error">{{ commitError() }}</p>
+        }
+      </div>
+    }
   </div>
 
   @if (!selectedName()) {

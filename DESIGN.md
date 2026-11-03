@@ -161,7 +161,7 @@ Eine warme, nachtdunkle Palette aus Tinte, Leder und Pergament mit einem einzige
 Sieben entsättigte Edelstein- und Metalltöne für kategoriale Daten (MTG-Farben, Yu-Gi-Oh!-Attribute): Steel-Blue, Ember-Rust, Bronze-Green, Aged-Gold, Weathered-Moss, Faded-Amethyst, Dried-Blood. Ihre Abstände in Farbton und Helligkeit halten die Kategorien auch bei Farbfehlsichtigkeit unterscheidbar. Pokémon erweitert die Palette um fünf Slots: `--chart-8` bis `--chart-12` (Charcoal-Plum, Cool Slate, Dusty Rose, Deep Indigo, Muted Teal).
 
 ### Game Themes
-Jedes Spiel überschreibt dieselben Tokens über `body[data-game='…']`. MTG ist der `:root`-Standard.
+Jedes Spiel überschreibt dieselben Tokens über `html[data-game='…']` (war `body[data-game='…']` bis 2026-11-03 - auf `<html>` verschoben, weil ein Custom Property, das außerhalb von `body`s eigenem Teilbaum aufgelöst wird, etwa die Scrollbar-Farbe des Browser-Viewports selbst, eine Übersteuerung auf `body` nie sehen konnte und stattdessen dauerhaft am `:root`-Standard/MTG-Gold hängen blieb - live gemeldet). MTG ist der `:root`-Standard.
 
 | Token | Yu-Gi-Oh! („Dark Magician“) | Pokémon („Pikachu“) |
 |---|---|---|

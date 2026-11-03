@@ -70,11 +70,16 @@ export class AppShell {
       this.destroyRef.onDestroy(() => observer.disconnect());
     });
 
-    // Reflects the active game on <body> (not just this component's own
+    // Reflects the active game on <html> (not just this component's own
     // template) so the global, var()-driven color theme in styles.scss can
-    // re-skin the whole app per game, not just the header.
+    // re-skin the whole app per game, not just the header. Was <body> until
+    // 2026-11-03: a custom property that only resolves on an element outside
+    // body's subtree (the <html>/root element itself, e.g. the viewport's
+    // own scrollbar-color) can never see a body[data-game] override - same
+    // family of bug as --color-on-accent's own comment below. <html> has no
+    // such blind spot since body is its descendant either way.
     effect(() => {
-      document.body.dataset['game'] = this.gameService.currentSlug();
+      document.documentElement.dataset['game'] = this.gameService.currentSlug();
       syncThemeColor();
     });
   }
@@ -97,7 +102,7 @@ export class AppShell {
   setGame(slug: string) {
     const apply = () => {
       this.gameService.setGame(slug as GameSlug);
-      document.body.dataset['game'] = slug;
+      document.documentElement.dataset['game'] = slug;
       syncThemeColor();
     };
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
