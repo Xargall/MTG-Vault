@@ -32,10 +32,17 @@
 .battlefield-band-label {
   position: absolute;
   left: var(--spacing-sm);
-  bottom: calc(50% + var(--spacing-sm));
   font-size: 0.75rem;
   color: var(--color-text-muted);
   pointer-events: none;
+}
+
+.battlefield-band-label--creatures {
+  top: var(--spacing-sm);
+}
+
+.battlefield-band-label--lands {
+  top: calc(50% + var(--spacing-sm));
 }
 
 // Centered over the creature/spell half, not the old small top-strip
@@ -81,22 +88,68 @@
   margin: 20px;
 }
 
-.battlefield-tap-toggle.active {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-}
-
-// Stacked, not side-by-side - two .btn--sm buttons next to each other
-// wouldn't fit under a 100px-wide card without shrinking below the
-// pointer:coarse 44px tap-target floor .btn--sm itself already guarantees
-// (found in review: an earlier version overrode that floor to force a fit).
+// Icon-only row (tap/graveyard/exile), hidden until the card is hovered
+// (mouse) or tapped-to-select (touch, via Battlefield.selectedInstanceId) -
+// three permanently-visible ghost-text buttons under every card both
+// crowded the 100px-wide table slot and didn't read as buttons at all
+// (feedback, 2026-11-03). Kept in normal flow (not absolutely positioned)
+// since each .battlefield-card is already independently free-positioned,
+// so this row's own height never shifts a sibling card.
 .battlefield-card-actions {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   gap: 4px;
   margin-top: 4px;
+  opacity: 0;
+  transition: opacity var(--dur-state) ease;
+}
 
-  .btn {
-    width: 100%;
+.battlefield-card.is-selected .battlefield-card-actions {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .battlefield-card:hover .battlefield-card-actions,
+  .battlefield-card:focus-within .battlefield-card-actions {
+    opacity: 1;
+  }
+}
+
+.battlefield-card-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-solid);
+  color: var(--color-text-muted);
+  cursor: pointer;
+
+  // 26px reads fine next to a 100px card for a mouse, but a real thumb
+  // needs DESIGN.md's --tap-min floor - grows on touch rather than failing
+  // it (same pattern as .hand-card-discard).
+  @media (pointer: coarse) {
+    width: var(--tap-min);
+    height: var(--tap-min);
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      color: var(--color-text);
+      border-color: var(--color-accent);
+    }
+  }
+
+  &.active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-on-accent);
   }
 }
