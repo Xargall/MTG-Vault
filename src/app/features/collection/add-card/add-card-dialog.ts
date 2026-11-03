@@ -96,6 +96,21 @@ export class AddCardDialog {
   // search view after staging a card needs an explicit focus() call.
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
+  /**
+   * Refocuses the search box after staging a card - but only on a device
+   * whose primary pointer is a mouse/trackpad. Programmatically focusing a
+   * text input on a touch device pops the on-screen keyboard open, which on
+   * mobile/tablet eats a third of the viewport and shoves the just-updated
+   * pending list and results grid out of view right after every single
+   * card added - reported live (2026-11-03) as actively disruptive there,
+   * not the convenience it is on desktop (where it just lets the next
+   * search be typed immediately, no mouse click needed).
+   */
+  private focusSearchInputOnDesktop(): void {
+    if (window.matchMedia('(pointer: coarse)').matches) return;
+    this.searchInput()?.nativeElement.focus();
+  }
+
   // Plain live camera preview, no scanning/OCR - a loupe to read a physical
   // card's print code by eye (digital zoom + the device's own torch/flash),
   // next to the search box rather than instead of it. See the Scanner
@@ -405,6 +420,19 @@ export class AddCardDialog {
       return;
     }
 
+    // Pokémon's own searchCards() never groups by name the way MTG/Yu-Gi-Oh!
+    // do (see PokemonApiService - TCGdex's search already returns one entry
+    // per printing) - every result here is already one exact print, so
+    // routing it through selectName()'s "pick a print" step would just
+    // re-fetch and show that same list again. Reported live (2026-11-03) as
+    // "macht so gar keinen Sinn" - straight to the configure-and-add form.
+    if (card.game === 'pokemon') {
+      this.savedScrollTop = this.getScrollContainer()?.scrollTop ?? 0;
+      this.selectedName.set(card.name);
+      this.selectPrint(card);
+      return;
+    }
+
     this.savedScrollTop = this.getScrollContainer()?.scrollTop ?? 0;
     void this.selectName(card);
   }
@@ -412,7 +440,7 @@ export class AddCardDialog {
   /** Stages one copy (no foil, NM, default language) straight from any direct-hit search result (an exact print code, or a set/prefix browse - see selectCard's doc) without opening the quantity/foil/condition/language form or leaving the results grid. Deliberately leaves the search query/results as they are instead of clearing them - the code is still what's typed in the box either way, and clearing it only costs an extra retype for anyone re-checking or correcting the same code, or re-finding the same set while clicking through it card by card. Anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form by searching the card's name instead of its print code. */
   private quickAdd(card: Card): void {
     this.stageItem(card, 1, false, 'NM', DEFAULT_CARD_LANGUAGE);
-    this.searchInput()?.nativeElement.focus();
+    this.focusSearchInputOnDesktop();
   }
 
   /** The number printed on the card itself, for scanning a browsed set quickly (e.g. typing "DABL" lists every card with its number, instead of just name/art) - MTG's own collectorNumber, or (Yu-Gi-Oh!, only once a specific printing is known - see selectCard's doc on printCode) the number portion of printCode. Null for a Yu-Gi-Oh! result with no resolved printing yet (a plain name search), where there's no one specific number to show. */
@@ -457,7 +485,7 @@ export class AddCardDialog {
       () => {
         const container = this.getScrollContainer();
         if (container) container.scrollTop = this.savedScrollTop;
-        this.searchInput()?.nativeElement.focus();
+        this.focusSearchInputOnDesktop();
       },
       { injector: this.injector },
     );
@@ -472,6 +500,14 @@ export class AddCardDialog {
   }
 
   backToPrints() {
+    const card = this.selectedCard();
+    // Pokémon's selectCard() skips the prints-view entirely (see its own
+    // doc) - there's no print list behind this form to go back to, only
+    // the original search results.
+    if (card?.game === 'pokemon') {
+      this.backToSearch();
+      return;
+    }
     this.selectedCard.set(null);
   }
 
