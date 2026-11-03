@@ -37,7 +37,15 @@ const BULK_FILE_PROXY_BASE = `${environment.supabaseUrl}/functions/v1/scryfall-p
 // dependency on it (MtgApiService depends on this service, not the other
 // way around), so the string is duplicated rather than shared.
 const USER_AGENT = 'TCGVault/1.0 (mathias-mayer.de)';
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+// 7 days, not 24h: this cache backs scanner identification only (name/
+// set/collector_number/type), none of which goes stale within a week, and
+// a stale hit still never blocks anything (live API fallback). Every miss
+// re-downloads Scryfall's ~77MB compressed default_cards file through the
+// scryfall-proxy edge function (see BULK_FILE_PROXY_BASE) - at 24h this
+// was the single biggest line item against Supabase's egress quota, since
+// every device re-pulls it once a day regardless of whether it ever opens
+// the scanner (see App's constructor).
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // One IndexedDB transaction per this many parsed cards, rather than one
 // tiny transaction per card (which would be drastically slower over
 // ~120k+ rows) or a single transaction for the whole file (which would
