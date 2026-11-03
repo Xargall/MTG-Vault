@@ -419,6 +419,13 @@ export class AddCardDialog {
   protected cardNumber(card: Card): string | null {
     if (card.game === 'mtg') return card.collectorNumber;
     if (card.game === 'yugioh' && card.printCode) return yugiohPrintNumber(card.printCode);
+    // Pokémon has no on-card set symbol/code to go by (see PokemonCard's
+    // own doc comment) - the printed "X/Y" number is the only thing left
+    // that lets someone match the physical card in hand against a list of
+    // same-named prints without having memorized every set's symbol.
+    if (card.game === 'pokemon' && card.localId) {
+      return card.setTotal ? `${card.localId}/${card.setTotal}` : card.localId;
+    }
     return null;
   }
 

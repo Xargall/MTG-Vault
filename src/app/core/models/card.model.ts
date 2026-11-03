@@ -106,6 +106,16 @@ export interface PokemonCard extends CardBase {
   types: string[];
   hp: number | null;
   evolvesFrom: string | null;
+  // TCGdex's `localId` - the number printed on the card within its own set
+  // (e.g. "9" for a card printed "9/25"), paired with `setTotal` (the set's
+  // official card count, "25" in that example) to reconstruct that same
+  // "X/Y" the physical card shows. The only way to tell apart same-named
+  // printings without a readable set symbol (see AddCardDialog.cardNumber) -
+  // Pokémon has no compact set-code+number block like MTG/Yu-Gi-Oh!, so a
+  // manual print search otherwise offers nothing to match the card in hand
+  // against besides the set's full name.
+  localId: string | null;
+  setTotal: number | null;
 }
 
 export type Card = MtgCard | YugiohCard | PokemonCard;
