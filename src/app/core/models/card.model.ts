@@ -116,6 +116,14 @@ export interface PokemonCard extends CardBase {
   // against besides the set's full name.
   localId: string | null;
   setTotal: number | null;
+  // The set's own small icon (the one printed on the physical card itself,
+  // next to the local/total number) - null for the ~18% of sets TCGdex has
+  // no symbol asset for (confirmed live: mostly old/niche ones, same
+  // pattern as the missing-artwork gap, see PokemonApiService). Lets a
+  // manual print search be matched visually against the card in hand
+  // without the person needing to already know what each set's symbol
+  // looks like.
+  setSymbolUrl: string | null;
 }
 
 export type Card = MtgCard | YugiohCard | PokemonCard;
