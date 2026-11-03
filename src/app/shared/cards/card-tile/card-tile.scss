@@ -102,10 +102,23 @@
   color: var(--color-text-muted);
   font-size: 0.8rem;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--spacing-sm);
   padding: var(--spacing-sm);
   text-align: center;
+}
+
+// No image anywhere (neither this card's own source nor, for Pokémon, its
+// English-locale fallback - see PokemonApiService's doc on real gaps like
+// the McDonald's promo sets) reads as an unfinished/broken tile next to
+// every other card's real artwork - a generic icon above the name at least
+// reads as "we know this one has no picture", not "this is broken".
+.card-placeholder-icon {
+  width: 2rem;
+  height: 2rem;
+  opacity: 0.5;
 }
 
 .card-name {

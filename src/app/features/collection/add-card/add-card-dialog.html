@@ -110,17 +110,42 @@
     />
 
     @if (gameService.currentSlug() === 'pokemon' && pokemonSets().length > 0) {
-      <select
-        class="pokemon-set-filter"
-        [attr.aria-label]="'addCard.pokemonSetFilterLabel' | translate"
-        [ngModel]="pokemonSetFilter()"
-        (ngModelChange)="onPokemonSetFilterChange($event)"
-      >
-        <option value="">{{ 'addCard.allSets' | translate }}</option>
-        @for (set of pokemonSets(); track set.id) {
-          <option [value]="set.id">{{ set.name }}</option>
+      <div class="pokemon-set-filter" #pokemonSetFilterEl>
+        <button
+          type="button"
+          class="pokemon-set-filter-toggle"
+          aria-haspopup="listbox"
+          [attr.aria-expanded]="pokemonSetFilterOpen()"
+          [attr.aria-label]="'addCard.pokemonSetFilterLabel' | translate"
+          (click)="togglePokemonSetFilter()"
+        >
+          @if (selectedPokemonSet()?.symbolUrl) {
+            <img class="set-symbol" [src]="selectedPokemonSet()!.symbolUrl!" alt="" aria-hidden="true" />
+          }
+          <span>{{ selectedPokemonSet()?.name ?? ('addCard.allSets' | translate) }}</span>
+          <svg class="pokemon-set-filter-chevron" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+        </button>
+        @if (pokemonSetFilterOpen()) {
+          <div class="pokemon-set-filter-panel" role="listbox" [attr.aria-label]="'addCard.pokemonSetFilterLabel' | translate">
+            <button type="button" role="option" [attr.aria-selected]="!pokemonSetFilter()" (click)="selectPokemonSet('')">
+              {{ 'addCard.allSets' | translate }}
+            </button>
+            @for (set of pokemonSets(); track set.id) {
+              <button
+                type="button"
+                role="option"
+                [attr.aria-selected]="pokemonSetFilter() === set.id"
+                (click)="selectPokemonSet(set.id)"
+              >
+                @if (set.symbolUrl) {
+                  <img class="set-symbol" [src]="set.symbolUrl" alt="" aria-hidden="true" loading="lazy" />
+                }
+                {{ set.name }}
+              </button>
+            }
+          </div>
         }
-      </select>
+      </div>
     }
 
     <!-- Reserves the same vertical space across every search state (idle,
@@ -150,7 +175,11 @@
               @if (cardNumber(card)) {
                 <span class="card-number">#{{ cardNumber(card) }}</span>
               }
-              <span class="print-meta">{{ card.setName }}<!--
+              <span class="print-meta">
+                @if (card.game === 'pokemon' && card.setSymbolUrl) {
+                  <img class="set-symbol" [src]="card.setSymbolUrl" alt="" aria-hidden="true" loading="lazy" />
+                }
+                {{ card.setName }}<!--
                 --> @if (card.rarity) { · {{ card.rarity }} }</span>
             </button>
           }
@@ -174,17 +203,16 @@
           <!-- Yu-Gi-Oh!'s prints all share the same underlying card id (see
                YugiohApiService.getPrints) - tracking by id alone would
                collide across them, so $index is folded in too. -->
+          <!-- Never reached for Pokémon - selectCard() stages every Pokémon
+               result straight away (see its own doc), so this print-picker
+               step is MTG/Yu-Gi-Oh! only. -->
           @for (print of prints(); track print.id + '-' + $index) {
             <button type="button" class="result-item" (click)="selectPrint(print)">
               <app-card-tile [card]="print" />
               @if (cardNumber(print)) {
                 <span class="card-number">#{{ cardNumber(print) }}</span>
               }
-              <span class="print-meta">
-                @if (print.game === 'pokemon' && print.setSymbolUrl) {
-                  <img class="set-symbol" [src]="print.setSymbolUrl" alt="" aria-hidden="true" loading="lazy" />
-                }
-                {{ print.setName }}<!--
+              <span class="print-meta">{{ print.setName }}<!--
                 --> @if (print.rarity) { · {{ print.rarity }} }</span>
             </button>
           }

@@ -30,7 +30,10 @@
         (load)="imageLoaded.set(true)"
       />
     } @else {
-      <div class="card-placeholder">{{ card().name }}</div>
+      <div class="card-placeholder">
+        <svg class="card-placeholder-icon" aria-hidden="true"><use href="#icon-image-missing" /></svg>
+        <span>{{ card().name }}</span>
+      </div>
     }
   </div>
 

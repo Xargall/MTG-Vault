@@ -183,11 +183,92 @@
 
 // Sits directly under the search input, same width, own row - lets a
 // Pokémon search be narrowed to one set server-side (see
-// AddCardDialog.onPokemonSetFilterChange) when a prolific name's own print
-// would otherwise sit past the search's result cap.
+// AddCardDialog.selectPokemonSet) when a prolific name's own print would
+// otherwise sit past the search's result cap. A custom listbox (not a
+// native <select>) because the whole point, requested live (2026-11-03),
+// is showing each set's own symbol per row - no cross-browser-reliable way
+// to put an image inside a native <option> (same click-outside pattern as
+// UserMenu's dropdown).
 .pokemon-set-filter {
-  width: 100%;
+  position: relative;
   margin-top: var(--spacing-sm);
+}
+
+.pokemon-set-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px var(--spacing-md);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+
+  span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (pointer: coarse) {
+    min-height: var(--tap-min);
+  }
+}
+
+.pokemon-set-filter-chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.pokemon-set-filter-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-solid);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  padding: 4px 0;
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px var(--spacing-md);
+    background: transparent;
+    border: none;
+    color: var(--color-text);
+    font: inherit;
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+
+    @media (pointer: coarse) {
+      min-height: var(--tap-min);
+    }
+
+    &:hover,
+    &[aria-selected='true'] {
+      background: var(--color-bg);
+      color: var(--color-accent-hover);
+    }
+  }
 }
 
 .results-grid {

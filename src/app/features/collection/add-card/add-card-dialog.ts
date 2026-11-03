@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  HostListener,
   Injector,
   afterNextRender,
   computed,
@@ -298,6 +299,18 @@ export class AddCardDialog {
   // and Yu-Gi-Oh! never need it.
   protected readonly pokemonSets = signal<PokemonSetOption[]>([]);
   protected readonly pokemonSetFilter = signal('');
+  // A native <select> can't render an <option>'s icon in any
+  // cross-browser-reliable way (confirmed: Chrome ignores background-image
+  // on <option>) - requested live (2026-11-03) specifically because the
+  // symbol is "offensichtlicher als der Name", i.e. the whole point is
+  // showing it per row. This small listbox (button + panel, same
+  // signal+click-outside pattern as UserMenu) replaces the native select
+  // so each row can carry its icon.
+  protected readonly pokemonSetFilterOpen = signal(false);
+  protected readonly selectedPokemonSet = computed(
+    () => this.pokemonSets().find((s) => s.id === this.pokemonSetFilter()) ?? null,
+  );
+  private readonly pokemonSetFilterEl = viewChild<ElementRef<HTMLElement>>('pokemonSetFilterEl');
 
   protected readonly selectedName = signal<string | null>(null);
   protected readonly prints = signal<Card[]>([]);
@@ -404,13 +417,26 @@ export class AddCardDialog {
     void this.search(trimmed);
   }
 
+  protected togglePokemonSetFilter(): void {
+    this.pokemonSetFilterOpen.update((v) => !v);
+  }
+
   /** Re-runs the current search as soon as the Pokémon set filter changes, same as every keystroke already does - without this, picking a set would silently do nothing until the next character typed. */
-  protected onPokemonSetFilterChange(value: string): void {
-    this.pokemonSetFilter.set(value);
+  protected selectPokemonSet(setId: string): void {
+    this.pokemonSetFilter.set(setId);
+    this.pokemonSetFilterOpen.set(false);
     const trimmed = this.query().trim();
     if (!trimmed) return;
     this.searching.set(true);
     void this.search(trimmed);
+  }
+
+  // Click-outside-to-close, same dependency-free pattern as UserMenu.
+  @HostListener('document:click', ['$event'])
+  protected onDocumentClick(event: MouseEvent): void {
+    if (!this.pokemonSetFilterOpen()) return;
+    const el = this.pokemonSetFilterEl()?.nativeElement;
+    if (el && !el.contains(event.target as Node)) this.pokemonSetFilterOpen.set(false);
   }
 
   private async search(query: string) {
@@ -441,27 +467,15 @@ export class AddCardDialog {
     }
   }
 
-  /** Normal name search still goes through selectName()'s "pick a print" step. A search that already landed on one specific print - an exact set code (MTG, e.g. "emn"), a bare set prefix (Yu-Gi-Oh!, e.g. "AMDE"), or an exact print code (Yu-Gi-Oh!, e.g. "LOB-DE001") - instead stages that card straight away (quickAdd: 1x, non-foil, NM, default language) without opening the quantity/foil/condition/language form or leaving the results grid at all. Browsing a whole set this way is a click-through-the-grid flow (see cardNumber's doc) - stopping to confirm defaults nobody asked to change, and losing the scroll position/staying card to a form round trip, on every single card defeated that; anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form, by searching the card's name instead. A Yu-Gi-Oh! result only ever carries a resolved printCode when it came from one of those two direct-hit searches (see YugiohApiService.searchCards) - the plain name search always returns printCode: null - so checking that field alone covers both cases without needing to re-parse the query here. MTG has no searchCards() path that resolves to one exact print from the search box the same way (getCardBySetAndNumber exists but isn't wired to it - see deck-import-dialog.ts/scanner.ts for its actual callers), so its own direct-hit case is set-code-only. */
+  /** Normal name search still goes through selectName()'s "pick a print" step. A search that already landed on one specific print - an exact set code (MTG, e.g. "emn"), a bare set prefix (Yu-Gi-Oh!, e.g. "AMDE"), an exact print code (Yu-Gi-Oh!, e.g. "LOB-DE001"), or any Pokémon result at all - instead stages that card straight away (quickAdd: 1x, non-foil, NM, default language) without opening the quantity/foil/condition/language form or leaving the results grid at all. Browsing a whole set this way is a click-through-the-grid flow (see cardNumber's doc) - stopping to confirm defaults nobody asked to change, and losing the scroll position/staying card to a form round trip, on every single card defeated that; anything other than the default (a second copy, foil, a non-NM condition) still goes through the normal form, by searching the card's name instead. A Yu-Gi-Oh! result only ever carries a resolved printCode when it came from one of those two direct-hit searches (see YugiohApiService.searchCards) - the plain name search always returns printCode: null - so checking that field alone covers both cases without needing to re-parse the query here. MTG has no searchCards() path that resolves to one exact print from the search box the same way (getCardBySetAndNumber exists but isn't wired to it - see deck-import-dialog.ts/scanner.ts for its actual callers), so its own direct-hit case is set-code-only. Pokémon's own searchCards() never groups by name the way MTG/Yu-Gi-Oh! do (TCGdex's search already returns one entry per printing, see PokemonApiService) - every result there is already one exact print, so it's unconditionally a direct hit, requested live (2026-11-03) to match Yu-Gi-Oh!'s one-click add rather than opening a form at all. */
   protected selectCard(card: Card): void {
     const trimmed = this.query().trim();
     const isDirectHit =
       (card.game === 'mtg' && card.setCode.toLowerCase() === trimmed.toLowerCase()) ||
-      (card.game === 'yugioh' && card.printCode != null);
+      (card.game === 'yugioh' && card.printCode != null) ||
+      card.game === 'pokemon';
     if (isDirectHit) {
       this.quickAdd(card);
-      return;
-    }
-
-    // Pokémon's own searchCards() never groups by name the way MTG/Yu-Gi-Oh!
-    // do (see PokemonApiService - TCGdex's search already returns one entry
-    // per printing) - every result here is already one exact print, so
-    // routing it through selectName()'s "pick a print" step would just
-    // re-fetch and show that same list again. Reported live (2026-11-03) as
-    // "macht so gar keinen Sinn" - straight to the configure-and-add form.
-    if (card.game === 'pokemon') {
-      this.savedScrollTop = this.getScrollContainer()?.scrollTop ?? 0;
-      this.selectedName.set(card.name);
-      this.selectPrint(card);
       return;
     }
 
@@ -532,14 +546,6 @@ export class AddCardDialog {
   }
 
   backToPrints() {
-    const card = this.selectedCard();
-    // Pokémon's selectCard() skips the prints-view entirely (see its own
-    // doc) - there's no print list behind this form to go back to, only
-    // the original search results.
-    if (card?.game === 'pokemon') {
-      this.backToSearch();
-      return;
-    }
     this.selectedCard.set(null);
   }
 

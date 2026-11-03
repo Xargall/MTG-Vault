@@ -23,6 +23,7 @@ interface TcgdexBriefCard {
 export interface PokemonSetOption {
   id: string;
   name: string;
+  symbolUrl: string | null;
 }
 
 interface TcgdexPriceVariant {
@@ -125,8 +126,10 @@ export class PokemonApiService implements CardApiService {
     try {
       const response = await fetch(`${API_BASE}/sets`);
       if (!response.ok) return [];
-      const raw: { id: string; name: string }[] = await response.json();
-      return raw.map((s) => ({ id: s.id, name: s.name })).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+      const raw: { id: string; name: string; symbol?: string }[] = await response.json();
+      return raw
+        .map((s) => ({ id: s.id, name: s.name, symbolUrl: toSetSymbolUrl(s.symbol) }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'de'));
     } catch {
       return [];
     }
