@@ -254,9 +254,12 @@
 }
 
 // ---------------------------------------------------------------------------
-// Phones (<= 640px): navigation moves to a bottom "book spine", the language
-// toggle leaves the header (it's in Settings), and a slim plaque takes over
-// once the full one has scrolled away.
+// Phones and tablets (<= 1024px): navigation moves to a bottom "book spine"
+// within thumb reach, the language toggle leaves the header (it's in
+// Settings), and a slim plaque takes over once the full one has scrolled
+// away. Tablets get the same touch-first chrome as phones rather than the
+// desktop top nav - there's no mouse to rely on at this width either
+// (feedback, 2026-11-03).
 // ---------------------------------------------------------------------------
 
 .shell-compact,
@@ -264,7 +267,7 @@
   display: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 1024px) {
   .shell-nav,
   .lang-switch {
     display: none;
@@ -331,13 +334,16 @@
     filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7));
   }
 
+  // Reuses .game-switch's carved-slot look and full 44px/1rem sizing (see
+  // the header - 1rem is also the iOS no-zoom-on-focus floor, so this
+  // can't shrink below it) with a tighter width cap for this narrower bar.
+  // Was a plain read-only span; now the same dropdown as the full header's
+  // so the game can be switched without scrolling back up to it (feedback,
+  // 2026-11-03).
   .shell-compact-game {
+    flex: 0 1 auto;
     min-width: 0;
-    overflow: hidden;
-    color: var(--color-text-muted);
-    font-size: 0.875rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    max-width: 9.5rem;
   }
 
   .shell-tabbar {

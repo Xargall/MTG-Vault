@@ -70,7 +70,16 @@
       <svg class="shell-compact-logo" viewBox="0 0 120 120"><use href="#logo-seal" /></svg>
       <span class="shell-compact-title">TCG Vault</span>
     </button>
-    <span class="shell-compact-game">{{ 'games.' + gameService.currentSlug() | translate }}</span>
+    <select
+      class="game-switch shell-compact-game"
+      [value]="gameService.currentSlug()"
+      (change)="setGame($any($event.target).value)"
+      [attr.aria-label]="'nav.gameSwitch' | translate"
+    >
+      <option value="mtg">{{ 'games.mtg' | translate }}</option>
+      <option value="yugioh">{{ 'games.yugioh' | translate }}</option>
+      <option value="pokemon">{{ 'games.pokemon' | translate }}</option>
+    </select>
   </div>
 
   <app-guest-banner />

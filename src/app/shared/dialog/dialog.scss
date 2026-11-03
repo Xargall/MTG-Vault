@@ -5,6 +5,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  // Belt-and-suspenders against any dialog content below that doesn't
+  // shrink cleanly on a mid-width (tablet) viewport - the backdrop itself
+  // must never be the reason the whole page gains a horizontal scrollbar.
+  overflow-x: hidden;
   padding: var(--spacing-lg);
   background: rgba(0, 0, 0, 0.6);
   transition: opacity 200ms ease;
@@ -23,6 +27,13 @@
   max-height: 85vh;
   max-height: 85dvh;
   overflow-y: auto;
+  // A dialog is a fixed-width box: nothing inside it should ever be wider
+  // than the box itself. This is the shell's own contract, not a per-dialog
+  // fix - any child that needs its own horizontal scroll (a wide table, a
+  // chip row) opts into that locally instead of pushing the whole panel
+  // wider (reported: tablet-width viewports showed a horizontal scrollbar
+  // across dialogs, 2026-11-03).
+  overflow-x: hidden;
   overscroll-behavior: contain;
   padding: var(--spacing-lg);
   // Decorative dialog edge in the interactive tier - the dim decorative
