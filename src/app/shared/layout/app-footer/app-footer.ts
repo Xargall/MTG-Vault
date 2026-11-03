@@ -1,8 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
-
-import { GameService } from '../../../core/services/game.service';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -12,6 +10,5 @@ import { GameService } from '../../../core/services/game.service';
   styleUrl: './app-footer.scss',
 })
 export class AppFooter {
-  protected readonly gameService = inject(GameService);
   protected readonly year = new Date().getFullYear();
 }

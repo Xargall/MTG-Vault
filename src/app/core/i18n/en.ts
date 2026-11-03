@@ -18,7 +18,6 @@ export const en: typeof de = {
     comingSoon: 'coming soon',
   },
   footer: {
-    cardDataFrom: 'Card data from',
     impressum: 'Legal Notice',
   },
   common: {
