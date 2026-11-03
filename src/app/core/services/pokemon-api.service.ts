@@ -26,11 +26,12 @@ interface TcgdexPriceVariant {
 
 interface TcgdexRawCard {
   id: string;
+  localId: string;
   name: string;
   image?: string;
   category: PokemonSupertype;
   rarity?: string;
-  set?: { name: string };
+  set?: { name: string; cardCount?: { official?: number } };
   types?: string[];
   hp?: number;
   evolveFrom?: string;
@@ -44,6 +45,15 @@ interface TcgdexRawCard {
 }
 
 const API_BASE = 'https://api.tcgdex.net/v2/de';
+// TCGdex's German-locale coverage has real gaps for older/niche sets (e.g.
+// the original Grundset/Base Set and promo-adjacent releases like McDonald's
+// collaborations) - confirmed live (2026-11-03): the entire German Grundset
+// (102/102 cards) has no `image` at all, while the exact same cards under
+// the English locale are 100% covered. All display text (name, attacks,
+// description, ...) still comes from the German response untouched - this
+// is only ever consulted for the one `image` field, and only when the
+// German response left it empty.
+const FALLBACK_IMAGE_API_BASE = 'https://api.tcgdex.net/v2/en';
 
 /** Runs `mapper` over `items` with at most `limit` calls in flight at once - TCGdex has no batch/collection endpoint (unlike Scryfall), so hydrating several cards means several individual requests. */
 async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
@@ -126,7 +136,21 @@ export class PokemonApiService implements CardApiService {
   private async fetchDetail(id: string): Promise<TcgdexRawCard | null> {
     const response = await fetch(`${API_BASE}/cards/${encodeURIComponent(id)}`);
     if (!response.ok) return null;
-    return response.json();
+    const raw: TcgdexRawCard = await response.json();
+    if (!raw.image) raw.image = await this.fetchFallbackImage(id);
+    return raw;
+  }
+
+  /** See FALLBACK_IMAGE_API_BASE's doc comment - only ever asked for when the German response itself had no image. Best-effort: any failure here just leaves the card imageless, same as before this fallback existed. */
+  private async fetchFallbackImage(id: string): Promise<string | undefined> {
+    try {
+      const response = await fetch(`${FALLBACK_IMAGE_API_BASE}/cards/${encodeURIComponent(id)}`);
+      if (!response.ok) return undefined;
+      const raw: { image?: string } = await response.json();
+      return raw.image;
+    } catch {
+      return undefined;
+    }
   }
 
   private toCard(raw: TcgdexRawCard): PokemonCard {
@@ -160,6 +184,8 @@ export class PokemonApiService implements CardApiService {
       types: raw.types ?? [],
       hp: typeof raw.hp === 'number' ? raw.hp : null,
       evolvesFrom: raw.evolveFrom ?? null,
+      localId: raw.localId ?? null,
+      setTotal: raw.set?.cardCount?.official ?? null,
     };
   }
 }
