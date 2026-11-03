@@ -125,7 +125,7 @@ $pokemon-surface-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.or
   // Text/icon color on an accent fill (primary buttons, active toggles).
   // Declared per theme rather than as var(--color-bg) here - see the
   // $noise-layer comment above for why a var()-of-a-var() declared on :root
-  // wouldn't follow a body[data-game] override.
+  // wouldn't follow an html[data-game] override.
   --color-on-accent: #17110b;
 
   // Semantic status colors, themed like everything else. Success = owned /
@@ -161,12 +161,16 @@ $pokemon-surface-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.or
   --dur-state: 150ms;
 }
 
-// Per-game color theme. Applied via [data-game] on <body> (set from
+// Per-game color theme. Applied via [data-game] on <html> (set from
 // AppShell's constructor effect, see app-shell.ts) so it re-skins the whole
 // app - not just the header - through the shared --color-* tokens above.
+// On <html> rather than <body> (was body until 2026-11-03) so nothing
+// outside body's own subtree - the root element's own rendering, like the
+// browser viewport's scrollbar-color - is ever stuck resolving the :root
+// default instead of the active theme.
 // MTG has no block here since :root already carries its (original) look;
 // each further game gets its own block as its theme is designed.
-body[data-game='yugioh'] {
+html[data-game='yugioh'] {
   // Dark Magician: violet robe, teal/turquoise armor and gold trim.
   --color-bg: #140b1f;
   --color-surface-solid: #241640;
@@ -199,7 +203,7 @@ body[data-game='yugioh'] {
   --pattern-seal-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(95,217,205,0.07)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E");
 }
 
-body[data-game='pokemon'] {
+html[data-game='pokemon'] {
   // Pikachu: electric yellow, cheek-red danger, dark storm-brown base.
   --color-bg: #170f05;
   --color-surface-solid: #2a1f0c;
@@ -231,9 +235,10 @@ body[data-game='pokemon'] {
   --pattern-seal-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgba(247,213,29,0.07)' stroke-width='1.5'%3E%3Cpolygon points='40,28 52,40 40,52 28,40'/%3E%3Cline x1='40' y1='8' x2='40' y2='16'/%3E%3Cline x1='40' y1='64' x2='40' y2='72'/%3E%3Cline x1='8' y1='40' x2='16' y2='40'/%3E%3Cline x1='64' y1='40' x2='72' y2='40'/%3E%3C/g%3E%3C/svg%3E");
 }
 
-// Tokens derived from the theme colors. Declared on body - the element that
-// carries [data-game] - so color-mix() resolves against that game's accent
-// and background (a :root declaration would freeze the MTG values).
+// Tokens derived from the theme colors. Declared on body rather than :root
+// so color-mix() resolves against the active game's accent and background,
+// inherited from html's [data-game] override (a :root declaration would
+// freeze the MTG values instead).
 body {
   --glow-accent: color-mix(in oklab, var(--color-accent) 16%, transparent);
   --glow-accent-strong: color-mix(in oklab, var(--color-accent) 30%, transparent);

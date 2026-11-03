@@ -37,12 +37,18 @@
   pointer-events: none;
 }
 
+// Tucked at each band's far edge from where its own snapped row starts
+// (creatures/lands both grow rightward from their band's near edge - see
+// snapToBand) rather than that same near corner, which the first snapped
+// card would otherwise sit directly on top of and hide completely (found
+// live, 2026-11-03, right after adding the creature band: the label was
+// never actually visible once a single creature was in play).
 .battlefield-band-label--creatures {
-  top: var(--spacing-sm);
+  bottom: calc(50% + var(--spacing-sm));
 }
 
 .battlefield-band-label--lands {
-  top: calc(50% + var(--spacing-sm));
+  bottom: var(--spacing-sm);
 }
 
 // Centered over the creature/spell half, not the old small top-strip
