@@ -16,7 +16,6 @@ export const de = {
     comingSoon: 'bald verfügbar',
   },
   footer: {
-    cardDataFrom: 'Kartendaten von',
     impressum: 'Impressum',
   },
   common: {
