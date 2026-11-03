@@ -182,6 +182,8 @@ export const de = {
     searchPlaceholder: 'Kartenname suchen…',
     searchPlaceholderMtg: 'Kartenname oder Set-Kürzel suchen (z. B. „EMN“)…',
     searchPlaceholderYugioh: 'Kartenname, Set-Code (z. B. „LOB-DE001“) oder Set-Kürzel (z. B. „AMDE“) suchen…',
+    pokemonSetFilterLabel: 'Nach Set filtern',
+    allSets: 'Alle Sets',
     searching: 'Suche…',
     searchFailed: 'Die Kartensuche ist gerade nicht erreichbar.',
     retry: 'Erneut versuchen',
