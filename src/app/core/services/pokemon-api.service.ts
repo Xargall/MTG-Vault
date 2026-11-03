@@ -31,7 +31,7 @@ interface TcgdexRawCard {
   image?: string;
   category: PokemonSupertype;
   rarity?: string;
-  set?: { name: string; cardCount?: { official?: number } };
+  set?: { name: string; cardCount?: { official?: number }; symbol?: string };
   types?: string[];
   hp?: number;
   evolveFrom?: string;
@@ -54,6 +54,19 @@ const API_BASE = 'https://api.tcgdex.net/v2/de';
 // is only ever consulted for the one `image` field, and only when the
 // German response left it empty.
 const FALLBACK_IMAGE_API_BASE = 'https://api.tcgdex.net/v2/en';
+
+/**
+ * A set's `symbol` field comes back as e.g.
+ * "https://assets.tcgdex.net/univ/base/base2/symbol" - that literal "univ"
+ * path segment 400s on TCGdex's own asset host (confirmed live: it's an
+ * S3 "InvalidBucketName" error, not a real locale bucket) and needs a real
+ * locale ("de" works for both plain and ".webp") substituted in, plus a
+ * file extension TCGdex's docs require and the bare path otherwise lacks.
+ */
+function toSetSymbolUrl(symbol: string | undefined): string | null {
+  if (!symbol) return null;
+  return `${symbol.replace('/univ/', '/de/')}.webp`;
+}
 
 /** Runs `mapper` over `items` with at most `limit` calls in flight at once - TCGdex has no batch/collection endpoint (unlike Scryfall), so hydrating several cards means several individual requests. */
 async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
@@ -186,6 +199,7 @@ export class PokemonApiService implements CardApiService {
       evolvesFrom: raw.evolveFrom ?? null,
       localId: raw.localId ?? null,
       setTotal: raw.set?.cardCount?.official ?? null,
+      setSymbolUrl: toSetSymbolUrl(raw.set?.symbol),
     };
   }
 }

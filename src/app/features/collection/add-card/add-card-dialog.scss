@@ -235,6 +235,18 @@
   text-align: center;
 }
 
+// The set icon printed on the physical card itself - shown so a manual
+// Pokémon print search can be matched visually against the card in hand
+// instead of requiring the set's full (often unfamiliar) name to be read
+// and recognized first.
+.set-symbol {
+  width: 0.9rem;
+  height: 0.9rem;
+  vertical-align: -0.1em;
+  margin-right: 0.25em;
+  object-fit: contain;
+}
+
 .prints-view {
   display: flex;
   flex-direction: column;
