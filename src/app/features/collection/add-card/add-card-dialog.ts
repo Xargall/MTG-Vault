@@ -17,6 +17,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { CARD_LANGUAGE_OPTIONS, DEFAULT_CARD_LANGUAGE } from '../../../core/constants/card-languages';
 import { Card } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
+import { PokemonApiService, PokemonSetOption } from '../../../core/services/pokemon-api.service';
 import { yugiohPrintNumber } from '../../../core/services/yugioh-api.service';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AppDialog } from '../../../shared/dialog/dialog';
@@ -77,6 +78,7 @@ interface PendingAddItem {
 })
 export class AddCardDialog {
   protected readonly gameService = inject(GameService);
+  private readonly pokemonApi = inject(PokemonApiService);
   private readonly collectionService = inject(CollectionService);
   private readonly translate = inject(TranslateService);
   private readonly hostEl = inject(ElementRef<HTMLElement>);
@@ -142,6 +144,10 @@ export class AddCardDialog {
       this.destroyed = true;
       this.cameraStream?.getTracks().forEach((track) => track.stop());
     });
+
+    if (this.gameService.currentSlug() === 'pokemon') {
+      void this.pokemonApi.getSets().then((sets) => this.pokemonSets.set(sets));
+    }
   }
 
   private async startCamera(): Promise<void> {
@@ -283,6 +289,16 @@ export class AddCardDialog {
   protected readonly searching = signal(false);
   protected readonly searchError = signal<string | null>(null);
 
+  // Pokémon-only: a prolific name (Pikachu alone has 200+ printings) can
+  // easily push the one a person actually has past PokemonApiService's own
+  // MAX_SEARCH_RESULTS cutoff, with no reliable way to sort it back within
+  // reach (see searchCards' own doc) - this dropdown lets the search be
+  // narrowed to one set server-side instead. Loaded once, lazily, only when
+  // the dialog opens on the Pokémon game (see the constructor below) - MTG
+  // and Yu-Gi-Oh! never need it.
+  protected readonly pokemonSets = signal<PokemonSetOption[]>([]);
+  protected readonly pokemonSetFilter = signal('');
+
   protected readonly selectedName = signal<string | null>(null);
   protected readonly prints = signal<Card[]>([]);
   protected readonly loadingPrints = signal(false);
@@ -388,6 +404,15 @@ export class AddCardDialog {
     void this.search(trimmed);
   }
 
+  /** Re-runs the current search as soon as the Pokémon set filter changes, same as every keystroke already does - without this, picking a set would silently do nothing until the next character typed. */
+  protected onPokemonSetFilterChange(value: string): void {
+    this.pokemonSetFilter.set(value);
+    const trimmed = this.query().trim();
+    if (!trimmed) return;
+    this.searching.set(true);
+    void this.search(trimmed);
+  }
+
   private async search(query: string) {
     this.abortController?.abort();
     const controller = new AbortController();
@@ -395,7 +420,14 @@ export class AddCardDialog {
 
     this.searchError.set(null);
     try {
-      const results = await this.gameService.cardApi().searchCards(query, controller.signal);
+      // Pokémon's set filter needs PokemonApiService's own extra `setId`
+      // param (see its searchCards doc) - GameService.cardApi() only ever
+      // types the shared CardApiService signature, so this reaches past it
+      // the same way cardNumber()/selectCard() already branch per game.
+      const results =
+        this.gameService.currentSlug() === 'pokemon'
+          ? await this.pokemonApi.searchCards(query, controller.signal, this.pokemonSetFilter() || undefined)
+          : await this.gameService.cardApi().searchCards(query, controller.signal);
       if (controller.signal.aborted) return; // a newer search already took over
       this.results.set(results);
     } catch (error) {

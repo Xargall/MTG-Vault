@@ -181,6 +181,15 @@
   }
 }
 
+// Sits directly under the search input, same width, own row - lets a
+// Pokémon search be narrowed to one set server-side (see
+// AddCardDialog.onPokemonSetFilterChange) when a prolific name's own print
+// would otherwise sit past the search's result cap.
+.pokemon-set-filter {
+  width: 100%;
+  margin-top: var(--spacing-sm);
+}
+
 .results-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));

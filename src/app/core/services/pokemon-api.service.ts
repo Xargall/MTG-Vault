@@ -20,6 +20,11 @@ interface TcgdexBriefCard {
   name: string;
 }
 
+export interface PokemonSetOption {
+  id: string;
+  name: string;
+}
+
 interface TcgdexPriceVariant {
   marketPrice?: number;
 }
@@ -86,14 +91,45 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item
 
 @Injectable({ providedIn: 'root' })
 export class PokemonApiService implements CardApiService {
-  async searchCards(query: string, signal?: AbortSignal): Promise<Card[]> {
+  private setsPromise: Promise<PokemonSetOption[]> | null = null;
+
+  /**
+   * `setId`, when given, narrows the search to that one TCGdex set
+   * server-side (`set=<id>`) instead of relying on name-match ranking
+   * alone - a prolific name like Pikachu has 200+ printings across 25+
+   * years, and MAX_SEARCH_RESULTS only ever hydrates the first 24 of
+   * whatever order TCGdex happens to return (confirmed live, 2026-11-03:
+   * not reliably newest-first, so a specific set's printing can sit well
+   * past that cutoff and never show up at all). Extra optional param on
+   * top of CardApiService's own signature - AddCardDialog calls this
+   * directly (not through GameService.cardApi()) when a Pokémon set
+   * filter is active, same way it already reaches into
+   * YugiohApiService.yugiohPrintNumber for a Yu-Gi-Oh!-only concern.
+   */
+  async searchCards(query: string, signal?: AbortSignal, setId?: string): Promise<Card[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
 
-    const brief = await this.fetchBrief(trimmed, signal);
+    const brief = await this.fetchBrief(trimmed, signal, setId);
     const capped = brief.slice(0, MAX_SEARCH_RESULTS);
     const raw = await mapWithConcurrency(capped, HYDRATE_CONCURRENCY, (entry) => this.fetchDetail(entry.id));
     return raw.filter((c): c is TcgdexRawCard => c !== null).map((c) => this.toCard(c));
+  }
+
+  /** Every TCGdex set (id + display name), for the set-filter dropdown next to Pokémon's search box - memoized for the service's lifetime, the list doesn't change within a session and is small enough (~155 entries) to just keep around. */
+  async getSets(): Promise<PokemonSetOption[]> {
+    return (this.setsPromise ??= this.fetchSets());
+  }
+
+  private async fetchSets(): Promise<PokemonSetOption[]> {
+    try {
+      const response = await fetch(`${API_BASE}/sets`);
+      if (!response.ok) return [];
+      const raw: { id: string; name: string }[] = await response.json();
+      return raw.map((s) => ({ id: s.id, name: s.name })).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    } catch {
+      return [];
+    }
   }
 
   async getCard(id: string): Promise<Card | null> {
@@ -137,8 +173,14 @@ export class PokemonApiService implements CardApiService {
     return { card: this.toCard(raw), confidence: best.confidence };
   }
 
-  private async fetchBrief(name: string, signal?: AbortSignal): Promise<TcgdexBriefCard[]> {
-    const response = await fetch(`${API_BASE}/cards?name=${encodeURIComponent(name)}`, { signal });
+  private async fetchBrief(name: string, signal?: AbortSignal, setId?: string): Promise<TcgdexBriefCard[]> {
+    const params = new URLSearchParams({ name });
+    // Confirmed live (2026-11-03): TCGdex's own `set` filter matches by id
+    // prefix, not just exact equality (e.g. "swsh12" also pulls in the
+    // "swsh12.5" sub-set) - harmless here since every id this ever receives
+    // comes straight from getSets()'s own real ids, never free-typed.
+    if (setId) params.set('set', setId);
+    const response = await fetch(`${API_BASE}/cards?${params.toString()}`, { signal });
     if (!response.ok) {
       if (response.status === 404) return [];
       throw new Error(`TCGdex-Anfrage fehlgeschlagen (${response.status})`);

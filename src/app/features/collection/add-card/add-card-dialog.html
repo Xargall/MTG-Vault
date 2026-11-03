@@ -109,6 +109,20 @@
       autofocus
     />
 
+    @if (gameService.currentSlug() === 'pokemon' && pokemonSets().length > 0) {
+      <select
+        class="pokemon-set-filter"
+        [attr.aria-label]="'addCard.pokemonSetFilterLabel' | translate"
+        [ngModel]="pokemonSetFilter()"
+        (ngModelChange)="onPokemonSetFilterChange($event)"
+      >
+        <option value="">{{ 'addCard.allSets' | translate }}</option>
+        @for (set of pokemonSets(); track set.id) {
+          <option [value]="set.id">{{ set.name }}</option>
+        }
+      </select>
+    }
+
     <!-- Reserves the same vertical space across every search state (idle,
          searching, error, no-results, results) - the dialog used to grow and
          shrink on every keystroke, collapsing to almost nothing on an empty
