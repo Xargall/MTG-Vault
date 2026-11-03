@@ -323,6 +323,16 @@ body {
 
 body {
   font-family: var(--font-body);
+  // Was unset app-wide (only 8 components bothered to set their own, each
+  // for a specific tight badge/label) - everything else fell back to each
+  // font's own "normal" metric, which for EB Garamond computes noticeably
+  // tighter than comfortable reading. 1.5 is the typeset.md floor for body
+  // copy, nudged toward the high end since this is light text on a dark
+  // surface throughout (readability feedback, 2026-11-03 - "the rest"
+  // beyond card names still read as cramped). Any element that already
+  // sets its own line-height (badges, tight labels) keeps it - a type
+  // selector here never outranks a class selector.
+  line-height: 1.5;
   background: var(--pattern-seal-faint) 0 0 / 80px 80px repeat, var(--color-bg);
   color: var(--color-text);
 
@@ -340,6 +350,10 @@ h3 {
   font-family: var(--font-heading);
   color: var(--color-accent-hover);
   letter-spacing: 0.5px;
+  // Tighter than body's 1.5 (headings don't need prose spacing) but still
+  // enough air for a heading that wraps to two lines - was "normal" too,
+  // same gap as body copy (see body's own comment above).
+  line-height: 1.25;
 }
 
 button {
