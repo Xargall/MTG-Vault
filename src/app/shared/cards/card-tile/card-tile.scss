@@ -41,7 +41,7 @@
   border: 1px solid var(--color-border);
   border-radius: 999px;
   padding: 1px 6px;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -111,7 +111,15 @@
 .card-name {
   margin: var(--spacing-sm) 0 0;
   font-family: var(--font-heading);
-  font-size: 0.8rem;
+  // Was 400/0.8rem - Cinzel's chiselled, tight-aperture letterforms read
+  // poorly at small sizes/regular weight, and this is the single most
+  // repeated text in the app (every card tile, every grid, every list).
+  // 600 and a touch more tracking keeps the identity (still Cinzel, still
+  // the "Chiselled Caps" name treatment) while fixing actual legibility -
+  // same compensation typeset.md calls for on light text over dark.
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--color-text);
   text-align: center;
   white-space: nowrap;
@@ -137,7 +145,7 @@
   border-radius: var(--radius-pill);
   background: var(--color-surface-alt);
   color: var(--color-text-muted);
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.01em;
 

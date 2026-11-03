@@ -51,8 +51,8 @@ typography:
     fontWeight: 600
   card-name:
     fontFamily: "Cinzel, serif"
-    fontSize: "0.8rem"
-    fontWeight: 400
+    fontSize: "0.85rem"
+    fontWeight: 600
 rounded:
   xs: "4px"
   base: "6px"
@@ -199,8 +199,8 @@ Dazu kommen pro Spiel die Header-Verläufe (`--header-grad-top/bottom`, `--heade
 - **Title** (700, 1rem): Panel-Überschriften im Dashboard, zentriert, mit fester Mindesthöhe (2.5rem), damit der Wechsel zwischen DE und EN nichts verschiebt.
 - **Body** (400, 1rem): Fließtext und Werte in Eingabefeldern. Eingabefelder bleiben bei 1rem, damit iOS beim Fokus nicht zoomt.
 - **Label** (400, 0.85rem): Formular-Labels, Zurück-Links, sekundäre Aktionen. Die häufigste Größe der App.
-- **Caption** (600, 0.75rem): Badges, Spielauswahl, Metadaten. 0.65–0.7rem nur für Sprach-Badges und Druck-Metadaten.
-- **Card Name** (Cinzel 400, 0.8rem): Name unter jedem Kartenbild, einzeilig mit Ellipse.
+- **Caption** (600, 0.75rem): Badges, Spielauswahl, Metadaten. **0.75rem ist die harte Untergrenze** für jeden Text in der App — nach Lese-Feedback (2026-11-03) auf vorher vereinzelt 0.6–0.7rem kleine Badges/Chart-Beschriftungen angehoben. Keine Ausnahme mehr darunter.
+- **Card Name** (Cinzel 600, 0.85rem, Tracking 0.02em): Name unter jedem Kartenbild, einzeilig mit Ellipse. War 400/0.8rem ohne Tracking - Cinzels gemeißelte, eng stehende Formen waren bei Normalgewicht und dieser Größe auf der meistwiederholten Textzeile der ganzen App (jede Karte, jedes Grid) schlecht lesbar (Nutzer-Feedback 2026-11-03). Bleibt Cinzel (Identität), aber kräftiger und mit mehr Luft.
 
 **The Chiselled Caps Rule.** Cinzel nur für Namen und Titel: Überschriften, Kartennamen, Wortmarke. Niemals für Fließtext, Labels oder Zahlenkolonnen.
 
@@ -213,7 +213,7 @@ Eine einspaltige, zentrierte App unter einer vollbreiten Header-Plakette. Die In
 Kartenraster sind `auto-fill`-Grids mit Mindestbreiten um 130px und Abstand `md`. Sie brechen dadurch ohne eigene Breakpoints um. Kartenbilder haben immer das Seitenverhältnis 5:7.
 
 Zwei Breakpoints:
-- **≤ 640px (Handy):** Die Hauptnavigation sitzt unten als Buchrücken (siehe Components), der Sprachumschalter verlässt den Header (er bleibt in den Einstellungen). Scrollt die Plakette aus dem Bild, gleitet oben eine schmale Plakette mit Wortmarke und aktivem Spiel ein. `--tabbar-offset` hält Seitenende und Toasts frei.
+- **≤ 1024px (Handy und Tablet):** Die Hauptnavigation sitzt unten als Buchrücken (siehe Components), der Sprachumschalter verlässt den Header (er bleibt in den Einstellungen). Scrollt die Plakette aus dem Bild, gleitet oben eine schmale Plakette mit Wortmarke, Spielauswahl (als Dropdown, nicht nur Anzeige) und aktivem Spiel ein. `--tabbar-offset` hält Seitenende und Toasts frei. War früher ≤640px (nur Handy) - Tablets bekommen dieselbe daumenfreundliche Chrome wie Handys statt der Desktop-Kopfnavigation, da auch dort meist keine Maus im Spiel ist (Feedback, 2026-11-03).
 - **≤ 480px:** Dialoge docken als Bottom Sheet unten an, nebeneinander stehende Detail-Layouts (Kartenbild + Formular) stapeln sich.
 
 Alles, was man antippt, hat mindestens `--tap-min` (44px) Trefferfläche auf Touch-Geräten (`pointer: coarse`). Safe Areas (`env(safe-area-inset-*)`) sind an Header, Leisten, Sheets und Scanner berücksichtigt.
@@ -279,8 +279,8 @@ Eine gemeinsame Hülle für alle Dialoge: Scroll-Sperre, `role="dialog"`/`aria-m
 Kleine Lederplakette mit statusfarbener Oberkante, steigt unten auf (über dem Buchrücken). Optional mit einer Aktion („Rückgängig“), der Countdown pausiert im Hintergrund-Tab, die Nachricht wird über eine Live-Region vorgelesen.
 
 ### Navigation
-- **Desktop:** zentrierte Textlinks in der Header-Plakette, 0.9rem, Mindestbreite 80px. Bei Hover wächst eine goldene 2px-Unterstreichung (`scaleX`) von der Mitte auf 60 %. Die aktive Route bekommt die volle Unterstreichung mit Glühen.
-- **Handy – Buchrücken (Signature):** feste Leiste unten aus geprägtem Leder mit nach oben gespiegeltem Goldschnitt. Vier gravierte Glyphen mit Label (je mindestens 56px hoch), alle mit der Raute des Siegels. Der aktive Tab bekommt eine Goldeinlage an der Oberkante.
+- **Desktop (> 1024px):** zentrierte Textlinks in der Header-Plakette, 0.9rem, Mindestbreite 80px. Bei Hover wächst eine goldene 2px-Unterstreichung (`scaleX`) von der Mitte auf 60 %. Die aktive Route bekommt die volle Unterstreichung mit Glühen.
+- **Handy und Tablet (≤ 1024px) – Buchrücken (Signature):** feste Leiste unten aus geprägtem Leder mit nach oben gespiegeltem Goldschnitt. Vier gravierte Glyphen mit Label (je mindestens 56px hoch), alle mit der Raute des Siegels. Der aktive Tab bekommt eine Goldeinlage an der Oberkante.
 
 ### Card Tile (Signature)
 Das Kartenbild ist das Juwel. Bild im Format 5:7 mit 8px Ecken, darunter der Name in Cinzel. Badges sitzen in den Ecken des Bildes: Menge oben rechts und Sprache unten rechts (beide als dunkle Pill), Status oben links als Punkt (vorhanden, teilweise, fehlt). Fehlende Karten werden graustufig mit halber Deckkraft gezeigt, teilweise vorhandene mit 80 %. Beim Laden schimmert ein Platzhalter (Skeleton Shimmer zwischen Surface und Surface-Alt).
