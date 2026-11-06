@@ -83,7 +83,7 @@
 
       @if (commandZone(); as commander) {
         <div class="playtest-zone">
-          <app-zone-pile [label]="'playtest.commandZone' | translate" [cards]="[commander]" (primaryAction)="onCastCommander()" />
+          <app-zone-pile [label]="'playtest.commandZone' | translate" [cards]="[commander]" [commander]="true" (primaryAction)="onCastCommander()" />
           @if (commanderCastCount() > 0) {
             <!-- Commander tax is a cost, not something this feature can apply
                  without a mana system (see commanderCastCount's own doc) - just

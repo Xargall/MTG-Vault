@@ -1,6 +1,6 @@
 <button type="button" class="zone-pile" [disabled]="cards().length === 0" (click)="primaryAction.emit()">
   @if (topCard(); as top) {
-    <app-playtest-card [card]="top.card" [faceDown]="faceDown()" />
+    <app-playtest-card [card]="top.card" [faceDown]="faceDown()" [commander]="commander()" />
   } @else {
     <div class="zone-pile-empty" aria-hidden="true"></div>
   }

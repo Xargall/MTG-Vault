@@ -197,11 +197,12 @@
   }
 }
 
+// Mirrors zone-pile.scss's own Carved Slot treatment (see that file's doc).
 .zone-pile-empty {
   width: 100%;
   aspect-ratio: 5 / 7;
   border-radius: var(--radius-card);
-  border: 1px dashed var(--color-border);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .zone-pile-count {

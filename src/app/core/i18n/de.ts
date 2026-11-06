@@ -733,6 +733,7 @@ export const de = {
     mulligan: 'Mulligan',
     newGame: 'Neues Spiel',
     turn: 'Runde {{count}}',
+    roundStart: 'Runde {{count}} beginnt',
     nextPhase: 'Weiter',
     phase: {
       untap: 'Enttappen',

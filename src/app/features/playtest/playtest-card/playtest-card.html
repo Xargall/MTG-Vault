@@ -1,6 +1,7 @@
 <div
   class="playtest-card-inner"
   [class.flipping]="flipping()"
+  [class.card-commander]="commander()"
   [style.transform]="cardTransform()"
   (click)="onClick()"
   (mouseenter)="onMouseEnter()"
