@@ -13,6 +13,15 @@
   transition: transform var(--dur-state) var(--ease-out);
 }
 
+// Gilt Glow (DESIGN.md's Shadow Vocabulary) marks the Command Zone's card as
+// the table's one permanently special, always-castable permanent - accent
+// only on what's active/selected (DESIGN.md's Gilt Leaf Rule), not a copied
+// Legendary card frame.
+.card-commander {
+  border-radius: var(--radius-card);
+  box-shadow: 0 0 0 2px var(--color-accent), 0 0 14px var(--glow-accent);
+}
+
 .card-glare {
   position: absolute;
   inset: 0;

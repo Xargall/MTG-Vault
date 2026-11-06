@@ -732,6 +732,7 @@ export const en: typeof de = {
     mulligan: 'Mulligan',
     newGame: 'New Game',
     turn: 'Turn {{count}}',
+    roundStart: 'Turn {{count}} begins',
     nextPhase: 'Next',
     phase: {
       untap: 'Untap',

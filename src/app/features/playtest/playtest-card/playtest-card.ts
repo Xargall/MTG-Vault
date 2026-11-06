@@ -24,6 +24,8 @@ export class PlaytestCard {
   readonly flipping = input(false);
   /** The MTG "tap" convention (rotated 90° - see Battlefield's own tap-toggle button) - composed with the live holo tilt below into one transform. */
   readonly tapped = input(false);
+  /** The Command Zone's own card is always its deck's special, always-castable permanent - a Gilt Glow ring (see playtest-card.scss) instead of a copied Legendary frame (DESIGN.md: no official card-frame reproductions). */
+  readonly commander = input(false);
 
   protected readonly imageLoaded = signal(false);
   private readonly tiltTransform = signal('');

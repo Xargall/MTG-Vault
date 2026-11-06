@@ -15,6 +15,8 @@ export class ZonePile {
   readonly label = input.required<string>();
   readonly cards = input.required<PlaytestCardInstance[]>();
   readonly faceDown = input(false);
+  /** Passed straight through to PlaytestCard - the Command Zone is the only caller that sets this (see playtest.html). */
+  readonly commander = input(false);
   readonly primaryAction = output<void>();
 
   protected readonly topCard = computed(() => this.cards()[0] ?? null);

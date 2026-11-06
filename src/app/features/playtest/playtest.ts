@@ -11,8 +11,9 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { ToastService } from '../../core/services/toast.service';
 import { DeckEntry } from '../decks/deck.service';
 import { Battlefield } from './battlefield/battlefield';
 import { Hand } from './hand/hand';
@@ -56,6 +57,8 @@ const COMBAT_REMINDER_MS = 4000;
 export class Playtest {
   private readonly playtestService = inject(PlaytestService);
   private readonly previewService = inject(PlaytestPreviewService);
+  private readonly toastService = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   protected readonly deckEntry = this.playtestService.deckEntry;
   protected readonly previewCard = this.previewService.hoveredCard;
@@ -153,6 +156,10 @@ export class Playtest {
     if (phase === 'untap') {
       this.battlefield.update((items) => items.map((c) => ({ ...c, tapped: false })));
       this.landsPlayedThisTurn.set(0);
+      // Only reached by wrapping Ende -> Untap (nextPhase bumps turn then,
+      // see its own doc) - never fires on the opening hand's initial untap,
+      // which resetGame sets directly without going through here.
+      this.toastService.show(this.translate.instant('playtest.roundStart', { count: turn }));
     } else if (phase === 'draw' && turn > 1) {
       // Turn 1 never auto-draws - the starting hand (drawStartingHand) is
       // already the opening 7, matching the paper-Magic "first player skips
