@@ -11,13 +11,16 @@
   // to not clip vertically - but per the CSS overflow spec, any overflow-x
   // other than visible forces the computed overflow-y to auto too (never
   // visible), so overflow-x: auto alone was still silently clipping every
-  // card dragged above this 150px-tall strip, even after removing an
-  // explicit overflow-y: hidden.
+  // card dragged above this strip, even after removing an explicit
+  // overflow-y: hidden.
 }
 
 .hand-row {
   display: flex;
-  justify-content: center;
+  // Left-anchored, not centered (live-requested, 2026-11-06, Playgroup.gg-
+  // style bottom bar: the hand now shares its row with the piles docked on
+  // the right - see playtest.scss's .playtest-bottom-bar).
+  justify-content: flex-start;
   align-items: flex-end;
   min-height: 100%;
   padding: var(--spacing-sm) var(--spacing-md);
@@ -25,12 +28,21 @@
 
 .hand-card {
   position: relative;
-  width: 90px;
+  width: 120px;
   flex-shrink: 0;
   // Overlapping fan, same idea as cards held in-hand - a hand of more than a
   // couple cards would otherwise overflow a fixed-height strip immediately.
-  margin-left: -28px;
+  margin-left: -36px;
   cursor: grab;
+  // Pivoting from the bottom-center, not just rotating in place, is what
+  // turns a per-card rotate() into an actual fan bow (live-requested,
+  // 2026-11-06): each card's top edge swings outward *and* dips slightly,
+  // same geometry as a hand of physical cards held from below.
+  transform-origin: center bottom;
+  // --fan-rotate is set per card in hand.html (index-based, see Hand's
+  // fanStepDeg) - read through a CSS var instead of a second inline
+  // transform so hover below can compose with it instead of overwriting it.
+  transform: rotate(var(--fan-rotate, 0deg));
 
   &:first-child {
     margin-left: 0;
@@ -44,13 +56,22 @@
   @media (hover: hover) and (pointer: fine) {
     &:hover {
       z-index: 1;
-      transform: translateY(-20px);
+      transform: rotate(var(--fan-rotate, 0deg)) translateY(-20px);
     }
   }
 
   &.cdk-drag-dragging {
     z-index: 2;
     cursor: grabbing;
+  }
+
+  // Back down near the old 90px size once the piles share this row too
+  // (see playtest.scss's .playtest-bottom-bar) - at phone width, the full
+  // 120px size would push the bar's overflow-x scroll into effect almost
+  // immediately even for a small hand.
+  @media (max-width: 640px) {
+    width: 84px;
+    margin-left: -24px;
   }
 }
 
@@ -70,7 +91,7 @@
   justify-content: center;
   cursor: pointer;
 
-  // 22px reads fine next to a 90px card on a mouse, but a real thumb needs
+  // 22px reads fine next to a 120px card on a mouse, but a real thumb needs
   // DESIGN.md's --tap-min floor - grows on touch rather than failing it.
   @media (pointer: coarse) {
     width: var(--tap-min);

@@ -60,6 +60,30 @@
   }
 
   <div class="playtest-board">
+    <app-battlefield
+      #battlefieldHost
+      class="playtest-battlefield"
+      [cards]="battlefield()"
+      [dropActive]="handDragActive()"
+      [combatReminder]="phase() === 'combat' ? ('playtest.combatReminder' | translate) : null"
+      (positionChanged)="onBattlefieldPositionChanged($event)"
+      (tapToggled)="onTapToggled($event)"
+      (sentToGraveyard)="onSentToGraveyard($event)"
+      (sentToExile)="onSentToExile($event)"
+    />
+  </div>
+
+  <!-- Playgroup.gg-style bottom bar: hand left (grows), piles docked right -
+       see playtest.scss's .playtest-bottom-bar doc. -->
+  <div class="playtest-bottom-bar">
+    <app-hand
+      class="playtest-hand"
+      [cards]="hand()"
+      (cardDragMoved)="onHandCardDragMoved($event)"
+      (cardDropped)="onHandCardDropped($event)"
+      (cardDiscarded)="onDiscardFromHand($event)"
+    />
+
     <div class="playtest-zones">
       <div class="playtest-zone">
         <button
@@ -93,27 +117,7 @@
         </div>
       }
     </div>
-
-    <app-battlefield
-      #battlefieldHost
-      class="playtest-battlefield"
-      [cards]="battlefield()"
-      [dropActive]="handDragActive()"
-      [combatReminder]="phase() === 'combat' ? ('playtest.combatReminder' | translate) : null"
-      (positionChanged)="onBattlefieldPositionChanged($event)"
-      (tapToggled)="onTapToggled($event)"
-      (sentToGraveyard)="onSentToGraveyard($event)"
-      (sentToExile)="onSentToExile($event)"
-    />
   </div>
-
-  <app-hand
-    class="playtest-hand"
-    [cards]="hand()"
-    (cardDragMoved)="onHandCardDragMoved($event)"
-    (cardDropped)="onHandCardDropped($event)"
-    (cardDiscarded)="onDiscardFromHand($event)"
-  />
 
   @if (previewCard(); as preview) {
     <div class="playtest-preview" aria-hidden="true">

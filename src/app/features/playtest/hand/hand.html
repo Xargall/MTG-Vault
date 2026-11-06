@@ -1,6 +1,12 @@
 <div class="hand-row">
-  @for (item of cards(); track item.instanceId) {
-    <div class="hand-card" cdkDrag (cdkDragMoved)="onDragMoved($event)" (cdkDragEnded)="onDragEnded(item.instanceId, $event)">
+  @for (item of cards(); track item.instanceId; let i = $index, count = $count) {
+    <div
+      class="hand-card"
+      [style.--fan-rotate]="(i - (count - 1) / 2) * fanStepDeg + 'deg'"
+      cdkDrag
+      (cdkDragMoved)="onDragMoved($event)"
+      (cdkDragEnded)="onDragEnded(item.instanceId, $event)"
+    >
       <app-playtest-card [card]="item.card" />
       <button
         type="button"
