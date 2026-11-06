@@ -134,36 +134,50 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
-
-  @media (max-width: 640px) {
-    flex-direction: column;
-  }
 }
 
-// A 2-column grid, not the single vertical stack this used to be - live-
-// reported scroll complaint: Library/Friedhof/Exil/Kommandozone stacked one
-// per row needed more height than the board has once the topbar and any
-// warning banners take their share, so this column scrolled on its own.
-// Two columns halve that to 2 rows, which fits without scrolling.
+// Playgroup.gg-style bottom bar (live-requested, 2026-11-06): hand on the
+// left, piles docked right, both bottom-aligned in one row - replaces the
+// old left-hand zones column + separate full-width hand strip. Takes over
+// the stacking-context fix the old .playtest-hand needed (see its own
+// former doc): a card dragged up out of the hand still must not render
+// behind .playtest-battlefield's opaque background.
+.playtest-bottom-bar {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-md);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  padding: var(--spacing-sm) var(--spacing-md);
+  padding-bottom: calc(var(--spacing-sm) + env(safe-area-inset-bottom));
+  // Safety net, not a layout target (shortcut: a very wide hand plus all
+  // four piles can outgrow a narrow phone screen - upgrade to shrinking
+  // card/pile size further per breakpoint if that's ever reported) - the
+  // bar scrolls sideways rather than clipping or wrapping.
+  overflow-x: auto;
+}
+
+.playtest-hand {
+  flex: 1;
+  min-width: 0;
+}
+
 .playtest-zones {
-  flex: 0 0 180px;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-sm) var(--spacing-md);
-  align-content: start;
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.playtest-zone,
+.playtest-zones > app-zone-pile {
+  flex: 0 0 72px;
 
   @media (max-width: 640px) {
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-
-    > * {
-      flex: 0 0 90px;
-    }
+    flex-basis: 56px;
   }
 }
 
@@ -227,20 +241,4 @@
 .playtest-battlefield {
   flex: 1;
   min-width: 0;
-}
-
-.playtest-hand {
-  // Explicit stacking, not just DOM-order luck - found in review (live-
-  // reported): a card dragged up out of this strip toward the battlefield
-  // was rendering behind .playtest-battlefield's own opaque background,
-  // invisible until release. flex: 0 0 auto alone doesn't win paint order
-  // against a sibling ahead of it in source order once that card's own
-  // drag transform puts it on a competing stacking level.
-  position: relative;
-  z-index: 1;
-  flex: 0 0 auto;
-  height: 150px;
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
-  padding-bottom: env(safe-area-inset-bottom);
 }

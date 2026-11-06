@@ -14,6 +14,9 @@ import { PlaytestCardInstance } from '../playtest-library';
   styleUrl: './hand.scss',
 })
 export class Hand {
+  /** Degrees of rotation per card step away from the hand's centre (live-requested "leichter Fächerbogen", 2026-11-06) - kept shallow on purpose, see hand.scss's transform-origin doc for how this becomes an actual bow, not just a tilt. */
+  protected readonly fanStepDeg = 2.2;
+
   readonly cards = input.required<PlaytestCardInstance[]>();
   readonly cardDropped = output<{ instanceId: string; clientX: number; clientY: number }>();
   /** Fires continuously during a drag (not just on drop) - lets the parent show a live drop-target highlight instead of only finding out whether the drop worked after releasing. */
