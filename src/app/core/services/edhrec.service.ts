@@ -17,7 +17,7 @@ const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
 // time. Retrying the one failed page a couple of times beats giving up on
 // the entire scan (RATE_LIMIT_COOLDOWN_MS) over what's often just noise.
 const FETCH_RETRY_ATTEMPTS = 3;
-const FETCH_RETRY_DELAY_MS = 1500;
+const FETCH_RETRY_DELAY_MS = 2000;
 
 // Live-confirmed trigger (2026-11-07): CommanderRecommendationsDialog's
 // BATCH_SIZE-5 parallel fetchPage calls tripped a 403, while a lone
@@ -26,7 +26,15 @@ const FETCH_RETRY_DELAY_MS = 1500;
 // pacing pattern as MoxfieldService/YgoprodeckDecksService use for their own
 // unofficial APIs: serialize every fetchPage call through one queue instead
 // of letting callers fire several at once.
-const MIN_DELAY_MS = 1000;
+//
+// 1000ms specifically still 403'd live, 3 attempts straight, right at the
+// start of a real scan - RequestQueue paces dispatch-to-dispatch (not
+// gap-after-completion), so at ~450ms/request that's really ~1000ms between
+// hitting EDHREC each time. A 56-request curl simulation at a true ~1.3-1.5s
+// cadence (1s sleep *after* each full round trip) had zero failures -
+// EDHREC's own threshold is apparently somewhere under that, so the floor
+// needs real headroom above 1000ms, not just any fixed delay.
+const MIN_DELAY_MS = 1600;
 
 /** One card+quantity in a computed "average deck" - shared shape between EDHREC's own precomputed average (Commander) and MoxfieldService's client-side aggregation (60-card formats), so the matching logic in commander-recommendations-stats.ts and deck-stats.ts stays source-agnostic. */
 export interface AverageDeckCard {
