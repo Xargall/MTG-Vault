@@ -249,25 +249,34 @@ export class EdhrecService {
     path: string,
     extract: (cardlists: EdhrecCardlistRaw[]) => T[],
   ): Promise<T[]> {
-    const { data, error } = await this.queue.add(() =>
-      this.supabase.client.functions.invoke<EdhrecPageResponse & { error?: string }>('edhrec-proxy', {
-        body: { path },
-      }),
-    );
-    if (error) {
-      // A 403 from the proxy means EDHREC itself blocked its outbound
-      // request (see edhrec-proxy/index.ts, which forwards EDHREC's own
-      // status through) - almost certainly a temporary IP-level block, not
-      // this specific page. Pausing every EDHREC call for a while beats
-      // hammering it with more requests that would just 403 again too.
-      if (error instanceof FunctionsHttpError && error.context?.status === 403) {
-        this.rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
-        return [];
-      }
-      throw error;
-    }
-    if (data?.error) throw new Error(`EDHREC-Anfrage fehlgeschlagen: ${data.error}`);
+    // The cooldown is re-checked inside the queued task itself, not just by
+    // the public getters above: several calls can pass that outer check in
+    // the same tick (e.g. a Promise.all batch) before any of them has
+    // actually run, so they'd all still land in the queue - this inner
+    // check, which only runs once a queued item's turn actually comes, is
+    // what stops a 403 from cascading through the rest of an
+    // already-queued batch instead of each firing its own request anyway.
+    return this.queue.add(async () => {
+      if (Date.now() < this.rateLimitedUntil) return [];
 
-    return extract(data?.container?.json_dict?.cardlists ?? []);
+      const { data, error } = await this.supabase.client.functions.invoke<
+        EdhrecPageResponse & { error?: string }
+      >('edhrec-proxy', { body: { path } });
+      if (error) {
+        // A 403 from the proxy means EDHREC itself blocked its outbound
+        // request (see edhrec-proxy/index.ts, which forwards EDHREC's own
+        // status through) - almost certainly a temporary IP-level block, not
+        // this specific page. Pausing every EDHREC call for a while beats
+        // hammering it with more requests that would just 403 again too.
+        if (error instanceof FunctionsHttpError && error.context?.status === 403) {
+          this.rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+          return [];
+        }
+        throw error;
+      }
+      if (data?.error) throw new Error(`EDHREC-Anfrage fehlgeschlagen: ${data.error}`);
+
+      return extract(data?.container?.json_dict?.cardlists ?? []);
+    });
   }
 }
