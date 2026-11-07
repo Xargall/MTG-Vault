@@ -3,12 +3,22 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { SupabaseService } from './supabase.service';
 import { readTtlCache, writeTtlCache } from '../utils/ttl-cache';
+import { RequestQueue } from '../utils/request-queue';
 
 // EDHREC's 403 (see edhrec-proxy) is presumably a temporary block on the
 // proxy's own outbound IP, not a per-user thing - same cool-off pattern as
 // GeminiVisionService.rateLimited/ScryfallRateLimitError, just a much
 // longer window since this is an IP-level block, not a per-second quota.
 const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
+
+// Live-confirmed trigger (2026-11-07): CommanderRecommendationsDialog's
+// BATCH_SIZE-5 parallel fetchPage calls tripped a 403, while a lone
+// sequential request to the same proxy succeeded seconds later - EDHREC's
+// bot-protection reacts to request *concurrency*, not just volume. Same
+// pacing pattern as MoxfieldService/YgoprodeckDecksService use for their own
+// unofficial APIs: serialize every fetchPage call through one queue instead
+// of letting callers fire several at once.
+const MIN_DELAY_MS = 1000;
 
 /** One card+quantity in a computed "average deck" - shared shape between EDHREC's own precomputed average (Commander) and MoxfieldService's client-side aggregation (60-card formats), so the matching logic in commander-recommendations-stats.ts and deck-stats.ts stays source-agnostic. */
 export interface AverageDeckCard {
@@ -136,6 +146,7 @@ export class EdhrecService {
   // either cache above, so a cooled-off skip never gets memoized as if it
   // were a real (empty) EDHREC result for that slug.
   private rateLimitedUntil = 0;
+  private readonly queue = new RequestQueue(MIN_DELAY_MS);
 
   getAverageDeck(commanderName: string): Promise<AverageDeckCard[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
@@ -238,9 +249,10 @@ export class EdhrecService {
     path: string,
     extract: (cardlists: EdhrecCardlistRaw[]) => T[],
   ): Promise<T[]> {
-    const { data, error } = await this.supabase.client.functions.invoke<EdhrecPageResponse & { error?: string }>(
-      'edhrec-proxy',
-      { body: { path } },
+    const { data, error } = await this.queue.add(() =>
+      this.supabase.client.functions.invoke<EdhrecPageResponse & { error?: string }>('edhrec-proxy', {
+        body: { path },
+      }),
     );
     if (error) {
       // A 403 from the proxy means EDHREC itself blocked its outbound
