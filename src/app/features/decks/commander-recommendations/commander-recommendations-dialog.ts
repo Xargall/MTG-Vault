@@ -101,6 +101,11 @@ export class CommanderRecommendationsDialog {
   protected readonly hasNoResults = computed(
     () => !this.loading() && !this.errorMessage() && this.recommendations().length === 0,
   );
+  // Distinguishes "no matching commanders" from "EDHREC blocked us mid-scan"
+  // (see EdhrecService.isRateLimited) - both leave recommendations() empty
+  // with no thrown error (every edhrec call in load() is .catch(() => [])),
+  // so without this they'd show the identical, misleading "none found".
+  protected readonly noResultsRateLimited = computed(() => this.hasNoResults() && this.edhrec.isRateLimited());
 
   // Detail (single commander's average decklist) - shown once a
   // recommendation row is clicked, replacing the list the same way
