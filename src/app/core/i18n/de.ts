@@ -339,6 +339,8 @@ export const de = {
     scanningCards: 'Durchsuche Sammlung nach möglichen Commandern… ({{progress}})',
     checkingCommanders: 'Prüfe Commander… ({{progress}})',
     noResults: 'Keine passenden Commander gefunden.',
+    noResultsRateLimited:
+      'EDHREC ist gerade nicht erreichbar (zu viele Anfragen). Versuch es in ein paar Minuten nochmal.',
     cardsCount: '{{matched}} / {{total}} Karten',
     freeMatchBadge: '{{percent}}% frei',
     missingTag: 'Commander fehlt in Sammlung',

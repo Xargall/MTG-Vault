@@ -124,7 +124,9 @@
       }
 
       @if (hasNoResults()) {
-        <p class="state-message">{{ 'commanderRecs.noResults' | translate }}</p>
+        <p class="state-message">
+          {{ (noResultsRateLimited() ? 'commanderRecs.noResultsRateLimited' : 'commanderRecs.noResults') | translate }}
+        </p>
       }
 
       <ul class="recommendation-list">

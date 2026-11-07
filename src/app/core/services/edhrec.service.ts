@@ -149,6 +149,11 @@ function parseQuantity(card: EdhrecCardviewRaw): number {
 export class EdhrecService {
   private readonly supabase = inject(SupabaseService);
 
+  /** Whether the shared 403 cooldown is currently active - lets a caller like CommanderRecommendationsDialog tell "EDHREC just blocked us" apart from "you genuinely have no matching commanders" once a scan comes back empty, instead of showing the same blank result for both. */
+  isRateLimited(): boolean {
+    return Date.now() < this.rateLimitedUntil;
+  }
+
   private readonly averageDeckCache = new Map<string, Promise<AverageDeckCard[]>>();
   // Set once a 403 comes back from the proxy - checked *before* touching
   // either cache above, so a cooled-off skip never gets memoized as if it

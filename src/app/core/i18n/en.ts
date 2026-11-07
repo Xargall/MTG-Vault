@@ -340,6 +340,7 @@ export const en: typeof de = {
     scanningCards: 'Scanning collection for possible commanders… ({{progress}})',
     checkingCommanders: 'Checking commanders… ({{progress}})',
     noResults: 'No matching commanders found.',
+    noResultsRateLimited: 'EDHREC is temporarily unavailable (too many requests). Try again in a few minutes.',
     cardsCount: '{{matched}} / {{total}} cards',
     freeMatchBadge: '{{percent}}% free',
     missingTag: 'Commander missing from collection',
