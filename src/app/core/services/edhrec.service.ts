@@ -9,7 +9,15 @@ import { RequestQueue } from '../utils/request-queue';
 // proxy's own outbound IP, not a per-user thing - same cool-off pattern as
 // GeminiVisionService.rateLimited/ScryfallRateLimitError, just a much
 // longer window since this is an IP-level block, not a per-second quota.
+// Only reached once FETCH_RETRY_ATTEMPTS is exhausted - see fetchPage.
 const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
+
+// Live-confirmed (2026-11-07): a single 403 is usually a one-off blip, not a
+// sustained block - 12 paced requests right after one still landed 200 every
+// time. Retrying the one failed page a couple of times beats giving up on
+// the entire scan (RATE_LIMIT_COOLDOWN_MS) over what's often just noise.
+const FETCH_RETRY_ATTEMPTS = 3;
+const FETCH_RETRY_DELAY_MS = 1500;
 
 // Live-confirmed trigger (2026-11-07): CommanderRecommendationsDialog's
 // BATCH_SIZE-5 parallel fetchPage calls tripped a 403, while a lone
@@ -259,24 +267,30 @@ export class EdhrecService {
     return this.queue.add(async () => {
       if (Date.now() < this.rateLimitedUntil) return [];
 
-      const { data, error } = await this.supabase.client.functions.invoke<
-        EdhrecPageResponse & { error?: string }
-      >('edhrec-proxy', { body: { path } });
-      if (error) {
-        // A 403 from the proxy means EDHREC itself blocked its outbound
-        // request (see edhrec-proxy/index.ts, which forwards EDHREC's own
-        // status through) - almost certainly a temporary IP-level block, not
-        // this specific page. Pausing every EDHREC call for a while beats
-        // hammering it with more requests that would just 403 again too.
-        if (error instanceof FunctionsHttpError && error.context?.status === 403) {
-          this.rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
-          return [];
+      for (let attempt = 1; attempt <= FETCH_RETRY_ATTEMPTS; attempt++) {
+        const { data, error } = await this.supabase.client.functions.invoke<
+          EdhrecPageResponse & { error?: string }
+        >('edhrec-proxy', { body: { path } });
+        if (error) {
+          // A 403 from the proxy means EDHREC itself blocked this specific
+          // request - usually a one-off blip (see FETCH_RETRY_ATTEMPTS'
+          // comment), so it's worth a couple of retries before concluding
+          // it's a sustained block and pausing every other EDHREC call too.
+          if (error instanceof FunctionsHttpError && error.context?.status === 403) {
+            if (attempt < FETCH_RETRY_ATTEMPTS) {
+              await new Promise((resolve) => setTimeout(resolve, FETCH_RETRY_DELAY_MS));
+              continue;
+            }
+            this.rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+            return [];
+          }
+          throw error;
         }
-        throw error;
-      }
-      if (data?.error) throw new Error(`EDHREC-Anfrage fehlgeschlagen: ${data.error}`);
+        if (data?.error) throw new Error(`EDHREC-Anfrage fehlgeschlagen: ${data.error}`);
 
-      return extract(data?.container?.json_dict?.cardlists ?? []);
+        return extract(data?.container?.json_dict?.cardlists ?? []);
+      }
+      return [];
     });
   }
 }
