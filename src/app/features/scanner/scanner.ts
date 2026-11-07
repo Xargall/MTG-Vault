@@ -673,9 +673,19 @@ export class Scanner {
     const ctx = this.gateCanvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return null;
 
-    ctx.filter = 'grayscale(1)';
     ctx.drawImage(videoEl, 0, 0, GATE_SAMPLE_SIZE, GATE_SAMPLE_SIZE);
-    return ctx.getImageData(0, 0, GATE_SAMPLE_SIZE, GATE_SAMPLE_SIZE).data;
+    const imageData = ctx.getImageData(0, 0, GATE_SAMPLE_SIZE, GATE_SAMPLE_SIZE);
+    const data = imageData.data;
+    // Manual luminance instead of ctx.filter = 'grayscale(1)': WebKit silently
+    // ignores CanvasRenderingContext2D.filter (https://bugs.webkit.org/show_bug.cgi?id=198416),
+    // and the gate math below only reads the red channel, assuming it's already luminance.
+    for (let i = 0; i < data.length; i += 4) {
+      const luminance = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+      data[i] = luminance;
+      data[i + 1] = luminance;
+      data[i + 2] = luminance;
+    }
+    return data;
   }
 
   /**
