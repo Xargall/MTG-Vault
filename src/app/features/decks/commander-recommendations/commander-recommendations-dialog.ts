@@ -55,7 +55,7 @@ function dedupeByCardName(entries: CollectionEntry[]): CollectionEntry[] {
   const seen = new Set<string>();
   const result: CollectionEntry[] = [];
   for (const entry of entries) {
-    const key = entry.card.name.toLowerCase();
+    const key = entry.card.oracleName.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     result.push(entry);
@@ -194,7 +194,7 @@ export class CommanderRecommendationsDialog {
       const ownedCommanders = dedupeByCardName(
         discoveryPool.filter(({ card }) => card.game === 'mtg' && isLegendaryCreature(card.typeLine)),
       );
-      const ownedCommanderNames = new Set(ownedCommanders.map((entry) => entry.card.name.toLowerCase()));
+      const ownedCommanderNames = new Set(ownedCommanders.map((entry) => entry.card.oracleName.toLowerCase()));
 
       // Candidate discovery: rather than asking EDHREC which commanders run
       // each owned card (one request per card, unbounded - tripped EDHREC's
@@ -238,12 +238,21 @@ export class CommanderRecommendationsDialog {
         ? await this.mtgApi.getCardsByNames(candidateNames).catch(() => [])
         : [];
       const candidateImageByName = new Map(
-        candidateCards.map((card) => [card.name.toLowerCase(), card.imageUrl]),
+        candidateCards.map((card) => [card.oracleName.toLowerCase(), card.imageUrl]),
       );
 
       const toVerify = [
         ...ownedCommanders.map((entry) => ({
-          name: entry.card.name,
+          // EDHREC's own API (slug derivation, hit.name, color-identity
+          // lists) only ever knows English card names - entry.card.name may
+          // be swapped to a translated display name by the card-language
+          // toggle (see CardBase.name's own doc comment), which produces a
+          // slug EDHREC has no page for. EDHREC now 403s an unknown slug
+          // instead of 404ing it (live-confirmed), and a single 403 trips
+          // EdhrecService's shared 30-minute "EDHREC blocked us" cooldown -
+          // so one translated owned-commander name used to take down the
+          // whole scan on its very first request, every time.
+          name: entry.card.oracleName,
           owned: true,
           imageUrl: entry.card.imageUrl,
         })),
