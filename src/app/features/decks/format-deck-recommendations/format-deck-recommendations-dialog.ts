@@ -22,6 +22,7 @@ import {
   PrintQuantity,
   UnresolvedAverageDeckCard,
   getPreciseAverageDeckMatch,
+  indexCardsByOracleName,
   mergeCardQuantities,
   splitAverageDeckByAvailability,
 } from '../deck-stats';
@@ -242,8 +243,7 @@ export class FormatDeckRecommendationsDialog {
           batch.map(async (deck) => {
             const deckCards = await this.fetchDeckCards(deck.id).catch(() => []);
             const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name)).catch(() => []);
-            // oracleName, not name - same reasoning as CommanderRecommendationsDialog.
-            const cardsByOracleName = new Map(cards.map((card) => [card.oracleName.toLowerCase(), card]));
+            const cardsByOracleName = indexCardsByOracleName(cards);
             const { matchedCount, totalCount, freeMatchedCount } = getPreciseAverageDeckMatch(
               deckCards,
               cardsByOracleName,
@@ -290,7 +290,7 @@ export class FormatDeckRecommendationsDialog {
     try {
       const deckCards = await this.fetchDeckCards(rec.id);
       const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name));
-      const cardsByOracleName = new Map(cards.map((card) => [card.oracleName.toLowerCase(), card]));
+      const cardsByOracleName = indexCardsByOracleName(cards);
 
       const { owned, assignedElsewhere, missing, unresolved } = splitAverageDeckByAvailability(
         deckCards,
