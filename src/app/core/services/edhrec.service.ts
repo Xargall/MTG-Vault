@@ -3,38 +3,12 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import { SupabaseService } from './supabase.service';
 import { readTtlCache, writeTtlCache } from '../utils/ttl-cache';
-import { RequestQueue } from '../utils/request-queue';
 
 // EDHREC's 403 (see edhrec-proxy) is presumably a temporary block on the
 // proxy's own outbound IP, not a per-user thing - same cool-off pattern as
 // GeminiVisionService.rateLimited/ScryfallRateLimitError, just a much
 // longer window since this is an IP-level block, not a per-second quota.
-// Only reached once FETCH_RETRY_ATTEMPTS is exhausted - see fetchPage.
 const RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
-
-// Live-confirmed (2026-11-07): a single 403 is usually a one-off blip, not a
-// sustained block - 12 paced requests right after one still landed 200 every
-// time. Retrying the one failed page a couple of times beats giving up on
-// the entire scan (RATE_LIMIT_COOLDOWN_MS) over what's often just noise.
-const FETCH_RETRY_ATTEMPTS = 3;
-const FETCH_RETRY_DELAY_MS = 2000;
-
-// Live-confirmed trigger (2026-11-07): CommanderRecommendationsDialog's
-// BATCH_SIZE-5 parallel fetchPage calls tripped a 403, while a lone
-// sequential request to the same proxy succeeded seconds later - EDHREC's
-// bot-protection reacts to request *concurrency*, not just volume. Same
-// pacing pattern as MoxfieldService/YgoprodeckDecksService use for their own
-// unofficial APIs: serialize every fetchPage call through one queue instead
-// of letting callers fire several at once.
-//
-// 1000ms specifically still 403'd live, 3 attempts straight, right at the
-// start of a real scan - RequestQueue paces dispatch-to-dispatch (not
-// gap-after-completion), so at ~450ms/request that's really ~1000ms between
-// hitting EDHREC each time. A 56-request curl simulation at a true ~1.3-1.5s
-// cadence (1s sleep *after* each full round trip) had zero failures -
-// EDHREC's own threshold is apparently somewhere under that, so the floor
-// needs real headroom above 1000ms, not just any fixed delay.
-const MIN_DELAY_MS = 1600;
 
 /** One card+quantity in a computed "average deck" - shared shape between EDHREC's own precomputed average (Commander) and MoxfieldService's client-side aggregation (60-card formats), so the matching logic in commander-recommendations-stats.ts and deck-stats.ts stays source-agnostic. */
 export interface AverageDeckCard {
@@ -167,7 +141,6 @@ export class EdhrecService {
   // either cache above, so a cooled-off skip never gets memoized as if it
   // were a real (empty) EDHREC result for that slug.
   private rateLimitedUntil = 0;
-  private readonly queue = new RequestQueue(MIN_DELAY_MS);
 
   getAverageDeck(commanderName: string): Promise<AverageDeckCard[]> {
     if (Date.now() < this.rateLimitedUntil) return Promise.resolve([]);
@@ -270,40 +243,24 @@ export class EdhrecService {
     path: string,
     extract: (cardlists: EdhrecCardlistRaw[]) => T[],
   ): Promise<T[]> {
-    // The cooldown is re-checked inside the queued task itself, not just by
-    // the public getters above: several calls can pass that outer check in
-    // the same tick (e.g. a Promise.all batch) before any of them has
-    // actually run, so they'd all still land in the queue - this inner
-    // check, which only runs once a queued item's turn actually comes, is
-    // what stops a 403 from cascading through the rest of an
-    // already-queued batch instead of each firing its own request anyway.
-    return this.queue.add(async () => {
-      if (Date.now() < this.rateLimitedUntil) return [];
-
-      for (let attempt = 1; attempt <= FETCH_RETRY_ATTEMPTS; attempt++) {
-        const { data, error } = await this.supabase.client.functions.invoke<
-          EdhrecPageResponse & { error?: string }
-        >('edhrec-proxy', { body: { path } });
-        if (error) {
-          // A 403 from the proxy means EDHREC itself blocked this specific
-          // request - usually a one-off blip (see FETCH_RETRY_ATTEMPTS'
-          // comment), so it's worth a couple of retries before concluding
-          // it's a sustained block and pausing every other EDHREC call too.
-          if (error instanceof FunctionsHttpError && error.context?.status === 403) {
-            if (attempt < FETCH_RETRY_ATTEMPTS) {
-              await new Promise((resolve) => setTimeout(resolve, FETCH_RETRY_DELAY_MS));
-              continue;
-            }
-            this.rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
-            return [];
-          }
-          throw error;
-        }
-        if (data?.error) throw new Error(`EDHREC-Anfrage fehlgeschlagen: ${data.error}`);
-
-        return extract(data?.container?.json_dict?.cardlists ?? []);
+    const { data, error } = await this.supabase.client.functions.invoke<EdhrecPageResponse & { error?: string }>(
+      'edhrec-proxy',
+      { body: { path } },
+    );
+    if (error) {
+      // A 403 from the proxy means EDHREC itself blocked its outbound
+      // request (see edhrec-proxy/index.ts, which forwards EDHREC's own
+      // status through) - almost certainly a temporary IP-level block, not
+      // this specific page. Pausing every EDHREC call for a while beats
+      // hammering it with more requests that would just 403 again too.
+      if (error instanceof FunctionsHttpError && error.context?.status === 403) {
+        this.rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+        return [];
       }
-      return [];
-    });
+      throw error;
+    }
+    if (data?.error) throw new Error(`EDHREC-Anfrage fehlgeschlagen: ${data.error}`);
+
+    return extract(data?.container?.json_dict?.cardlists ?? []);
   }
 }
