@@ -260,12 +260,12 @@ export function getAssignedElsewhereDecks(
 // MoxfieldService's per-deck real decklist for 60-card formats - against the
 // user's collection and other decks. ---
 
-/** Keyed by name, but only from rows with no recorded oracle_id - a row that has one is already covered by the oracle-keyed buildOwnedOracleMap above, so leaving it out here keeps the two maps disjoint and safely summable. */
-export function buildOwnedByNameMap(entries: CollectionEntry[]): Map<string, number> {
+/** Keyed by oracleName (always English/canonical - never the display-language-swapped `name`, see CardBase's own doc comment), but only from rows with no recorded oracle_id - a row that has one is already covered by the oracle-keyed buildOwnedOracleMap above, so leaving it out here keeps the two maps disjoint and safely summable. */
+export function buildOwnedByOracleNameMap(entries: CollectionEntry[]): Map<string, number> {
   const owned = new Map<string, number>();
   for (const { row, card } of entries) {
     if (row.oracle_id) continue;
-    const key = card.name.toLowerCase();
+    const key = card.oracleName.toLowerCase();
     owned.set(key, (owned.get(key) ?? 0) + row.quantity);
   }
   return owned;
@@ -297,11 +297,13 @@ export interface AverageDeckMatch {
  */
 export function getPreciseAverageDeckMatch(
   deckCards: AverageDeckCard[],
-  cardsByName: Map<string, Card>,
+  // Keyed by oracleName.toLowerCase(), never the display `name` - see this
+  // function's own live-confirmed bug below.
+  cardsByOracleName: Map<string, Card>,
   collectionEntries: CollectionEntry[],
   allDecks: DeckEntry[],
 ): AverageDeckMatch {
-  const ownedByName = buildOwnedByNameMap(collectionEntries);
+  const ownedByOracleName = buildOwnedByOracleNameMap(collectionEntries);
   const ownedByOracle = buildOwnedOracleMap(collectionEntries);
   const { byCardId: assignedByCardId, byOracleId: assignedByOracle } = buildAssignedElsewhereMaps(allDecks, null);
 
@@ -310,11 +312,20 @@ export function getPreciseAverageDeckMatch(
   let total = 0;
   for (const { name, quantity } of deckCards) {
     total += quantity;
-    const card = cardsByName.get(name.toLowerCase());
+    // `name` is EDHREC/Moxfield's own name, always English - matching it
+    // against cardsByOracleName (keyed by oracleName, also always English)
+    // instead of the resolved Card's own possibly-translated `name` is what
+    // keeps this working once the display language isn't English. Live-
+    // confirmed bug without this: 21 perfectly ordinary cards (Panharmonicon,
+    // Aetherflux Reservoir, ...) came back "unresolved" under a German UI,
+    // purely because their resolved Card.name was the German printed name
+    // ("Panharmonikon") while `name` here stayed the English EDHREC name -
+    // the card was never actually missing from the database.
+    const card = cardsByOracleName.get(name.toLowerCase());
     if (!card) continue; // unresolved - counts toward total above, contributes nothing else (see UnresolvedAverageDeckCard)
 
     const oracleQty = card.oracleId ? (ownedByOracle.get(card.oracleId) ?? 0) : 0;
-    const ownedQty = oracleQty + (ownedByName.get(name.toLowerCase()) ?? 0);
+    const ownedQty = oracleQty + (ownedByOracleName.get(name.toLowerCase()) ?? 0);
     matched += Math.min(quantity, ownedQty);
 
     const assignedQty = getOwnedQuantity({ cardId: card.id, oracleId: card.oracleId }, assignedByCardId, assignedByOracle);
@@ -376,11 +387,13 @@ export interface AverageDeckSplit {
  */
 export function splitAverageDeckByAvailability(
   deckCards: AverageDeckCard[],
-  cardsByName: Map<string, Card>,
+  // Keyed by oracleName.toLowerCase() - see getPreciseAverageDeckMatch's own
+  // doc comment for why, same function, same bug class.
+  cardsByOracleName: Map<string, Card>,
   collectionEntries: CollectionEntry[],
   allDecks: DeckEntry[],
 ): AverageDeckSplit {
-  const ownedByName = buildOwnedByNameMap(collectionEntries);
+  const ownedByOracleName = buildOwnedByOracleNameMap(collectionEntries);
   const ownedByOracle = buildOwnedOracleMap(collectionEntries);
   // null-equivalent "no current deck to exclude" - the recommended deck
   // doesn't exist yet, same reasoning as browse-decks-dialog.ts's precon
@@ -393,7 +406,7 @@ export function splitAverageDeckByAvailability(
   const unresolved: UnresolvedAverageDeckCard[] = [];
 
   for (const { name, quantity } of deckCards) {
-    const card = cardsByName.get(name.toLowerCase());
+    const card = cardsByOracleName.get(name.toLowerCase());
     if (!card) {
       // Silently dropping this card used to also drop it from every total/
       // percentage below it - live-confirmed case: a real 60-card deck whose
@@ -405,7 +418,7 @@ export function splitAverageDeckByAvailability(
     }
 
     const oracleQty = card.oracleId ? (ownedByOracle.get(card.oracleId) ?? 0) : 0;
-    const ownedQty = oracleQty + (ownedByName.get(name.toLowerCase()) ?? 0);
+    const ownedQty = oracleQty + (ownedByOracleName.get(name.toLowerCase()) ?? 0);
 
     // Oracle-based match catches any assigned printing of the same card; the
     // exact card_id match additionally covers the (rare) case where a
