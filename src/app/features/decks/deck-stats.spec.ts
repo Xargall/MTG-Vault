@@ -7,9 +7,10 @@ import { DeckCardRow, DeckEntry, DeckRow } from './deck.service';
 function deckEntry(
   id: string,
   cardRows: Array<{ cardId: string; quantity: number; isAssigned?: boolean }>,
+  options: { isPrecon?: boolean } = {},
 ): DeckEntry {
   return {
-    deck: { id, name: id, is_precon: false, all_cards_owned: false } as unknown as DeckRow,
+    deck: { id, name: id, is_precon: options.isPrecon ?? false, all_cards_owned: false } as unknown as DeckRow,
     cards: cardRows.map(({ cardId, quantity, isAssigned = true }) => ({
       row: { id: `${id}-${cardId}`, deck_id: id, card_id: cardId, quantity, is_assigned: isAssigned } as DeckCardRow,
       card: { id: cardId, oracleId: null } as unknown as Card,
@@ -49,5 +50,58 @@ describe('buildAssignedElsewhereMaps + getCardAvailability', () => {
       after.byOracleId,
     );
     expect(availabilityAfter.available).toBe(1); // now free for Deck A to actually use
+  });
+
+  it('keeps 5 Game Night precons each at 100%, even though they all share one card_id', () => {
+    // Each precon was granted its own real copy (DeckService.grantAllCards
+    // always adds the full quantity unconditionally for a precon/sealed
+    // product - see its own doc comment) - 5 precons, 5 copies owned total,
+    // never 1 shared copy pretending to satisfy all 5 at once.
+    const gameNightDecks = Array.from({ length: 5 }, (_, i) =>
+      deckEntry(`game-night-${i}`, [{ cardId: 'howling-golem', quantity: 1 }], { isPrecon: true }),
+    );
+    const owned = new Map([['howling-golem', 5]]);
+    const ownedByOracle = new Map<string, number>();
+
+    for (const deck of gameNightDecks) {
+      const { byCardId, byOracleId } = buildAssignedElsewhereMaps(gameNightDecks, deck.deck.id);
+      const availability = getCardAvailability(
+        { cardId: 'howling-golem' },
+        1,
+        owned,
+        ownedByOracle,
+        byCardId,
+        byOracleId,
+      );
+      // 5 owned minus the other 4 precons' own claims (4) = 1, exactly what
+      // this deck itself needs - each of the 5 nets out to "available" on
+      // its own, independent copy, not "sharing" one.
+      expect(availability.available).toBe(1);
+      expect(availability.status).toBe('available');
+    }
+  });
+
+  it('treats a card that only exists inside one precon as unavailable for an unrelated recommendation scan', () => {
+    // Live-reported bug: Graha Tia only ever entered the collection via the
+    // Final Fantasy Starter Deck precon, but kept showing up as a free
+    // commander candidate in CommanderRecommendationsDialog - that physical
+    // copy is sealed inside the precon, not loose in the binder.
+    const finalFantasyPrecon = deckEntry('ff-starter', [{ cardId: 'graha-tia', quantity: 1 }], { isPrecon: true });
+    const owned = new Map([['graha-tia', 1]]);
+    const ownedByOracle = new Map<string, number>();
+
+    // currentDeckId: null - same call shape as getFreelyOwnedEntries, asking
+    // "is this free for something else entirely", not for the precon itself.
+    const { byCardId, byOracleId } = buildAssignedElsewhereMaps([finalFantasyPrecon], null);
+    const availability = getCardAvailability(
+      { cardId: 'graha-tia' },
+      1,
+      owned,
+      ownedByOracle,
+      byCardId,
+      byOracleId,
+    );
+    expect(availability.available).toBe(0);
+    expect(availability.status).toBe('unavailable');
   });
 });
