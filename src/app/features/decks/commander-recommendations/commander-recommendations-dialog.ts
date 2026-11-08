@@ -275,10 +275,14 @@ export class CommanderRecommendationsDialog {
           batch.map(async (candidate) => {
             const deckCards = await this.edhrec.getAverageDeck(candidate.name).catch(() => []);
             const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name)).catch(() => []);
-            const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
+            // oracleName, not name - EDHREC's own deckCards names are always
+            // English, and under a non-English display language, a resolved
+            // Card's own `name` may be swapped to a translated print name
+            // (see getPreciseAverageDeckMatch's own doc comment).
+            const cardsByOracleName = new Map(cards.map((card) => [card.oracleName.toLowerCase(), card]));
             const { matchedCount, totalCount, freeMatchedCount } = getPreciseAverageDeckMatch(
               deckCards,
-              cardsByName,
+              cardsByOracleName,
               collection,
               this.includeAssignedElsewhere() ? [] : allDecks,
             );
@@ -325,11 +329,11 @@ export class CommanderRecommendationsDialog {
       // EDHREC-name oracle lookup needed, unlike the bulk verification pass
       // in load() (which never resolves full cards, for performance).
       const cards = await this.mtgApi.getCardsByNames(deckCards.map((c) => c.name));
-      const cardsByName = new Map(cards.map((card) => [card.name.toLowerCase(), card]));
+      const cardsByOracleName = new Map(cards.map((card) => [card.oracleName.toLowerCase(), card]));
 
       const { owned, assignedElsewhere, missing, unresolved } = splitAverageDeckByAvailability(
         deckCards,
-        cardsByName,
+        cardsByOracleName,
         this.collectionEntries(),
         this.includeAssignedElsewhere() ? [] : this.allDecks(),
       );

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { Card } from '../../core/models/card.model';
-import { buildAssignedElsewhereMaps, getCardAvailability } from './deck-stats';
+import { CollectionEntry } from '../collection/collection.service';
+import { buildAssignedElsewhereMaps, getCardAvailability, splitAverageDeckByAvailability } from './deck-stats';
 import { DeckCardRow, DeckEntry, DeckRow } from './deck.service';
 
 function deckEntry(
@@ -103,5 +104,37 @@ describe('buildAssignedElsewhereMaps + getCardAvailability', () => {
     );
     expect(availability.available).toBe(0);
     expect(availability.status).toBe('unavailable');
+  });
+
+  it('resolves an EDHREC deck card whose owned printing has a translated display name', () => {
+    // Live-reported bug: with the UI set to German, a resolved card's own
+    // `name` can be swapped to its translated print name (e.g.
+    // "Panharmonikon") while EDHREC's own decklist name stays English
+    // ("Panharmonicon") - looking cardsByOracleName up by the EDHREC name
+    // only works if the map itself is keyed by oracleName, not `name`.
+    const panharmonicon = {
+      id: 'print-de',
+      name: 'Panharmonikon',
+      oracleName: 'Panharmonicon',
+      oracleId: 'oracle-panharmonicon',
+    } as unknown as Card;
+    const cardsByOracleName = new Map([[panharmonicon.oracleName.toLowerCase(), panharmonicon]]);
+
+    const collectionEntries: CollectionEntry[] = [
+      {
+        row: { card_id: 'print-de', oracle_id: 'oracle-panharmonicon', quantity: 1 } as never,
+        card: panharmonicon,
+      },
+    ];
+
+    const { owned, unresolved } = splitAverageDeckByAvailability(
+      [{ name: 'Panharmonicon', quantity: 1 }],
+      cardsByOracleName,
+      collectionEntries,
+      [],
+    );
+    expect(unresolved).toEqual([]);
+    expect(owned).toHaveLength(1);
+    expect(owned[0].quantity).toBe(1);
   });
 });
