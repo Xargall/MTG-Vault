@@ -525,7 +525,12 @@ create policy "Anyone can read scryfall cards"
 -- multiplied by every printing's row. Also matches a modal DFC/split/
 -- adventure card's front-face-only name ("Sea Gate Restoration") against
 -- its combined `name` ("Sea Gate Restoration // Sea Gate, Reborn") - EDHREC/
--- Moxfield decklists only ever name such a card by its front face.
+-- Moxfield decklists only ever name such a card by its front face. Excludes
+-- a front=back name match (e.g. "Sea Gate Restoration // Sea Gate
+-- Restoration") - that shape only ever belongs to a non-playable Art Series/
+-- token print, never a real card (which always has a different name on
+-- each face), so without this exclusion those rows polluted a front-face
+-- lookup alongside the real card.
 create or replace function scryfall_cards_by_name(names text[])
 returns setof scryfall_cards
 language sql
@@ -533,7 +538,11 @@ stable
 as $$
   select distinct on (name) *
   from scryfall_cards
-  where name = any(names) or split_part(name, ' // ', 1) = any(names)
+  where name = any(names)
+     or (
+       split_part(name, ' // ', 1) = any(names)
+       and split_part(name, ' // ', 1) <> split_part(name, ' // ', 2)
+     )
   order by name, (printed_name is null) desc, released_at desc nulls last, id;
 $$;
 
