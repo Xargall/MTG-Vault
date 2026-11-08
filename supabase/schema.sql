@@ -522,7 +522,10 @@ create policy "Anyone can read scryfall cards"
 -- One row per name, picking the printing with no printed_name override and
 -- the most recent release as a deterministic tiebreaker - used by
 -- getCardsByNames/getPrints so a plain `name in (...)` lookup isn't
--- multiplied by every printing's row.
+-- multiplied by every printing's row. Also matches a modal DFC/split/
+-- adventure card's front-face-only name ("Sea Gate Restoration") against
+-- its combined `name` ("Sea Gate Restoration // Sea Gate, Reborn") - EDHREC/
+-- Moxfield decklists only ever name such a card by its front face.
 create or replace function scryfall_cards_by_name(names text[])
 returns setof scryfall_cards
 language sql
@@ -530,11 +533,13 @@ stable
 as $$
   select distinct on (name) *
   from scryfall_cards
-  where name = any(names)
+  where name = any(names) or split_part(name, ' // ', 1) = any(names)
   order by name, (printed_name is null) desc, released_at desc nulls last, id;
 $$;
 
 grant execute on function scryfall_cards_by_name(text[]) to anon, authenticated;
+create index if not exists scryfall_cards_front_face_name_idx
+  on scryfall_cards (split_part(name, ' // ', 1));
 
 -- Batched card-display-language lookup (final form, see 026-030_*.sql for
 -- the iteration history) - requires an exact set_code + collector_number

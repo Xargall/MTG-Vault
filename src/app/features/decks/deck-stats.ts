@@ -271,6 +271,29 @@ export function buildOwnedByOracleNameMap(entries: CollectionEntry[]): Map<strin
   return owned;
 }
 
+/**
+ * Builds the oracleName -> Card lookup map getPreciseAverageDeckMatch/
+ * splitAverageDeckByAvailability expect, indexed by both a card's full
+ * oracleName and, for a modal DFC/split/adventure card ("Front // Back"),
+ * its front face alone - EDHREC/Moxfield decklists (and players at the
+ * table) only ever name such a card by its front face ("Sea Gate
+ * Restoration"), never its full combined oracleName ("Sea Gate Restoration
+ * // Sea Gate, Reborn"). Only adds the front-face alias when nothing else
+ * already claims that key, so it can never shadow a genuinely different
+ * card that happens to share a name with another card's front face.
+ */
+export function indexCardsByOracleName(cards: Card[]): Map<string, Card> {
+  const byOracleName = new Map<string, Card>();
+  for (const card of cards) {
+    byOracleName.set(card.oracleName.toLowerCase(), card);
+  }
+  for (const card of cards) {
+    const frontFace = card.oracleName.split(' // ')[0].toLowerCase();
+    if (!byOracleName.has(frontFace)) byOracleName.set(frontFace, card);
+  }
+  return byOracleName;
+}
+
 export interface AverageDeckMatch {
   /** Plain ownership match - includes copies already committed to other decks. */
   matchedCount: number;

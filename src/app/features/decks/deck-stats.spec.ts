@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { Card } from '../../core/models/card.model';
 import { CollectionEntry } from '../collection/collection.service';
-import { buildAssignedElsewhereMaps, getCardAvailability, splitAverageDeckByAvailability } from './deck-stats';
+import {
+  buildAssignedElsewhereMaps,
+  getCardAvailability,
+  indexCardsByOracleName,
+  splitAverageDeckByAvailability,
+} from './deck-stats';
 import { DeckCardRow, DeckEntry, DeckRow } from './deck.service';
 
 function deckEntry(
@@ -129,6 +134,38 @@ describe('buildAssignedElsewhereMaps + getCardAvailability', () => {
 
     const { owned, unresolved } = splitAverageDeckByAvailability(
       [{ name: 'Panharmonicon', quantity: 1 }],
+      cardsByOracleName,
+      collectionEntries,
+      [],
+    );
+    expect(unresolved).toEqual([]);
+    expect(owned).toHaveLength(1);
+    expect(owned[0].quantity).toBe(1);
+  });
+
+  it('resolves a modal DFC by its front-face-only name, as EDHREC/Moxfield name it', () => {
+    // Live-reported bug: Scryfall stores a modal DFC's oracleName as the
+    // full combined "Front // Back" ("Sea Gate Restoration // Sea Gate,
+    // Reborn"), but EDHREC/Moxfield decklists only ever name it by its front
+    // face ("Sea Gate Restoration") - indexCardsByOracleName must alias the
+    // front face too, not just the full oracleName.
+    const seaGateRestoration = {
+      id: 'print-sgr',
+      name: 'Sea Gate Restoration // Sea Gate, Reborn',
+      oracleName: 'Sea Gate Restoration // Sea Gate, Reborn',
+      oracleId: 'oracle-sea-gate-restoration',
+    } as unknown as Card;
+    const cardsByOracleName = indexCardsByOracleName([seaGateRestoration]);
+
+    const collectionEntries: CollectionEntry[] = [
+      {
+        row: { card_id: 'print-sgr', oracle_id: 'oracle-sea-gate-restoration', quantity: 1 } as never,
+        card: seaGateRestoration,
+      },
+    ];
+
+    const { owned, unresolved } = splitAverageDeckByAvailability(
+      [{ name: 'Sea Gate Restoration', quantity: 1 }],
       cardsByOracleName,
       collectionEntries,
       [],
