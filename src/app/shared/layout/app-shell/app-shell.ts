@@ -16,6 +16,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { GameSlug } from '../../../core/models/card.model';
 import { GameService } from '../../../core/services/game.service';
+import { DemoScanBlockedDialog } from '../../../features/collection/demo-scan-blocked-dialog/demo-scan-blocked-dialog';
 import { setAppLanguage } from '../../../core/utils/language.util';
 import { AppFooter } from '../app-footer/app-footer';
 import { GeminiOnboardingDialog } from '../gemini-onboarding-dialog/gemini-onboarding-dialog';
@@ -30,6 +31,7 @@ import { UserMenu } from '../user-menu/user-menu';
     RouterLinkActive,
     RouterOutlet,
     AppFooter,
+    DemoScanBlockedDialog,
     GuestBanner,
     GeminiOnboardingDialog,
     UserMenu,
@@ -89,6 +91,16 @@ export class AppShell {
   protected skipToContent(event: Event) {
     event.preventDefault();
     this.mainContent().nativeElement.focus();
+  }
+
+  protected readonly showDemoScanBlocked = signal(false);
+
+  /** Same lock as the collection page's scan button: guests get the explanation instead of the route. */
+  protected onScanTabClick(event: MouseEvent) {
+    if (this.authService.isGuest()) {
+      event.preventDefault();
+      this.showDemoScanBlocked.set(true);
+    }
   }
 
   scrollToTop() {

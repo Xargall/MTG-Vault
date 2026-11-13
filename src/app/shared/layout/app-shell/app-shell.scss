@@ -47,17 +47,6 @@
   gap: var(--spacing-sm);
 }
 
-@media (max-width: 480px) {
-  .shell-brand,
-  .shell-controls {
-    flex: 1 1 100%;
-  }
-
-  .shell-controls {
-    justify-content: space-between;
-  }
-}
-
 .corner-flourish {
   position: absolute;
   top: 0;
@@ -253,6 +242,49 @@
   flex: 1;
 }
 
+// Phones: the plaque shrinks to a single pinned row - seal, small wordmark,
+// game, help, account. The full-size version cost a quarter of the first
+// screen before any content; pinned, it also replaces the slim plaque below
+// (which only ever shows once the header has scrolled away).
+@media (max-width: 640px) {
+  .shell-header {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    padding: calc(0.375rem + env(safe-area-inset-top)) calc(var(--spacing-md) + env(safe-area-inset-right))
+      0.375rem calc(var(--spacing-md) + env(safe-area-inset-left));
+  }
+
+  .shell-top,
+  .shell-controls {
+    flex-wrap: nowrap;
+    gap: var(--spacing-sm);
+  }
+
+  .shell-controls {
+    flex: 1;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
+  .shell-logo,
+  .corner-flourish {
+    width: 28px;
+    height: 28px;
+  }
+
+  .shell-title {
+    font-size: 1.2rem;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .game-switch {
+    min-width: 0;
+    max-width: 9.5rem;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Phones and tablets (<= 1024px): navigation moves to a bottom "book spine"
 // within thumb reach, the language toggle leaves the header (it's in
@@ -418,6 +450,24 @@
       width: 1.5rem;
       height: 1.5rem;
       transition: transform var(--dur-release) var(--ease-out);
+    }
+
+    .tab-icon {
+      position: relative;
+      display: flex;
+    }
+
+    // Same lock seal as the collection page's scan button.
+    .tab-lock {
+      position: absolute;
+      right: -8px;
+      bottom: -3px;
+      width: 0.9rem;
+      height: 0.9rem;
+      padding: 1px;
+      border: 1px solid var(--color-border-strong);
+      border-radius: 50%;
+      background: var(--color-bg);
     }
 
     a:active svg {

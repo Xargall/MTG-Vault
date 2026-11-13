@@ -241,6 +241,11 @@ h1 {
 .scan-button {
   position: relative;
 
+  // Phones and tablets reach the scanner through the tab bar's centre slot.
+  @media (max-width: 1024px) {
+    display: none;
+  }
+
   // Guests can see the scanner exists but not use it - muted plate instead
   // of the gold fill, plus a small lock seal on its edge.
   &--demo-locked {

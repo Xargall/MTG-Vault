@@ -126,6 +126,24 @@
       <svg aria-hidden="true"><use href="#icon-nav-collection" /></svg>
       <span>{{ 'nav.collection' | translate }}</span>
     </a>
+    <!-- Scanning is the one thing done with the phone in hand, so it gets
+         the centre slot. Guests see it locked, as on the collection page. -->
+    <a
+      [routerLink]="authService.isGuest() ? null : '/scan'"
+      routerLinkActive="is-active"
+      ariaCurrentWhenActive="page"
+      [class.is-locked]="authService.isGuest()"
+      [attr.aria-label]="authService.isGuest() ? ('collection.scanCardDemoAria' | translate) : null"
+      (click)="onScanTabClick($event)"
+    >
+      <span class="tab-icon">
+        <svg aria-hidden="true"><use href="#icon-nav-scan" /></svg>
+        @if (authService.isGuest()) {
+          <svg class="tab-lock" aria-hidden="true"><use href="#icon-lock" /></svg>
+        }
+      </span>
+      <span>{{ 'nav.scan' | translate }}</span>
+    </a>
     <a routerLink="/decks" routerLinkActive="is-active" ariaCurrentWhenActive="page">
       <svg aria-hidden="true"><use href="#icon-nav-decks" /></svg>
       <span>{{ 'nav.decks' | translate }}</span>
@@ -135,6 +153,10 @@
       <span>{{ 'nav.wishlist' | translate }}</span>
     </a>
   </nav>
+
+  @if (showDemoScanBlocked()) {
+    <app-demo-scan-blocked-dialog (close)="showDemoScanBlocked.set(false)" />
+  }
 
   @if (showGeminiOnboarding()) {
     <app-gemini-onboarding-dialog
