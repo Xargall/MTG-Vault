@@ -259,6 +259,8 @@ Metallbeschläge auf Leder, als globale Klassen in `src/styles/_buttons.scss`. K
 ### Chips (Filter)
 - **Style:** Pill, transparent, kräftiger Rahmen, 0.8rem, gedämpfter Text.
 - **State:** Jeder Chip trägt seine eigene `--filter-color`. Aktiv wird der Chip in dieser Farbe gefüllt, der Text dunkel und 600 fett. Der Überschuss-Filter nutzt Danger.
+- **Sammlung:** Die Farb-Chips stehen in einer einzigen, seitlich wischbaren Zeile, die bis an den Panelrand läuft (ein angeschnittener Chip zeigt, dass es weitergeht). Darunter liegt die Mana-Kurve als schmale Aufklappzeile; der Zustand wird gemerkt.
+- **Nach oben:** Lange Seiten (Sammlung, Hilfe) nutzen `<app-back-to-top>`, eine runde Sekundär-Schaltfläche unten rechts über dem Buchrücken, sichtbar ab anderthalb Bildschirmhöhen.
 
 ### Cards / Containers
 - **Corner Style:** 6px

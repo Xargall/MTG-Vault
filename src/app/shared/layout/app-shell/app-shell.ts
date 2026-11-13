@@ -59,7 +59,16 @@ export class AppShell {
   protected readonly headerScrolledAway = signal(false);
   private readonly shellHeader = viewChild.required<ElementRef<HTMLElement>>('shellHeader');
 
+  /** Matches the single-row phone header in app-shell.scss, where the game select only has room for a short name ("Magic"). */
+  protected readonly isPhone = signal(false);
+
   constructor() {
+    const phoneQuery = window.matchMedia('(max-width: 640px)');
+    const syncPhone = () => this.isPhone.set(phoneQuery.matches);
+    syncPhone();
+    phoneQuery.addEventListener('change', syncPhone);
+    this.destroyRef.onDestroy(() => phoneQuery.removeEventListener('change', syncPhone));
+
     // An observer rather than a scroll listener: the full header stays in
     // normal flow and scrolls away as-is, so swapping in the slim plaque
     // never changes layout height (no scroll-anchoring jitter at the edge).

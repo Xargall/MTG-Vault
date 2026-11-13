@@ -12,11 +12,15 @@ export const en: typeof de = {
     help: 'Help & Glossary',
     scan: 'Scan',
     skipToContent: 'Skip to content',
+    backToTop: 'Back to top',
   },
   games: {
     mtg: 'Magic: The Gathering',
     yugioh: 'Yu-Gi-Oh!',
     pokemon: 'Pokémon',
+    mtgShort: 'Magic',
+    yugiohShort: 'Yu-Gi-Oh!',
+    pokemonShort: 'Pokémon',
     comingSoon: 'coming soon',
   },
   footer: {

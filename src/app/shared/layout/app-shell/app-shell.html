@@ -29,9 +29,9 @@
           (change)="setGame($any($event.target).value)"
           [attr.aria-label]="'nav.gameSwitch' | translate"
         >
-          <option value="mtg">{{ 'games.mtg' | translate }}</option>
-          <option value="yugioh">{{ 'games.yugioh' | translate }}</option>
-          <option value="pokemon">{{ 'games.pokemon' | translate }}</option>
+          <option value="mtg">{{ (isPhone() ? 'games.mtgShort' : 'games.mtg') | translate }}</option>
+          <option value="yugioh">{{ (isPhone() ? 'games.yugiohShort' : 'games.yugioh') | translate }}</option>
+          <option value="pokemon">{{ (isPhone() ? 'games.pokemonShort' : 'games.pokemon') | translate }}</option>
         </select>
 
         <div class="lang-switch" role="group" [attr.aria-label]="'settings.languageTitle' | translate">

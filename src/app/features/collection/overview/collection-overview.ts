@@ -5,7 +5,6 @@ import {
   DestroyRef,
   effect,
   ElementRef,
-  HostListener,
   inject,
   signal,
   untracked,
@@ -14,6 +13,7 @@ import {
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
+import { BackToTop } from '../../../shared/layout/back-to-top/back-to-top';
 import { BarChart, BarChartDatum } from '../../../shared/charts/bar-chart/bar-chart';
 import { CardTile } from '../../../shared/cards/card-tile/card-tile';
 import { AppDialog } from '../../../shared/dialog/dialog';
@@ -53,6 +53,15 @@ const INITIAL_RENDER_LIMIT = 60;
 const RENDER_LIMIT_STEP = 60;
 
 const SORT_STORAGE_KEY = 'tcgvault.collection.sort';
+const MANA_CURVE_STORAGE_KEY = 'tcgvault.collection.manaCurveExpanded';
+
+function readStoredManaCurveExpanded(): boolean {
+  try {
+    return localStorage.getItem(MANA_CURVE_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 function readStoredSort(): CollectionSort {
   try {
@@ -75,6 +84,7 @@ export interface ActiveFilterChip {
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-collection-overview',
   imports: [
+    BackToTop,
     BarChart,
     CardTile,
     AddCardDialog,
@@ -287,28 +297,19 @@ export class CollectionOverview {
   });
 
   protected readonly manaCurve = computed<BarChartDatum[]>(() => getManaCurve(this.filteredEntries()));
-  // Only matters on phones, where the chart starts collapsed behind a
-  // disclosure button (desktop always shows it, see collection-overview.scss).
-  protected readonly manaCurveExpanded = signal(false);
-  // Single source of truth for the 640px mobile cutoff used by BOTH the
-  // template's disclosure button (@if (isMobileViewport())) and the chart
-  // body's collapsed state ([class.is-collapsed]) - deliberately not a
-  // second, independent @media query in collection-overview.scss, which
-  // would let the two silently disagree (e.g. on a platform where `resize`
-  // doesn't fire reliably: chart collapsed by CSS, but JS still thinks it's
-  // desktop and never renders a button to reopen it). Below this width, a
-  // focusable "expand" control that can't actually change anything visible
-  // (desktop always shows the chart) would also be a dead interactive
-  // element for keyboard/screen-reader users.
-  protected readonly isMobileViewport = signal(this.computeIsMobileViewport());
+  // The curve is a look-it-up-sometimes statistic, so it sits behind a slim
+  // disclosure row instead of taking half the toolbar; whoever does want it
+  // open keeps it open across visits.
+  protected readonly manaCurveExpanded = signal(readStoredManaCurveExpanded());
 
-  private computeIsMobileViewport(): boolean {
-    return typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
-  }
-
-  @HostListener('window:resize')
-  protected onWindowResize() {
-    this.isMobileViewport.set(this.computeIsMobileViewport());
+  protected toggleManaCurve() {
+    const expanded = !this.manaCurveExpanded();
+    this.manaCurveExpanded.set(expanded);
+    try {
+      localStorage.setItem(MANA_CURVE_STORAGE_KEY, String(expanded));
+    } catch {
+      // Not remembering the choice is fine.
+    }
   }
 
   // How many of filteredEntries() actually get a DOM node right now - see

@@ -10,11 +10,15 @@ export const de = {
     help: 'Hilfe & Lexikon',
     scan: 'Scannen',
     skipToContent: 'Zum Inhalt springen',
+    backToTop: 'Nach oben',
   },
   games: {
     mtg: 'Magic: The Gathering',
     yugioh: 'Yu-Gi-Oh!',
     pokemon: 'Pokémon',
+    mtgShort: 'Magic',
+    yugiohShort: 'Yu-Gi-Oh!',
+    pokemonShort: 'Pokémon',
     comingSoon: 'bald verfügbar',
   },
   footer: {

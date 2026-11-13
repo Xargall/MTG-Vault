@@ -73,37 +73,29 @@
             </button>
           }
         </div>
-      </section>
 
-      @if (hasAnyCards() && gameService.currentSlug() === 'mtg') {
-        <section class="chart-card mana-curve-card" [class.is-expanded]="manaCurveExpanded()">
-          <h2>
-            @if (isMobileViewport()) {
+        @if (hasAnyCards() && gameService.currentSlug() === 'mtg') {
+          <div class="mana-curve" [class.is-expanded]="manaCurveExpanded()">
+            <h2 class="mana-curve-heading">
               <button
                 type="button"
                 class="mana-curve-toggle"
-                (click)="manaCurveExpanded.set(!manaCurveExpanded())"
+                (click)="toggleManaCurve()"
                 [attr.aria-expanded]="manaCurveExpanded()"
                 aria-controls="mana-curve-body"
               >
                 {{ 'collection.manaCurve' | translate }}
                 <svg class="toggle-chevron" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
               </button>
-            } @else {
-              {{ 'collection.manaCurve' | translate }}
-            }
-          </h2>
-          <div
-            class="mana-curve-body"
-            id="mana-curve-body"
-            [class.is-collapsed]="isMobileViewport() && !manaCurveExpanded()"
-          >
-            <div class="mana-curve-body-inner">
-              <app-bar-chart [data]="manaCurve()" [label]="'collection.manaCurve' | translate" />
+            </h2>
+            <div class="mana-curve-body" id="mana-curve-body" [class.is-collapsed]="!manaCurveExpanded()">
+              <div class="mana-curve-body-inner">
+                <app-bar-chart [data]="manaCurve()" [label]="'collection.manaCurve' | translate" />
+              </div>
             </div>
           </div>
-        </section>
-      }
+        }
+      </section>
     </div>
 
     @if (hasAnyCards()) {
@@ -319,3 +311,5 @@
 @if (showDemoScanBlocked()) {
   <app-demo-scan-blocked-dialog (close)="showDemoScanBlocked.set(false)" />
 }
+
+<app-back-to-top />
