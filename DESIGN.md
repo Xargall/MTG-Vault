@@ -200,7 +200,7 @@ Dazu kommen pro Spiel die Header-Verläufe (`--header-grad-top/bottom`, `--heade
 - **Body** (400, 1rem): Fließtext und Werte in Eingabefeldern. Eingabefelder bleiben bei 1rem, damit iOS beim Fokus nicht zoomt.
 - **Label** (400, 0.85rem): Formular-Labels, Zurück-Links, sekundäre Aktionen. Die häufigste Größe der App.
 - **Caption** (600, 0.75rem): Badges, Spielauswahl, Metadaten. **0.75rem ist die harte Untergrenze** für jeden Text in der App — nach Lese-Feedback (2026-11-03) auf vorher vereinzelt 0.6–0.7rem kleine Badges/Chart-Beschriftungen angehoben. Keine Ausnahme mehr darunter.
-- **Card Name** (Cinzel 600, 0.85rem, Tracking 0.02em): Name unter jedem Kartenbild, einzeilig mit Ellipse. War 400/0.8rem ohne Tracking - Cinzels gemeißelte, eng stehende Formen waren bei Normalgewicht und dieser Größe auf der meistwiederholten Textzeile der ganzen App (jede Karte, jedes Grid) schlecht lesbar (Nutzer-Feedback 2026-11-03). Bleibt Cinzel (Identität), aber kräftiger und mit mehr Luft.
+- **Card Name** (Cinzel 600, 0.85rem, Tracking 0.02em): Name unter jedem Kartenbild, bis zu zwei Zeilen (danach Ellipse) bei immer fester Zwei-Zeilen-Höhe, damit Rasterreihen ausgerichtet bleiben - einzeilig waren zwei Drittel aller Namen abgeschnitten (Review 2026-11-13). War 400/0.8rem ohne Tracking - Cinzels gemeißelte, eng stehende Formen waren bei Normalgewicht und dieser Größe auf der meistwiederholten Textzeile der ganzen App (jede Karte, jedes Grid) schlecht lesbar (Nutzer-Feedback 2026-11-03). Bleibt Cinzel (Identität), aber kräftiger und mit mehr Luft.
 
 **The Breathing Line Rule.** `body` trägt app-weit `line-height: 1.5`, Überschriften (`h1`–`h3`) `1.25` - beides global in styles.scss, nicht pro Komponente wiederholt. War bis 2026-11-03 app-weit gar nicht gesetzt (nur 8 Komponenten hatten eine eigene, enge Zeilenhöhe für einzelne Badges/Labels - die bleiben als bewusste Ausnahme bestehen). Alles andere fiel auf die „normal“-Metrik der jeweiligen Schrift zurück, die bei EB Garamond spürbar enger ist als angenehmes Lesen - genau das Element, das reine Kontrast-/Schriftgrößen-Prüfung (auch automatisierte wie axe-core) nicht erfasst, aber im Lese-Feedback als „der Rest liest sich eng“ auffiel (2026-11-03, u. a. Hilfe/Lexikon).
 
@@ -210,7 +210,7 @@ Dazu kommen pro Spiel die Header-Verläufe (`--header-grad-top/bottom`, `--heade
 
 ## Layout
 
-Eine einspaltige, zentrierte App unter einer vollbreiten Header-Plakette. Die Inhaltsbreite richtet sich nach der Ansicht: Dashboard und Collection bis 1100px, Wunschliste bis 720px, Formular-Spalten bis 520px, Dialoge bis 720px und 85dvh hoch. Abstände folgen einer Dreierskala aus `sm` (0.5rem), `md` (1rem) und `lg` (1.5rem). Kleine Einzelabstände (4px, 6px) kommen nur innerhalb von Komponenten vor.
+Eine einspaltige, zentrierte App unter einer vollbreiten Header-Plakette. Die Inhaltsbreite richtet sich nach der Ansicht: Dashboard, Collection und Decks bis 1100px (dieselbe Kante, damit die Seitenüberschrift beim Tab-Wechsel nicht springt), Wunschliste und Hilfe als schmale Lesespalte bis 720px, Formular-Spalten bis 520px, Dialoge bis 720px und 85dvh hoch. Abstände folgen einer Dreierskala aus `sm` (0.5rem), `md` (1rem) und `lg` (1.5rem). Kleine Einzelabstände (4px, 6px) kommen nur innerhalb von Komponenten vor.
 
 Kartenraster sind `auto-fill`-Grids mit Mindestbreiten um 130px und Abstand `md`. Sie brechen dadurch ohne eigene Breakpoints um. Kartenbilder haben immer das Seitenverhältnis 5:7.
 

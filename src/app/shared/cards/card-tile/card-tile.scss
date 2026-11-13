@@ -135,9 +135,18 @@
   letter-spacing: 0.02em;
   color: var(--color-text);
   text-align: center;
-  white-space: nowrap;
+  // Up to two lines, and always the height of two: a single-line ellipsis
+  // cut off two thirds of all names in a typical grid ("CRATERHOOF BEH…"),
+  // while a height that follows the text would knock neighbouring tiles'
+  // rows out of line.
+  line-height: 1.25;
+  height: 2.5em;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
 }
 
 .status-badge svg {
