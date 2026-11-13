@@ -54,6 +54,7 @@
             type="button"
             class="filter-button"
             [class.is-active]="selectedCategory() === null"
+            [attr.aria-pressed]="selectedCategory() === null"
             style="--filter-color: var(--color-accent)"
             (click)="selectedCategory.set(null)"
           >
@@ -64,6 +65,7 @@
               type="button"
               class="filter-button"
               [class.is-active]="selectedCategory() === category.key"
+              [attr.aria-pressed]="selectedCategory() === category.key"
               [style.--filter-color]="category.color"
               (click)="toggleCategory(category.key)"
             >
@@ -97,7 +99,7 @@
             [class.is-collapsed]="isMobileViewport() && !manaCurveExpanded()"
           >
             <div class="mana-curve-body-inner">
-              <app-bar-chart [data]="manaCurve()" />
+              <app-bar-chart [data]="manaCurve()" [label]="'collection.manaCurve' | translate" />
             </div>
           </div>
         </section>

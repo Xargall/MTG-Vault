@@ -6,6 +6,8 @@ import { BarChartDatum } from '../bar-chart/bar-chart';
 interface DonutSegment extends BarChartDatum {
   dasharray: string;
   dashoffset: number;
+  focusDasharray: string;
+  focusDashoffset: number;
   percent: number;
 }
 
@@ -13,6 +15,11 @@ const RADIUS = 70;
 const STROKE_WIDTH = 28;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const SEGMENT_GAP = 2;
+// The focus arc sits just outside the ring; its dash lengths are the
+// segment's own, scaled up to the larger circle.
+const FOCUS_RADIUS = RADIUS + STROKE_WIDTH / 2 + 4;
+const FOCUS_SCALE = FOCUS_RADIUS / RADIUS;
+const FOCUS_CIRCUMFERENCE = CIRCUMFERENCE * FOCUS_SCALE;
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -23,9 +30,12 @@ const SEGMENT_GAP = 2;
 })
 export class DonutChart {
   readonly data = input<BarChartDatum[]>([]);
+  /** Accessible name of the whole chart (its visible heading) - the segments announce their own label and value. */
+  readonly label = input<string>('');
 
   protected readonly hoveredLabel = signal<string | null>(null);
   protected readonly radius = RADIUS;
+  protected readonly focusRadius = FOCUS_RADIUS;
   protected readonly strokeWidth = STROKE_WIDTH;
 
   protected readonly total = computed(() => this.data().reduce((sum, d) => sum + d.value, 0));
@@ -55,6 +65,8 @@ export class DonutChart {
         ...d,
         dasharray: `${drawnLength} ${CIRCUMFERENCE - drawnLength}`,
         dashoffset: -cumulative,
+        focusDasharray: `${drawnLength * FOCUS_SCALE} ${FOCUS_CIRCUMFERENCE - drawnLength * FOCUS_SCALE}`,
+        focusDashoffset: -cumulative * FOCUS_SCALE,
         percent: Math.round(fraction * 100),
       });
 

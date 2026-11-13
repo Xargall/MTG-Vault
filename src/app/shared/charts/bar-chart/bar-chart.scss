@@ -31,6 +31,20 @@
   filter: brightness(1.2);
 }
 
+// Stands in for the global :focus-visible outline (see bar-chart.html).
+.focus-ring {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bar-group:focus-visible .focus-ring {
+  opacity: 1;
+}
+
 .value-label {
   fill: var(--color-text-muted);
   font-size: 12px;

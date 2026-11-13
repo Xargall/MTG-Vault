@@ -84,6 +84,13 @@ export class AppShell {
     });
   }
 
+  private readonly mainContent = viewChild.required<ElementRef<HTMLElement>>('mainContent');
+
+  protected skipToContent(event: Event) {
+    event.preventDefault();
+    this.mainContent().nativeElement.focus();
+  }
+
   scrollToTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }

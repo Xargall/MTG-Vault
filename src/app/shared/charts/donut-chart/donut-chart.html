@@ -1,5 +1,5 @@
 <div class="donut-chart">
-  <svg class="ring" viewBox="0 0 170 170" role="img">
+  <svg class="ring" viewBox="0 0 170 170" role="group" [attr.aria-label]="label() || null">
     <circle
       class="track"
       cx="85"
@@ -24,6 +24,8 @@
         [attr.stroke-dashoffset]="segment.dashoffset"
         transform="rotate(-90 85 85)"
         tabindex="0"
+        role="img"
+        [attr.aria-label]="(segment.label | translate) + ': ' + segment.value + ' (' + segment.percent + '%)'"
         (mouseenter)="hoveredLabel.set(segment.label)"
         (mouseleave)="hoveredLabel.set(null)"
         (focus)="hoveredLabel.set(segment.label)"
@@ -31,6 +33,19 @@
       >
         <title>{{ segment.label | translate }}: {{ segment.value }} ({{ segment.percent }}%)</title>
       </circle>
+      <!-- Drawn focus ring: an outline on a stroked <circle> would box the
+           whole ring, so the focused segment gets an accent arc just outside
+           its own span instead (shown via :focus-visible + sibling in CSS). -->
+      <circle
+        class="segment-focus"
+        cx="85"
+        cy="85"
+        [attr.r]="focusRadius"
+        fill="none"
+        [attr.stroke-dasharray]="segment.focusDasharray"
+        [attr.stroke-dashoffset]="segment.focusDashoffset"
+        transform="rotate(-90 85 85)"
+      />
     }
 
     <text class="total-value" x="85" y="80" text-anchor="middle">{{ total() }}</text>

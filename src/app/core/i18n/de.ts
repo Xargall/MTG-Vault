@@ -8,6 +8,8 @@ export const de = {
     primary: 'Hauptnavigation',
     gameSwitch: 'Spiel wechseln',
     help: 'Hilfe & Lexikon',
+    scan: 'Scannen',
+    skipToContent: 'Zum Inhalt springen',
   },
   games: {
     mtg: 'Magic: The Gathering',
@@ -722,6 +724,7 @@ export const de = {
     clearFilters: 'Filter zurücksetzen',
   },
   playtest: {
+    title: 'Playtest',
     noDeckSelected: 'Kein Deck ausgewählt. Starte den Playtest über ein Deck in deinen Decks.',
     backToDecks: 'Zurück zu Decks',
     library: 'Bibliothek',

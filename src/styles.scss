@@ -315,6 +315,32 @@ body {
   }
 }
 
+// Keyboard shortcut past the header (see app-shell.html): off-screen until it
+// takes focus, then a plain accent plate in the top-left corner.
+.skip-link {
+  position: fixed;
+  top: var(--spacing-sm);
+  left: var(--spacing-sm);
+  z-index: 1000;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+
+  &:focus {
+    transform: none;
+  }
+}
+
+// The skip link's target only takes focus programmatically - a ring around
+// the whole page would say nothing.
+#main-content:focus {
+  outline: none;
+}
+
 html,
 body {
   margin: 0;

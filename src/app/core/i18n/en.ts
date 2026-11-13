@@ -10,6 +10,8 @@ export const en: typeof de = {
     primary: 'Main navigation',
     gameSwitch: 'Switch game',
     help: 'Help & Glossary',
+    scan: 'Scan',
+    skipToContent: 'Skip to content',
   },
   games: {
     mtg: 'Magic: The Gathering',
@@ -720,6 +722,7 @@ export const en: typeof de = {
     clearFilters: 'Clear filters',
   },
   playtest: {
+    title: 'Playtest',
     noDeckSelected: 'No deck selected. Start a playtest from a deck in your Decks.',
     backToDecks: 'Back to Decks',
     library: 'Library',

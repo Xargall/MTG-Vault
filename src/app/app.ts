@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { SwUpdate } from '@angular/service-worker';
 import { TranslateService } from '@ngx-translate/core';
@@ -29,6 +29,13 @@ export class App {
     if (saved === 'de' || saved === 'en') {
       translate.use(saved);
     }
+
+    // Keeps <html lang> in step with the UI language - screen readers pick
+    // their pronunciation rules from it, and it was stuck on the static
+    // value from index.html regardless of the language actually shown.
+    effect(() => {
+      document.documentElement.lang = translate.currentLang() ?? 'de';
+    });
 
     // Kicked off once here regardless of which game is currently active -
     // by the time a user switches to MTG and opens the scanner, the local

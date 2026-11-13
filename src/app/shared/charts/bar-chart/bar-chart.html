@@ -2,7 +2,8 @@
   class="bar-chart"
   [attr.viewBox]="'0 0 ' + viewBoxWidth() + ' ' + viewBoxHeight"
   preserveAspectRatio="xMidYMid meet"
-  role="img"
+  role="group"
+  [attr.aria-label]="label() || null"
 >
   <line
     class="baseline"
@@ -16,12 +17,25 @@
     <g
       class="bar-group"
       tabindex="0"
+      role="img"
+      [attr.aria-label]="(bar.label | translate) + ': ' + bar.value"
       (mouseenter)="hoveredIndex.set(i)"
       (mouseleave)="hoveredIndex.set(null)"
       (focus)="hoveredIndex.set(i)"
       (blur)="hoveredIndex.set(null)"
     >
       <title>{{ bar.label | translate }}: {{ bar.value }}</title>
+
+      <!-- Drawn focus ring: an outline on an SVG <g> isn't rendered
+           consistently across browsers, a rect in the band always is. -->
+      <rect
+        class="focus-ring"
+        [attr.x]="i * bandWidth + focusInset"
+        [attr.y]="focusInset"
+        [attr.width]="bandWidth - focusInset * 2"
+        [attr.height]="viewBoxHeight - focusInset * 2"
+        [attr.rx]="barRadius"
+      />
 
       <rect
         class="bar"

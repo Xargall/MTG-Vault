@@ -1,4 +1,11 @@
 <div class="shell">
+  <!-- First tab stop: jumps past the header's ten controls straight to the
+       page. A click handler rather than a plain fragment link - with
+       <base href="/"> a bare "#main-content" would navigate to the root. -->
+  <a class="skip-link" href="#main-content" (click)="skipToContent($event)">
+    {{ 'nav.skipToContent' | translate }}
+  </a>
+
   <header class="shell-header" #shellHeader>
     <svg class="corner-flourish corner-flourish--left" width="48" height="48" aria-hidden="true">
       <use href="#flourish-swirl" />
@@ -27,10 +34,11 @@
           <option value="pokemon">{{ 'games.pokemon' | translate }}</option>
         </select>
 
-        <div class="lang-switch">
+        <div class="lang-switch" role="group" [attr.aria-label]="'settings.languageTitle' | translate">
           <button
             type="button"
             [class.is-active]="translate.currentLang() === 'de'"
+            [attr.aria-pressed]="translate.currentLang() === 'de'"
             (click)="setLang('de')"
           >
             DE
@@ -38,6 +46,7 @@
           <button
             type="button"
             [class.is-active]="translate.currentLang() === 'en'"
+            [attr.aria-pressed]="translate.currentLang() === 'en'"
             (click)="setLang('en')"
           >
             EN
@@ -52,13 +61,24 @@
       </div>
     </div>
 
-    <nav class="shell-nav">
-      <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">
+    <nav class="shell-nav" [attr.aria-label]="'nav.primary' | translate">
+      <a
+        routerLink="/"
+        routerLinkActive="is-active"
+        ariaCurrentWhenActive="page"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
         {{ 'nav.overview' | translate }}
       </a>
-      <a routerLink="/collection" routerLinkActive="is-active">{{ 'nav.collection' | translate }}</a>
-      <a routerLink="/decks" routerLinkActive="is-active">{{ 'nav.decks' | translate }}</a>
-      <a routerLink="/wishlist" routerLinkActive="is-active">{{ 'nav.wishlist' | translate }}</a>
+      <a routerLink="/collection" routerLinkActive="is-active" ariaCurrentWhenActive="page">
+        {{ 'nav.collection' | translate }}
+      </a>
+      <a routerLink="/decks" routerLinkActive="is-active" ariaCurrentWhenActive="page">
+        {{ 'nav.decks' | translate }}
+      </a>
+      <a routerLink="/wishlist" routerLinkActive="is-active" ariaCurrentWhenActive="page">
+        {{ 'nav.wishlist' | translate }}
+      </a>
     </nav>
   </header>
 
@@ -84,7 +104,7 @@
 
   <app-guest-banner />
 
-  <main class="shell-content">
+  <main class="shell-content" id="main-content" tabindex="-1" #mainContent>
     <router-outlet />
   </main>
 
@@ -93,19 +113,24 @@
   <!-- Phones: the primary navigation lives at the bottom edge, within thumb
        reach - a tooled-leather "book spine" with gilt-inlaid active tab. -->
   <nav class="shell-tabbar" [attr.aria-label]="'nav.primary' | translate">
-    <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">
+    <a
+      routerLink="/"
+      routerLinkActive="is-active"
+      ariaCurrentWhenActive="page"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
       <svg aria-hidden="true"><use href="#icon-nav-overview" /></svg>
       <span>{{ 'nav.overview' | translate }}</span>
     </a>
-    <a routerLink="/collection" routerLinkActive="is-active">
+    <a routerLink="/collection" routerLinkActive="is-active" ariaCurrentWhenActive="page">
       <svg aria-hidden="true"><use href="#icon-nav-collection" /></svg>
       <span>{{ 'nav.collection' | translate }}</span>
     </a>
-    <a routerLink="/decks" routerLinkActive="is-active">
+    <a routerLink="/decks" routerLinkActive="is-active" ariaCurrentWhenActive="page">
       <svg aria-hidden="true"><use href="#icon-nav-decks" /></svg>
       <span>{{ 'nav.decks' | translate }}</span>
     </a>
-    <a routerLink="/wishlist" routerLinkActive="is-active">
+    <a routerLink="/wishlist" routerLinkActive="is-active" ariaCurrentWhenActive="page">
       <svg aria-hidden="true"><use href="#icon-nav-wishlist" /></svg>
       <span>{{ 'nav.wishlist' | translate }}</span>
     </a>
