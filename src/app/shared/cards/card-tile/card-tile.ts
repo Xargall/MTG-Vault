@@ -1,8 +1,14 @@
-import { ChangeDetectionStrategy, Component, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 
 import { Card } from '../../../core/models/card.model';
 
 export type CardOwnedStatus = 'owned' | 'partial' | 'missing';
+
+/** True when the browser reports the user asked for less data, or a 2G-class connection (Chromium only; elsewhere the full-size image is simply allowed). */
+function prefersLightImages(): boolean {
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  return !!connection && (connection.saveData === true || /2g/.test(connection.effectiveType ?? ''));
+}
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -21,4 +27,17 @@ export class CardTile {
   readonly keywords = input<string[]>([]);
 
   protected readonly imageLoaded = signal(false);
+
+  /**
+   * The small thumbnail (146px wide for Scryfall) is only sharp on a 1x
+   * screen - a tile is 130-170 CSS px wide, so a phone or HiDPI laptop needs
+   * the full-size image to fill its physical pixels. The browser picks one
+   * of the two, never both. Null (plain `src` only) when there is just one
+   * size or the user is on a data-saving connection.
+   */
+  protected readonly srcset = computed(() => {
+    const { imageUrl, imageUrlSmall } = this.card();
+    if (!imageUrl || !imageUrlSmall || imageUrl === imageUrlSmall || prefersLightImages()) return null;
+    return `${imageUrlSmall} 1x, ${imageUrl} 2x`;
+  });
 }
