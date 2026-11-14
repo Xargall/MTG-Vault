@@ -3,7 +3,7 @@ import { BarChartDatum } from '../../shared/charts/bar-chart/bar-chart';
 import { getEntryPrice } from './card-price-stats';
 import { CollectionEntry } from './collection.service';
 
-export { getEntryPrice, getPriceDistribution, getTotalValue } from './card-price-stats';
+export { getEntryPrice, getTopValuedEntries, getTotalValue } from './card-price-stats';
 
 export interface ColorCategorySummary {
   key: ColorCategory;

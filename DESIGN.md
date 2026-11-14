@@ -139,7 +139,7 @@ Eine warme, nachtdunkle Palette aus Tinte, Leder und Pergament mit einem einzige
 - **Burnished Gold** (`burnished-gold`): Hover-Stufe des Akzents und Farbe der Überschriften h1–h3.
 
 ### Secondary
-- **Aged Bronze** (`aged-bronze`): Akzent für einzelne Datenreihen (Manakurve, Preishistogramm), Scrollbar-Thumb und unterer Stopp der Goldfolien-Wortmarke.
+- **Aged Bronze** (`aged-bronze`): Akzent für einzelne Datenreihen (Manakurve), Scrollbar-Thumb und unterer Stopp der Goldfolien-Wortmarke.
 
 ### Neutral
 - **Ink Night** (`ink-night`): Seitenhintergrund (unter dem schwachen Siegelmuster). Gleichzeitig der Hintergrund von Eingabefeldern und Badges und die Textfarbe auf Gold.

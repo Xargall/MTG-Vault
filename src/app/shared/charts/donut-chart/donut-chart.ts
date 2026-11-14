@@ -40,9 +40,17 @@ export class DonutChart {
 
   protected readonly total = computed(() => this.data().reduce((sum, d) => sum + d.value, 0));
 
+  // Largest first, empty entries dropped: the legend and the ring then read
+  // in the same order, and a category with no cards takes no row.
+  private readonly visible = computed(() =>
+    this.data()
+      .filter((d) => d.value > 0)
+      .sort((a, b) => b.value - a.value),
+  );
+
   protected readonly legend = computed(() => {
     const total = this.total();
-    return this.data().map((d) => ({
+    return this.visible().map((d) => ({
       ...d,
       percent: total > 0 ? Math.round((d.value / total) * 100) : 0,
     }));
@@ -55,8 +63,7 @@ export class DonutChart {
     let cumulative = 0;
     const result: DonutSegment[] = [];
 
-    for (const d of this.data()) {
-      if (d.value <= 0) continue;
+    for (const d of this.visible()) {
       const fraction = d.value / total;
       const rawLength = fraction * CIRCUMFERENCE;
       const drawnLength = Math.max(rawLength - SEGMENT_GAP, 0);
