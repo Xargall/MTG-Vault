@@ -37,7 +37,8 @@ export class AuthCallback {
   private async finish() {
     const result = await this.authService.finalizeGoogleSignIn().catch(() => 'rejected' as const);
     if (result === 'ok') {
-      await this.router.navigateByUrl('/');
+      // Every fresh sign-in passes the game picker, not only an account's first.
+      await this.router.navigate(['/select-game'], { queryParams: { redirectTo: '/' } });
     } else {
       await this.router.navigate(['/login'], { queryParams: { error: 'inviteRequired' } });
     }
