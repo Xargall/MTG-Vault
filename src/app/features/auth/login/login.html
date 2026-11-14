@@ -1,4 +1,15 @@
 <div class="auth-page">
+  <div class="login-stack">
+  <!-- Who we are before the form asks for anything: seal, wordmark and one
+       sentence. The page's own heading stays "Anmelden" in the card. -->
+  <header class="login-brand">
+    <svg class="login-seal" width="64" height="64" viewBox="0 0 120 120" aria-hidden="true">
+      <use href="#logo-seal" />
+    </svg>
+    <p class="login-wordmark">TCG Vault</p>
+    <p class="login-tagline">{{ 'auth.tagline' | translate }}</p>
+  </header>
+
   <form class="auth-card" [formGroup]="form" (ngSubmit)="submit()">
     <h1>{{ 'auth.loginTitle' | translate }}</h1>
 
@@ -29,7 +40,7 @@
 
     <div class="divider"><span>{{ 'auth.or' | translate }}</span></div>
 
-    <button type="button" class="btn btn--ghost guest-button" [disabled]="isSubmitting()" (click)="signInAsGuest()">
+    <button type="button" class="btn btn--secondary" [disabled]="isSubmitting()" (click)="signInAsGuest()">
       @if (isSeedingDemo()) {
         <span class="loading-rune" aria-hidden="true"></span>
       }
@@ -37,4 +48,5 @@
     </button>
     <p class="guest-hint">{{ (isSeedingDemo() ? 'auth.demoSeedingHint' : 'auth.demoHint') | translate }}</p>
   </form>
+  </div>
 </div>

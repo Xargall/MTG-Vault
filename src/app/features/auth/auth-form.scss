@@ -80,17 +80,6 @@
     }
   }
 
-  // Dashed outline: an offer to look around, not an account action.
-  .guest-button {
-    border: 1px dashed var(--color-border-strong);
-
-    @media (hover: hover) and (pointer: fine) {
-      &:hover:not(:disabled) {
-        border-color: var(--color-accent);
-      }
-    }
-  }
-
   // Reuses the app's own crest motif (diamond-in-circle) as a small
   // spinner instead of a generic browser spinner, so the one genuinely
   // slow wait in the app (seeding the demo account) still feels in-world.

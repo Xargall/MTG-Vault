@@ -1,1 +1,51 @@
 @use '../auth-form';
+
+// Brand block above the card: seal, gold-foil wordmark (same treatment as
+// the app shell's), one sentence.
+.login-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-lg);
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.login-seal {
+  margin-bottom: 4px;
+}
+
+.login-wordmark {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  line-height: 1.1;
+  background: linear-gradient(
+    180deg,
+    var(--title-grad-start) 0%,
+    var(--color-accent) 45%,
+    var(--color-bronze) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7));
+}
+
+.login-tagline {
+  max-width: 36ch;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}

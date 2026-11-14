@@ -67,6 +67,7 @@ export const de = {
   },
   auth: {
     loginTitle: 'Anmelden',
+    tagline: 'Sammlung, Decks und Wunschliste für Magic, Yu-Gi-Oh! und Pokémon.',
     email: 'E-Mail',
     password: 'Passwort',
     emailInvalid: 'Bitte eine gültige E-Mail-Adresse eingeben.',

@@ -69,6 +69,7 @@ export const en: typeof de = {
   },
   auth: {
     loginTitle: 'Sign In',
+    tagline: 'Collection, decks and wishlist for Magic, Yu-Gi-Oh! and Pokémon.',
     email: 'Email',
     password: 'Password',
     emailInvalid: 'Please enter a valid email address.',
