@@ -19,11 +19,18 @@ app-deck-banner {
   margin-bottom: var(--spacing-md);
 }
 
+// Equal-width columns however many buttons the game offers (three for MTG
+// and Yu-Gi-Oh!, one for Pokémon); a lone button keeps a sensible width
+// instead of stretching across the page.
 .deck-action-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-lg);
+
+  > :only-child {
+    max-width: 320px;
+  }
 }
 
 .state-message {

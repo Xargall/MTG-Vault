@@ -255,9 +255,9 @@ export const en: typeof de = {
   decks: {
     title: 'Decks',
     bannerAria: 'Browse precon decks',
-    bannerText: 'Browse & add precon decks',
-    commanderRecsButton: 'Commander recommendations from your collection',
-    formatRecsButton: 'Format deck recommendations',
+    bannerText: 'Browse precon decks',
+    commanderRecsButton: 'Commander picks',
+    formatRecsButton: 'Format picks',
     almostComplete: 'Almost complete',
     almostCompleteHint: 'Precon decks you already own at least 75% of the cards for.',
     matchInCollection: '{{percent}}% in collection',
@@ -633,7 +633,7 @@ export const en: typeof de = {
     importFailed: 'Deck could not be imported.',
   },
   archetypeBrowser: {
-    openButton: 'Browse archetypes',
+    openButton: 'Archetypes',
     title: 'Browse Archetypes',
     hint: 'Shows every card in a theme (archetype) - not a curated deck, just the full card pool to browse.',
     searchPlaceholder: 'Search archetype, e.g. "Blue-Eyes"…',

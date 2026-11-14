@@ -253,9 +253,9 @@ export const de = {
   decks: {
     title: 'Decks',
     bannerAria: 'Precon-Decks durchsuchen',
-    bannerText: 'Precon-Decks durchsuchen & hinzufügen',
-    commanderRecsButton: 'Commander-Empfehlungen aus deiner Sammlung',
-    formatRecsButton: 'Format-Deck-Empfehlungen',
+    bannerText: 'Precon-Decks durchsuchen',
+    commanderRecsButton: 'Commander-Empfehlungen',
+    formatRecsButton: 'Format-Empfehlungen',
     almostComplete: 'Fast komplett',
     almostCompleteHint: 'Precon-Decks, von denen du bereits mindestens 75 % der Karten besitzt.',
     matchInCollection: '{{percent}}% in Sammlung',
@@ -635,7 +635,7 @@ export const de = {
     importFailed: 'Deck konnte nicht importiert werden.',
   },
   archetypeBrowser: {
-    openButton: 'Archetypen durchsuchen',
+    openButton: 'Archetypen',
     title: 'Archetypen durchsuchen',
     hint: 'Zeigt alle Karten eines Themas (Archetyp) — kein kuratiertes Deck, sondern der gesamte Kartenpool zum Stöbern.',
     searchPlaceholder: 'Archetyp suchen, z. B. „Blue-Eyes“…',
