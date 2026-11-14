@@ -27,6 +27,7 @@ export const en: typeof de = {
     impressum: 'Legal Notice',
   },
   common: {
+    offlineNotice: 'Offline – saved card images stay visible, data and prices may be missing.',
     card: 'card',
     cards: 'cards',
     unknown: 'Unknown',

@@ -12,7 +12,8 @@
           "/index.html",
           "/manifest.webmanifest",
           "/*.css",
-          "/*.js"
+          "/*.js",
+          "/media/*latin-wght*.woff2"
         ]
       }
     },
@@ -22,6 +23,23 @@
       "updateMode": "prefetch",
       "resources": {
         "files": ["/**/*.(svg|cur|jpg|jpeg|png|apng|webp|avif|gif|otf|ttf|woff|woff2)"]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "card-images",
+      "urls": [
+        "https://cards.scryfall.io/**",
+        "https://images.ygoprodeck.com/**",
+        "https://assets.tcgdex.net/**",
+        "https://images.pokemontcg.io/**"
+      ],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 400,
+        "maxAge": "30d",
+        "cacheOpaqueResponses": true
       }
     }
   ]

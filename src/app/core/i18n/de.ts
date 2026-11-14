@@ -25,6 +25,7 @@ export const de = {
     impressum: 'Impressum',
   },
   common: {
+    offlineNotice: 'Offline – gespeicherte Kartenbilder bleiben sichtbar, Daten und Preise können fehlen.',
     card: 'Karte',
     cards: 'Karten',
     unknown: 'Unbekannt',

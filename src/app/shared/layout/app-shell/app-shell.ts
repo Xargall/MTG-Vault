@@ -21,6 +21,7 @@ import { setAppLanguage } from '../../../core/utils/language.util';
 import { AppFooter } from '../app-footer/app-footer';
 import { GeminiOnboardingDialog } from '../gemini-onboarding-dialog/gemini-onboarding-dialog';
 import { GuestBanner } from '../guest-banner/guest-banner';
+import { OfflineBanner } from '../offline-banner/offline-banner';
 import { UserMenu } from '../user-menu/user-menu';
 
 @Component({
@@ -33,6 +34,7 @@ import { UserMenu } from '../user-menu/user-menu';
     AppFooter,
     DemoScanBlockedDialog,
     GuestBanner,
+    OfflineBanner,
     GeminiOnboardingDialog,
     UserMenu,
     TranslatePipe,
