@@ -120,6 +120,34 @@
   gap: 6px;
 }
 
+.legality-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+
+  svg {
+    width: 12px;
+    height: 12px;
+    transition: transform var(--dur-state) ease;
+
+    &.is-open {
+      transform: rotate(180deg);
+    }
+  }
+
+  &:hover {
+    color: var(--color-text);
+  }
+}
+
 .legality-badge {
   display: inline-flex;
   align-items: center;
@@ -159,9 +187,12 @@
 
 // --- Your copy ------------------------------------------------------------
 
+// Sits in the info column right under the name/mana row.
 .copy-panel {
-  padding-top: var(--spacing-md);
-  border-top: 1px solid var(--color-border);
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-md) 0;
+  border-block: 1px solid var(--color-border);
 }
 
 .copy-heading {

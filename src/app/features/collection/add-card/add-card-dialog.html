@@ -1,6 +1,8 @@
 <app-dialog [heading]="'addCard.title' | translate" maxWidth="720px" (closeRequest)="close.emit()">
 
+  @if (loupeOpen() || pendingItems().length > 0) {
   <div class="top-row">
+    @if (loupeOpen()) {
     <!-- Always first in DOM, regardless of the pending list below - was
          second, so the preview sat alone on the left until the first staged
          card made the pending list appear before it and bump it rightward
@@ -10,6 +12,14 @@
          eye - zoom + manual focus + the device's own torch/flash. -->
     <div class="camera-preview">
       <div class="camera-preview-frame">
+        <button
+          type="button"
+          class="camera-preview-close"
+          [attr.aria-label]="'addCard.loupeClose' | translate"
+          (click)="toggleLoupe()"
+        >
+          <svg aria-hidden="true"><use href="#icon-close" /></svg>
+        </button>
         @if (cameraError()) {
           <p class="state-message error camera-preview-error">{{ cameraError() }}</p>
         }
@@ -60,6 +70,7 @@
         />
       }
     </div>
+    }
 
     @if (pendingItems().length > 0) {
       <div class="pending-list">
@@ -97,17 +108,41 @@
       </div>
     }
   </div>
+  }
 
   @if (!selectedName()) {
-    <input
-      #searchInput
-      type="text"
-      class="search-input"
-      [placeholder]="searchPlaceholderKey() | translate"
-      [ngModel]="query()"
-      (ngModelChange)="onQueryChange($event)"
-      autofocus
-    />
+    <!-- Search comes first; the camera loupe is an opt-in button beside it
+         (and remembers whether it was left open). -->
+    <div class="search-row">
+      <input
+        #searchInput
+        type="text"
+        class="search-input"
+        [placeholder]="searchPlaceholderKey() | translate"
+        [ngModel]="query()"
+        (ngModelChange)="onQueryChange($event)"
+        autofocus
+      />
+      <button
+        type="button"
+        class="btn btn--secondary btn--round"
+        [class.is-active]="loupeOpen()"
+        [attr.aria-label]="(loupeOpen() ? 'addCard.loupeClose' : 'addCard.loupeOpen') | translate"
+        [attr.aria-pressed]="loupeOpen()"
+        [title]="(loupeOpen() ? 'addCard.loupeClose' : 'addCard.loupeOpen') | translate"
+        (click)="toggleLoupe()"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linejoin="round"
+          />
+          <circle cx="12" cy="13.5" r="3.2" stroke="currentColor" stroke-width="1.6" />
+        </svg>
+      </button>
+    </div>
 
     @if (gameService.currentSlug() === 'pokemon' && pokemonSets().length > 0) {
       <div class="pokemon-set-filter" #pokemonSetFilterEl>
@@ -152,7 +187,7 @@
          searching, error, no-results, results) - the dialog used to grow and
          shrink on every keystroke, collapsing to almost nothing on an empty
          or no-match query, then jumping back open once results arrived. -->
-    <div class="search-results-area">
+    <div class="search-results-area" [class.is-compact]="loupeOpen()">
       @if (searching() && results().length === 0) {
         <p class="state-message">{{ 'addCard.searching' | translate }}</p>
       } @else if (searchError()) {

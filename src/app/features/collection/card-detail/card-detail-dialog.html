@@ -41,6 +41,88 @@
         }
       }
 
+    <!-- This copy, edited in place and kept right under the name (it is
+           the part people come here to change): one compact block instead of
+           a separate edit mode. Save/discard appear only once something
+           changed. -->
+    <section class="copy-panel" aria-labelledby="copy-heading">
+      <h2 id="copy-heading" class="copy-heading">{{ 'cardDetail.yourCopy' | translate }}</h2>
+
+      <div class="copy-fields">
+        <div class="copy-field">
+          <span class="field-caption" id="copy-quantity-label">{{ 'cardDetail.quantity' | translate }}</span>
+          <div class="quantity-row">
+            <div class="stepper" role="group" aria-labelledby="copy-quantity-label">
+              <button
+                type="button"
+                class="icon-btn stepper-button"
+                [disabled]="editQuantity() <= 1"
+                (click)="stepQuantity(-1)"
+                [attr.aria-label]="'cardDetail.decrease' | translate"
+              >
+                <svg aria-hidden="true"><use href="#icon-minus" /></svg>
+              </button>
+              <input
+                class="stepper-value"
+                type="number"
+                inputmode="numeric"
+                min="1"
+                aria-labelledby="copy-quantity-label"
+                [ngModel]="editQuantity()"
+                (ngModelChange)="onQuantityInput($event)"
+              />
+              <button
+                type="button"
+                class="icon-btn stepper-button"
+                (click)="stepQuantity(1)"
+                [attr.aria-label]="'cardDetail.increase' | translate"
+              >
+                <svg aria-hidden="true"><use href="#icon-plus" /></svg>
+              </button>
+            </div>
+            <!-- Purely a visual "saved" confirmation - saveError() below
+                 already surfaces a failure accessibly, so this stays
+                 decorative rather than an aria-live region announcing every
+                 autosave. -->
+            <svg class="quantity-saved-check" [class.is-visible]="quantityJustSaved()" aria-hidden="true">
+              <use href="#icon-check" />
+            </svg>
+          </div>
+        </div>
+
+        <div class="copy-field copy-field--grow">
+          <label class="field-caption" for="copy-language">{{ 'cardDetail.language' | translate }}</label>
+          <select id="copy-language" [ngModel]="editLanguage()" (ngModelChange)="editLanguage.set($event)">
+            @for (option of languageOptions; track option.code) {
+              <option [value]="option.code">{{ option.labelKey | translate }}</option>
+            }
+          </select>
+        </div>
+
+        @if (entry().card.game === 'mtg') {
+          <label class="checkbox-label copy-foil">
+            <input type="checkbox" [ngModel]="editFoil()" (ngModelChange)="editFoil.set($event)" />
+            {{ 'cardDetail.foil' | translate }}
+          </label>
+        }
+      </div>
+
+      @if (saveError()) {
+        <p class="state-message error">{{ saveError() }}</p>
+      }
+
+      @if (dirty()) {
+        <div class="copy-actions">
+          <button type="button" class="btn btn--ghost btn--sm" [disabled]="saving()" (click)="discardEdit()">
+            {{ 'cardDetail.discard' | translate }}
+          </button>
+          <button type="button" class="btn btn--primary btn--sm" [disabled]="saving()" (click)="saveEdit()">
+            {{ 'cardDetail.saveButton' | translate }}
+          </button>
+        </div>
+      }
+    </section>
+
       <!-- Facts about the card itself. What's specific to this copy (quantity,
            foil, language) lives editable in "Your copy" below. -->
       <dl class="info-list">
@@ -88,7 +170,7 @@
         <div class="legality-section">
           <span class="field-caption">{{ 'cardDetail.legalitiesHeading' | translate }}</span>
           <div class="legality-badges">
-            @for (item of formatLegalities(); track item.format.slug) {
+            @for (item of visibleLegalities(); track item.format.slug) {
               <span
                 [class]="'legality-badge legality-badge--' + item.status"
                 [title]="(item.format.nameKey | translate) + ': ' + (legalityStatusLabelKey(item.status) | translate)"
@@ -97,6 +179,15 @@
               </span>
             }
           </div>
+          <button
+            type="button"
+            class="legality-toggle"
+            [attr.aria-expanded]="showAllFormats()"
+            (click)="showAllFormats.set(!showAllFormats())"
+          >
+            {{ (showAllFormats() ? 'cardDetail.fewerFormats' : 'cardDetail.allFormats') | translate }}
+            <svg aria-hidden="true" [class.is-open]="showAllFormats()"><use href="#icon-chevron-down" /></svg>
+          </button>
         </div>
       }
 
@@ -107,86 +198,6 @@
       }
     </div>
   </div>
-
-  <!-- This copy, edited in place: one compact row instead of a separate
-       edit mode. Save/discard appear only once something changed. -->
-  <section class="copy-panel" aria-labelledby="copy-heading">
-    <h2 id="copy-heading" class="copy-heading">{{ 'cardDetail.yourCopy' | translate }}</h2>
-
-    <div class="copy-fields">
-      <div class="copy-field">
-        <span class="field-caption" id="copy-quantity-label">{{ 'cardDetail.quantity' | translate }}</span>
-        <div class="quantity-row">
-          <div class="stepper" role="group" aria-labelledby="copy-quantity-label">
-            <button
-              type="button"
-              class="icon-btn stepper-button"
-              [disabled]="editQuantity() <= 1"
-              (click)="stepQuantity(-1)"
-              [attr.aria-label]="'cardDetail.decrease' | translate"
-            >
-              <svg aria-hidden="true"><use href="#icon-minus" /></svg>
-            </button>
-            <input
-              class="stepper-value"
-              type="number"
-              inputmode="numeric"
-              min="1"
-              aria-labelledby="copy-quantity-label"
-              [ngModel]="editQuantity()"
-              (ngModelChange)="onQuantityInput($event)"
-            />
-            <button
-              type="button"
-              class="icon-btn stepper-button"
-              (click)="stepQuantity(1)"
-              [attr.aria-label]="'cardDetail.increase' | translate"
-            >
-              <svg aria-hidden="true"><use href="#icon-plus" /></svg>
-            </button>
-          </div>
-          <!-- Purely a visual "saved" confirmation - saveError() below
-               already surfaces a failure accessibly, so this stays
-               decorative rather than an aria-live region announcing every
-               autosave. -->
-          <svg class="quantity-saved-check" [class.is-visible]="quantityJustSaved()" aria-hidden="true">
-            <use href="#icon-check" />
-          </svg>
-        </div>
-      </div>
-
-      <div class="copy-field copy-field--grow">
-        <label class="field-caption" for="copy-language">{{ 'cardDetail.language' | translate }}</label>
-        <select id="copy-language" [ngModel]="editLanguage()" (ngModelChange)="editLanguage.set($event)">
-          @for (option of languageOptions; track option.code) {
-            <option [value]="option.code">{{ option.labelKey | translate }}</option>
-          }
-        </select>
-      </div>
-
-      @if (entry().card.game === 'mtg') {
-        <label class="checkbox-label copy-foil">
-          <input type="checkbox" [ngModel]="editFoil()" (ngModelChange)="editFoil.set($event)" />
-          {{ 'cardDetail.foil' | translate }}
-        </label>
-      }
-    </div>
-
-    @if (saveError()) {
-      <p class="state-message error">{{ saveError() }}</p>
-    }
-
-    @if (dirty()) {
-      <div class="copy-actions">
-        <button type="button" class="btn btn--ghost btn--sm" [disabled]="saving()" (click)="discardEdit()">
-          {{ 'cardDetail.discard' | translate }}
-        </button>
-        <button type="button" class="btn btn--primary btn--sm" [disabled]="saving()" (click)="saveEdit()">
-          {{ 'cardDetail.saveButton' | translate }}
-        </button>
-      </div>
-    }
-  </section>
 
   <div class="danger-zone">
     @if (deleteError()) {
