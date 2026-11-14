@@ -13,6 +13,9 @@ export interface MtgFormatOption {
   nameKey: string;
 }
 
+/** The formats most people care about - shown by default on a card, everything else sits behind "All formats". */
+export const MTG_CORE_FORMAT_SLUGS = ['standard', 'pioneer', 'modern', 'legacy', 'vintage', 'pauper', 'commander'];
+
 export const MTG_LEGALITY_FORMATS: MtgFormatOption[] = [
   { slug: 'standard', abbrKey: 'mtgFormats.abbrStandard', nameKey: 'mtgFormats.nameStandard' },
   { slug: 'pioneer', abbrKey: 'mtgFormats.abbrPioneer', nameKey: 'mtgFormats.namePioneer' },

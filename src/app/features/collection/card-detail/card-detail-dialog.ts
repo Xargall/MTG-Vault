@@ -13,7 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { CARD_LANGUAGE_OPTIONS } from '../../../core/constants/card-languages';
-import { MTG_LEGALITY_FORMATS, MtgFormatOption } from '../../../core/constants/mtg-formats';
+import { MTG_CORE_FORMAT_SLUGS, MTG_LEGALITY_FORMATS, MtgFormatOption } from '../../../core/constants/mtg-formats';
 import { Card, MtgCard, PokemonCard, YugiohBanlistStatus, YugiohCard } from '../../../core/models/card.model';
 import { AppDialog } from '../../../shared/dialog/dialog';
 import { rarityLabelKey } from '../collection-filters';
@@ -272,6 +272,15 @@ export class CardDetailDialog implements OnDestroy {
     if (!legalities) return [];
     return MTG_LEGALITY_FORMATS.map((format) => ({ format, status: legalities[format.slug] ?? 'not_legal' }));
   });
+
+  /** Collapsed by default: only the core formats show, the rest sit behind "All formats". */
+  protected readonly showAllFormats = signal(false);
+
+  protected readonly visibleLegalities = computed(() =>
+    this.showAllFormats()
+      ? this.formatLegalities()
+      : this.formatLegalities().filter((item) => MTG_CORE_FORMAT_SLUGS.includes(item.format.slug)),
+  );
 
   protected legalityStatusLabelKey(status: string): string {
     switch (status) {

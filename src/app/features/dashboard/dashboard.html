@@ -59,25 +59,34 @@
         <svg class="corner corner--tr" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
-        <h2>{{ 'dashboard.priceDistribution' | translate }}</h2>
-        <div class="chart-body">
-          <app-bar-chart [data]="priceDistribution()" [label]="'dashboard.priceDistribution' | translate" />
-        </div>
+        <h2>{{ 'dashboard.topCards' | translate }}</h2>
+        <ol class="top-list">
+          @for (entry of topCards(); track entry.row.id; let i = $index) {
+            <li class="top-row">
+              <span class="top-rank">{{ i + 1 }}</span>
+              <span class="top-name">
+                {{ entry.card.name }}
+                @if (entry.row.foil) {
+                  <span class="top-foil">{{ 'cardDetail.foil' | translate }}</span>
+                }
+              </span>
+              <span class="top-price">{{ showcasePrice(entry) | price }}</span>
+            </li>
+          }
+        </ol>
       </section>
     </div>
 
     @if (gameService.currentSlug() === 'mtg' && (currentPopularCard() || currentSaltiestCard())) {
-      <!-- Both featured panels share one structure (title, caption, card,
-           name, footer) so they always come out the same height. -->
-      <div class="dash-row reveal-grid">
+      <!-- One full-width panel, landscape: each feature is the card on the
+           left and its text on the right, side by side (stacked on a phone). -->
+      <section class="panel panel--framed feature-panel reveal-grid">
+        <svg class="corner corner--tl" aria-hidden="true"><use href="#flourish-vine" /></svg>
+        <svg class="corner corner--tr" aria-hidden="true"><use href="#flourish-vine" /></svg>
+        <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
+        <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
         @if (currentPopularCard(); as card) {
-          <section class="panel panel--framed feature-card">
-            <svg class="corner corner--tl" aria-hidden="true"><use href="#flourish-vine" /></svg>
-            <svg class="corner corner--tr" aria-hidden="true"><use href="#flourish-vine" /></svg>
-            <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
-            <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
-            <h2>{{ 'dashboard.popularCards' | translate }}</h2>
-            <p class="panel-caption">{{ 'dashboard.popularCardsSubtitle' | translate }}</p>
+          <article class="feature">
             <div class="feature-image">
               <!-- Keyed by card id: each rotation mounts a fresh image that
                    fades in, instead of swapping src under a visible frame. -->
@@ -89,21 +98,19 @@
                 }
               }
             </div>
-            <p class="feature-name">{{ card.name }}</p>
-            <span class="feature-badge">
-              {{ 'dashboard.popularRank' | translate: { rank: popularRank(), total: popularCards().length } }}
-            </span>
-          </section>
+            <div class="feature-text">
+              <h2>{{ 'dashboard.popularCards' | translate }}</h2>
+              <p class="panel-caption">{{ 'dashboard.popularCardsSubtitle' | translate }}</p>
+              <p class="feature-name">{{ card.name }}</p>
+              <span class="feature-badge">
+                {{ 'dashboard.popularRank' | translate: { rank: popularRank(), total: popularCards().length } }}
+              </span>
+            </div>
+          </article>
         }
 
         @if (currentSaltiestCard(); as entry) {
-          <section class="panel panel--framed feature-card">
-            <svg class="corner corner--tl" aria-hidden="true"><use href="#flourish-vine" /></svg>
-            <svg class="corner corner--tr" aria-hidden="true"><use href="#flourish-vine" /></svg>
-            <svg class="corner corner--bl" aria-hidden="true"><use href="#flourish-vine" /></svg>
-            <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
-            <h2>{{ 'dashboard.saltiestCards' | translate }}</h2>
-            <p class="panel-caption">{{ 'dashboard.saltiestCardsSubtitle' | translate }}</p>
+          <article class="feature">
             <div class="feature-image">
               @for (shown of [entry.card]; track shown.id) {
                 @if (shown.imageUrl; as imageUrl) {
@@ -113,13 +120,17 @@
                 }
               }
             </div>
-            <p class="feature-name">{{ entry.card.name }}</p>
-            <span class="feature-badge salt-badge salt-badge--{{ saltLevel(entry.salt) }}">
-              {{ entry.salt | number: '1.1-1' }} / 4.0
-            </span>
-          </section>
+            <div class="feature-text">
+              <h2>{{ 'dashboard.saltiestCards' | translate }}</h2>
+              <p class="panel-caption">{{ 'dashboard.saltiestCardsSubtitle' | translate }}</p>
+              <p class="feature-name">{{ entry.card.name }}</p>
+              <span class="feature-badge salt-badge salt-badge--{{ saltLevel(entry.salt) }}">
+                {{ entry.salt | number: '1.1-1' }} / 4.0
+              </span>
+            </div>
+          </article>
         }
-      </div>
+      </section>
     }
 
     <section class="color-categories">
@@ -150,20 +161,6 @@
               </span>
             </span>
           </a>
-        }
-        <!-- Empty categories come last and keep their slot, so the grid
-             stays whole instead of ending on a gap. -->
-        @for (category of emptyCategories(); track category.label) {
-          <div class="category-card category-card--empty">
-            <span class="category-bar" [style.background]="category.color"></span>
-            <span class="showcase-window">
-              <svg class="empty-seal" aria-hidden="true" [style.color]="category.color"><use href="#icon-diamond" /></svg>
-            </span>
-            <span class="category-body">
-              <span class="category-label">{{ category.label | translate }}</span>
-              <span class="category-count">{{ 'dashboard.noCards' | translate }}</span>
-            </span>
-          </div>
         }
       </div>
     </section>

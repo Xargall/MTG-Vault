@@ -29,6 +29,7 @@ const CONDITIONS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 3;
 const ZOOM_STEP = 0.1;
+const LOUPE_STORAGE_KEY = 'addCard.loupeOpen';
 
 // Torch isn't in TS's bundled MediaTrackCapabilities/-ConstraintSet types yet,
 // though Chromium-based browsers on Android support it (same situation as
@@ -58,6 +59,22 @@ interface FocusRange {
   min: number;
   max: number;
   step: number;
+}
+
+function readLoupePreference(): boolean {
+  try {
+    return localStorage.getItem(LOUPE_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveLoupePreference(open: boolean): void {
+  try {
+    localStorage.setItem(LOUPE_STORAGE_KEY, open ? '1' : '0');
+  } catch {
+    // Storage blocked (private mode) - the loupe just starts closed next time.
+  }
 }
 
 /** One card staged for a batch add - see pendingItems' doc. */
@@ -128,6 +145,14 @@ export class AddCardDialog {
   // had nothing to stop), and the stream that showed up afterward was never
   // stopped by anything. Found in review (ponytail-review, 2026-11-02).
   private destroyed = false;
+  // Bumped on every start/stop, so a getUserMedia call that resolves after
+  // the loupe was closed (or re-opened) again can tell it is out of date and
+  // stop its own stream instead of attaching it to nothing.
+  private cameraRun = 0;
+  // Off by default - the camera (and its permission prompt) only starts when
+  // asked for. Remembered across openings, so someone who works with the
+  // loupe finds it open again.
+  protected readonly loupeOpen = signal(readLoupePreference());
   protected readonly cameraError = signal<string | null>(null);
   protected readonly torchSupported = signal(false);
   protected readonly torchOn = signal(false);
@@ -140,7 +165,7 @@ export class AddCardDialog {
   protected readonly focusDistance = signal(0.5);
 
   constructor() {
-    afterNextRender(() => void this.startCamera());
+    if (this.loupeOpen()) afterNextRender(() => void this.startCamera());
     this.destroyRef.onDestroy(() => {
       this.destroyed = true;
       this.cameraStream?.getTracks().forEach((track) => track.stop());
@@ -151,9 +176,34 @@ export class AddCardDialog {
     }
   }
 
+  protected toggleLoupe(): void {
+    const open = !this.loupeOpen();
+    this.loupeOpen.set(open);
+    saveLoupePreference(open);
+    if (open) {
+      // The <video> only exists once the panel has rendered.
+      afterNextRender(() => void this.startCamera(), { injector: this.injector });
+    } else {
+      this.stopCamera();
+    }
+  }
+
+  private stopCamera(): void {
+    this.cameraRun++;
+    this.cameraStream?.getTracks().forEach((track) => track.stop());
+    this.cameraStream = null;
+    this.cameraTrack = null;
+    this.cameraError.set(null);
+    this.torchSupported.set(false);
+    this.torchOn.set(false);
+    this.supportsManualFocus.set(false);
+    this.zoom.set(MIN_ZOOM);
+  }
+
   private async startCamera(): Promise<void> {
     const videoEl = this.cameraVideo()?.nativeElement;
     if (!videoEl) return;
+    const run = ++this.cameraRun;
 
     // Prefer a USB camera over built-in/virtual ones, same as the Scanner
     // feature (scanner.ts's startCamera) - typically much higher resolution,
@@ -169,7 +219,7 @@ export class AddCardDialog {
     } catch {
       // enumerateDevices() failing just means no auto-preference - carry on.
     }
-    if (this.destroyed) return;
+    if (this.destroyed || run !== this.cameraRun) return;
 
     let stream: MediaStream;
     try {
@@ -192,7 +242,7 @@ export class AddCardDialog {
     // The dialog closed while getUserMedia was still waiting on the
     // browser's permission prompt - see destroyed's doc. Stop the stream
     // this call just opened instead of handing it to a dead component.
-    if (this.destroyed) {
+    if (this.destroyed || run !== this.cameraRun) {
       stream.getTracks().forEach((track) => track.stop());
       return;
     }

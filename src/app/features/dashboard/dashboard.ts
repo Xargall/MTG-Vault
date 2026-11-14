@@ -12,7 +12,6 @@ import {
 import { RouterLink } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
-import { BarChart } from '../../shared/charts/bar-chart/bar-chart';
 import { DonutChart } from '../../shared/charts/donut-chart/donut-chart';
 import { PricePipe } from '../../shared/pipes/price.pipe';
 import { Card } from '../../core/models/card.model';
@@ -20,11 +19,12 @@ import { EdhrecService } from '../../core/services/edhrec.service';
 import { GameService } from '../../core/services/game.service';
 import { MtgApiService } from '../../core/services/mtg-api.service';
 import { getCategoryDistribution, getCategorySummaries } from '../collection/card-category-stats';
-import { getEntryPrice, getPriceDistribution, getTotalValue } from '../collection/card-price-stats';
+import { getEntryPrice, getTopValuedEntries, getTotalValue } from '../collection/card-price-stats';
 import { CollectionEntry, CollectionService } from '../collection/collection.service';
 import { getWishlistTotals } from '../wishlist/wishlist-stats';
 import { WishlistService } from '../wishlist/wishlist.service';
 
+const TOP_VALUED_COUNT = 10;
 const POPULAR_CARD_COUNT = 12;
 const POPULAR_CARD_ROTATION_MS = 15000;
 // Offset from the popular-cards timer so the two panels never flip in the
@@ -51,7 +51,7 @@ export function saltLevel(salt: number): SaltLevel {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-dashboard',
-  imports: [DonutChart, BarChart, RouterLink, DecimalPipe, PricePipe, TranslatePipe],
+  imports: [DonutChart, RouterLink, DecimalPipe, PricePipe, TranslatePipe],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -75,17 +75,14 @@ export class Dashboard {
   protected readonly colorCategories = computed(() =>
     getCategorySummaries(this.entries(), this.gameService.currentSlug()),
   );
-  protected readonly priceDistribution = computed(() => getPriceDistribution(this.entries()));
+  protected readonly topCards = computed(() => getTopValuedEntries(this.entries(), TOP_VALUED_COUNT));
   protected readonly totalValue = computed(() => getTotalValue(this.entries()));
   protected readonly cardCount = computed(() =>
     this.entries().reduce((sum, entry) => sum + entry.row.quantity, 0),
   );
-  // Categories with no cards render last as muted placeholder tiles.
+  // Categories with no cards get no tile at all.
   protected readonly filledCategories = computed(() =>
     this.colorCategories().filter((category) => category.count > 0),
-  );
-  protected readonly emptyCategories = computed(() =>
-    this.colorCategories().filter((category) => category.count === 0),
   );
   /** Null while unknown (not loaded or failed) - the treasury shows a dash rather than a misleading 0. */
   protected readonly wishlistTotals = signal<{ value: number; count: number } | null>(null);
