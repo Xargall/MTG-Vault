@@ -48,6 +48,26 @@
     </div>
   </section>
 
+  @if (!loading() && terms().length > 0) {
+    <details class="help-index" #helpIndex>
+      <summary>{{ 'help.indexLabel' | translate: { count: terms().length } }}</summary>
+      <div class="help-index-body">
+        @for (group of indexGroups(); track group.letter) {
+          <div class="help-index-group">
+            <span class="help-index-letter" aria-hidden="true">{{ group.letter }}</span>
+            <div class="help-index-links">
+              @for (term of group.terms; track term.id) {
+                <button type="button" class="related-link" (click)="jumpToTerm(term.id); helpIndex.open = false">
+                  {{ termText(term) }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </details>
+  }
+
   @if (previousFilter(); as prev) {
     <button type="button" class="restore-filter" (click)="restorePreviousFilter()">
       <svg class="restore-filter-icon" aria-hidden="true"><use href="#icon-chevron-left" /></svg>
@@ -55,7 +75,9 @@
     </button>
   }
 
-  @if (filteredTerms().length === 0) {
+  @if (loading()) {
+    <p class="state-message" role="status">{{ 'help.loading' | translate }}</p>
+  } @else if (filteredTerms().length === 0) {
     <p class="state-message">
       {{ 'help.noMatches' | translate }}
       @if (searchQuery() || selectedCategory()) {

@@ -30,6 +30,52 @@
   margin-bottom: var(--spacing-lg);
 }
 
+// A-Z index: collapsed by default, a flowing list of links per letter.
+.help-index {
+  margin-bottom: var(--spacing-md);
+
+  summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  &[open] summary {
+    color: var(--color-text);
+  }
+}
+
+.help-index-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.help-index-group {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  gap: var(--spacing-sm);
+}
+
+.help-index-letter {
+  color: var(--color-accent);
+  font-family: var(--font-heading);
+  font-weight: 700;
+}
+
+.help-index-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--spacing-md);
+}
+
 // Appears after "Siehe auch" jumps that cleared a search/category (see
 // restorePreviousFilter in help.ts) - same back-link language as
 // geminiKey.html's "Zurück zu den Einstellungen" (chevron + muted text,

@@ -49,13 +49,18 @@ export class Login {
     try {
       const { email, password } = this.form.getRawValue();
       await this.authService.signInWithEmail(email, password);
-      const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo') ?? '/';
-      await this.router.navigateByUrl(redirectTo);
+      await this.goToGamePicker();
     } catch (error) {
       this.errorMessage.set(error instanceof Error ? error.message : this.translate.instant('auth.loginFailed'));
     } finally {
       this.isSubmitting.set(false);
     }
+  }
+
+  /** Every fresh sign-in lands on the game picker first (it carries the final destination along), not just an account's very first one. */
+  private async goToGamePicker() {
+    const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo') ?? '/';
+    await this.router.navigate(['/select-game'], { queryParams: { redirectTo } });
   }
 
   async signInWithGoogle() {
@@ -73,8 +78,7 @@ export class Login {
     this.isSeedingDemo.set(true);
     try {
       await this.authService.signInAsGuest();
-      const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo') ?? '/';
-      await this.router.navigateByUrl(redirectTo);
+      await this.goToGamePicker();
     } catch (error) {
       this.errorMessage.set(error instanceof Error ? error.message : this.translate.instant('auth.demoFailed'));
     } finally {

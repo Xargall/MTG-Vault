@@ -1,10 +1,15 @@
 <button type="button" class="banner" (click)="bannerClick.emit()" [attr.aria-label]="'decks.bannerAria' | translate">
-  <div class="track">
-    @for (image of loopImages(); track $index) {
-      <img class="banner-image" [src]="image" alt="" loading="lazy" />
-    }
-  </div>
-  <div class="overlay">
-    <span class="overlay-text">{{ 'decks.bannerText' | translate }}</span>
-  </div>
+  <span class="window">
+    <span class="track">
+      @for (image of loopImages(); track $index) {
+        <img class="banner-image" [src]="image" alt="" loading="lazy" />
+      }
+    </span>
+  </span>
+  <!-- The caption has its own strip under the art instead of sitting on it,
+       so it reads the same whatever card art is scrolling past. -->
+  <span class="strip">
+    <span class="strip-text">{{ 'decks.bannerText' | translate }}</span>
+    <svg class="strip-arrow" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+  </span>
 </button>

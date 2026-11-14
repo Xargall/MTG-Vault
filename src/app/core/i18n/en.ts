@@ -27,6 +27,7 @@ export const en: typeof de = {
     impressum: 'Legal Notice',
   },
   common: {
+    offlineNotice: 'Offline – saved card images stay visible, data and prices may be missing.',
     card: 'card',
     cards: 'cards',
     unknown: 'Unknown',
@@ -69,6 +70,7 @@ export const en: typeof de = {
   },
   auth: {
     loginTitle: 'Sign In',
+    tagline: 'Collection, decks and wishlist for Magic, Yu-Gi-Oh! and Pokémon.',
     email: 'Email',
     password: 'Password',
     emailInvalid: 'Please enter a valid email address.',
@@ -254,9 +256,9 @@ export const en: typeof de = {
   decks: {
     title: 'Decks',
     bannerAria: 'Browse precon decks',
-    bannerText: 'Browse & add precon decks',
-    commanderRecsButton: 'Commander recommendations from your collection',
-    formatRecsButton: 'Format deck recommendations',
+    bannerText: 'Browse precon decks',
+    commanderRecsButton: 'Commander picks',
+    formatRecsButton: 'Format picks',
     almostComplete: 'Almost complete',
     almostCompleteHint: 'Precon decks you already own at least 75% of the cards for.',
     matchInCollection: '{{percent}}% in collection',
@@ -632,7 +634,7 @@ export const en: typeof de = {
     importFailed: 'Deck could not be imported.',
   },
   archetypeBrowser: {
-    openButton: 'Browse archetypes',
+    openButton: 'Archetypes',
     title: 'Browse Archetypes',
     hint: 'Shows every card in a theme (archetype) - not a curated deck, just the full card pool to browse.',
     searchPlaceholder: 'Search archetype, e.g. "Blue-Eyes"…',
@@ -708,6 +710,8 @@ export const en: typeof de = {
     later: 'Later',
   },
   help: {
+    loading: 'Loading glossary…',
+    indexLabel: 'Index A–Z ({{count}} terms)',
     title: 'Help & Glossary',
     subtitle: 'Terms and situations for whenever you get stuck.',
     searchPlaceholder: 'Search for a term…',

@@ -25,6 +25,7 @@ export const de = {
     impressum: 'Impressum',
   },
   common: {
+    offlineNotice: 'Offline – gespeicherte Kartenbilder bleiben sichtbar, Daten und Preise können fehlen.',
     card: 'Karte',
     cards: 'Karten',
     unknown: 'Unbekannt',
@@ -67,6 +68,7 @@ export const de = {
   },
   auth: {
     loginTitle: 'Anmelden',
+    tagline: 'Sammlung, Decks und Wunschliste für Magic, Yu-Gi-Oh! und Pokémon.',
     email: 'E-Mail',
     password: 'Passwort',
     emailInvalid: 'Bitte eine gültige E-Mail-Adresse eingeben.',
@@ -252,9 +254,9 @@ export const de = {
   decks: {
     title: 'Decks',
     bannerAria: 'Precon-Decks durchsuchen',
-    bannerText: 'Precon-Decks durchsuchen & hinzufügen',
-    commanderRecsButton: 'Commander-Empfehlungen aus deiner Sammlung',
-    formatRecsButton: 'Format-Deck-Empfehlungen',
+    bannerText: 'Precon-Decks durchsuchen',
+    commanderRecsButton: 'Commander-Empfehlungen',
+    formatRecsButton: 'Format-Empfehlungen',
     almostComplete: 'Fast komplett',
     almostCompleteHint: 'Precon-Decks, von denen du bereits mindestens 75 % der Karten besitzt.',
     matchInCollection: '{{percent}}% in Sammlung',
@@ -634,7 +636,7 @@ export const de = {
     importFailed: 'Deck konnte nicht importiert werden.',
   },
   archetypeBrowser: {
-    openButton: 'Archetypen durchsuchen',
+    openButton: 'Archetypen',
     title: 'Archetypen durchsuchen',
     hint: 'Zeigt alle Karten eines Themas (Archetyp) — kein kuratiertes Deck, sondern der gesamte Kartenpool zum Stöbern.',
     searchPlaceholder: 'Archetyp suchen, z. B. „Blue-Eyes“…',
@@ -710,6 +712,8 @@ export const de = {
     later: 'Später',
   },
   help: {
+    loading: 'Lade Lexikon…',
+    indexLabel: 'Index A–Z ({{count}} Begriffe)',
     title: 'Hilfe & Lexikon',
     subtitle: 'Begriffe und Situationen, falls du mal auf dem Schlauch stehst.',
     searchPlaceholder: 'Begriff suchen…',
