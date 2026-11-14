@@ -4,12 +4,26 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { GameService } from '../../core/services/game.service';
 import { ToastService } from '../../core/services/toast.service';
-import { HELP_CATEGORIES, HELP_TERMS, HelpCategory, HelpLang, HelpTerm } from './help-terms';
+import { HELP_CATEGORIES, HelpCategory, HelpLang, HelpTerm, loadHelpTerms } from './help-terms';
+
+/** One letter of the A-Z index with the terms that start with it. */
+export interface IndexGroup {
+  letter: string;
+  terms: HelpTerm[];
+}
 
 /** A step resolved to the current language, ready for the template. */
 export interface ResolvedStep {
   text: string;
   branches?: string[];
+}
+
+/** Sort/filing key of a term for the A-Z index: diacritics folded, leading punctuation (a quote mark) dropped. */
+function indexKey(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/^[^\p{L}\p{N}]+/u, '');
 }
 
 // "Trottel-Modus" ("dummy mode") is the feature's actual product name (see
@@ -40,6 +54,10 @@ export class Help {
   protected readonly translate = inject(TranslateService);
 
   protected readonly categories = HELP_CATEGORIES;
+  // The active game's glossary, loaded lazily (see loadHelpTerms): empty
+  // until the chunk arrives, and again right after a game switch.
+  protected readonly terms = signal<HelpTerm[]>([]);
+  protected readonly loading = signal(true);
   protected readonly searchQuery = signal('');
   protected readonly selectedCategory = signal<HelpCategory | null>(null);
   protected readonly trottelMode = signal(readStoredTrottelMode());
@@ -67,7 +85,24 @@ export class Help {
   constructor() {
     effect(() => {
       const game = this.gameService.currentSlug();
-      const names = [...new Set(HELP_TERMS.filter((term) => term.game === game).flatMap((term) => term.exampleCards ?? []))];
+      this.loading.set(true);
+      this.terms.set([]);
+      void loadHelpTerms(game)
+        .then((terms) => {
+          // The game may have been switched again while the chunk loaded.
+          if (this.gameService.currentSlug() !== game) return;
+          this.terms.set(terms);
+        })
+        .catch(() => {
+          // Chunk failed to load (offline): the page shows its empty state.
+        })
+        .finally(() => {
+          if (this.gameService.currentSlug() === game) this.loading.set(false);
+        });
+    });
+
+    effect(() => {
+      const names = [...new Set(this.terms().flatMap((term) => term.exampleCards ?? []))];
       if (names.length === 0) {
         this.exampleCardImages.set(new Map());
         return;
@@ -87,12 +122,10 @@ export class Help {
   }
 
   protected readonly filteredTerms = computed(() => {
-    const game = this.gameService.currentSlug();
     const query = this.searchQuery().trim().toLowerCase();
     const category = this.selectedCategory();
     const lang = this.lang();
-    return HELP_TERMS.filter((term) => {
-      if (term.game !== game) return false;
+    return this.terms().filter((term) => {
       if (category && term.category !== category) return false;
       if (!query) return true;
       return (
@@ -111,6 +144,26 @@ export class Help {
       map.set(term.category, list);
     }
     return map;
+  });
+
+  // A-Z index: the entries themselves stay in their curated order (basics
+  // before exotic keywords), so finding one by name on a 200-entry page is
+  // what this is for. Diacritics are folded so "Öl" files under O, and leading
+  // punctuation (a quote mark) is skipped.
+  protected readonly indexGroups = computed<IndexGroup[]>(() => {
+    const lang = this.lang();
+    const keyed = this.terms()
+      .map((term) => ({ term, key: indexKey(term.term[lang]) }))
+      .sort((a, b) => a.key.localeCompare(b.key, lang));
+    const groups: IndexGroup[] = [];
+    for (const { term, key } of keyed) {
+      const first = key.charAt(0).toUpperCase();
+      const letter = /[A-Z]/.test(first) ? first : '#';
+      const last = groups[groups.length - 1];
+      if (last?.letter === letter) last.terms.push(term);
+      else groups.push({ letter, terms: [term] });
+    }
+    return groups;
   });
 
   protected setMode(trottel: boolean) {
@@ -156,7 +209,7 @@ export class Help {
   protected relatedTermsFor(term: HelpTerm): HelpTerm[] {
     if (!term.relatedTerms?.length) return [];
     return term.relatedTerms
-      .map((id) => HELP_TERMS.find((candidate) => candidate.id === id))
+      .map((id) => this.terms().find((candidate) => candidate.id === id))
       .filter((candidate): candidate is HelpTerm => !!candidate);
   }
 

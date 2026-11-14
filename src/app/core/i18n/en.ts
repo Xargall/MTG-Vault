@@ -710,6 +710,8 @@ export const en: typeof de = {
     later: 'Later',
   },
   help: {
+    loading: 'Loading glossary…',
+    indexLabel: 'Index A–Z ({{count}} terms)',
     title: 'Help & Glossary',
     subtitle: 'Terms and situations for whenever you get stuck.',
     searchPlaceholder: 'Search for a term…',

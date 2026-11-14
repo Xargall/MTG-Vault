@@ -712,6 +712,8 @@ export const de = {
     later: 'Später',
   },
   help: {
+    loading: 'Lade Lexikon…',
+    indexLabel: 'Index A–Z ({{count}} Begriffe)',
     title: 'Hilfe & Lexikon',
     subtitle: 'Begriffe und Situationen, falls du mal auf dem Schlauch stehst.',
     searchPlaceholder: 'Begriff suchen…',
