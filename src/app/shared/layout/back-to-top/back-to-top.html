@@ -1,0 +1,9 @@
+<button
+  type="button"
+  class="btn btn--secondary btn--round back-to-top"
+  [class.is-visible]="visible()"
+  [attr.aria-label]="'nav.backToTop' | translate"
+  (click)="scrollToTop()"
+>
+  <svg aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+</button>

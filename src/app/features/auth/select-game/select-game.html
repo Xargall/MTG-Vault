@@ -19,6 +19,7 @@
         type="button"
         class="game-tile"
         [class.is-active]="gameService.currentSlug() === 'mtg'"
+        [attr.aria-current]="gameService.currentSlug() === 'mtg' ? 'true' : null"
         [disabled]="choosing() !== null"
         (click)="choose('mtg')"
       >
@@ -33,6 +34,7 @@
         type="button"
         class="game-tile"
         [class.is-active]="gameService.currentSlug() === 'yugioh'"
+        [attr.aria-current]="gameService.currentSlug() === 'yugioh' ? 'true' : null"
         [disabled]="choosing() !== null"
         (click)="choose('yugioh')"
       >
@@ -47,6 +49,7 @@
         type="button"
         class="game-tile"
         [class.is-active]="gameService.currentSlug() === 'pokemon'"
+        [attr.aria-current]="gameService.currentSlug() === 'pokemon' ? 'true' : null"
         [disabled]="choosing() !== null"
         (click)="choose('pokemon')"
       >

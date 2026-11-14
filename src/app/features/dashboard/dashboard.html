@@ -50,7 +50,7 @@
         <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <h2>{{ categoryHeading() | translate }}</h2>
         <div class="chart-body">
-          <app-donut-chart [data]="colorDistribution()" />
+          <app-donut-chart [data]="colorDistribution()" [label]="categoryHeading() | translate" />
         </div>
       </section>
 
@@ -61,7 +61,7 @@
         <svg class="corner corner--br" aria-hidden="true"><use href="#flourish-vine" /></svg>
         <h2>{{ 'dashboard.priceDistribution' | translate }}</h2>
         <div class="chart-body">
-          <app-bar-chart [data]="priceDistribution()" />
+          <app-bar-chart [data]="priceDistribution()" [label]="'dashboard.priceDistribution' | translate" />
         </div>
       </section>
     </div>

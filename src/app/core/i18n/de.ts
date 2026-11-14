@@ -8,11 +8,17 @@ export const de = {
     primary: 'Hauptnavigation',
     gameSwitch: 'Spiel wechseln',
     help: 'Hilfe & Lexikon',
+    scan: 'Scannen',
+    skipToContent: 'Zum Inhalt springen',
+    backToTop: 'Nach oben',
   },
   games: {
     mtg: 'Magic: The Gathering',
     yugioh: 'Yu-Gi-Oh!',
     pokemon: 'Pokémon',
+    mtgShort: 'Magic',
+    yugiohShort: 'Yu-Gi-Oh!',
+    pokemonShort: 'Pokémon',
     comingSoon: 'bald verfügbar',
   },
   footer: {
@@ -722,6 +728,7 @@ export const de = {
     clearFilters: 'Filter zurücksetzen',
   },
   playtest: {
+    title: 'Playtest',
     noDeckSelected: 'Kein Deck ausgewählt. Starte den Playtest über ein Deck in deinen Decks.',
     backToDecks: 'Zurück zu Decks',
     library: 'Bibliothek',

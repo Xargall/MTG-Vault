@@ -45,6 +45,18 @@
   filter: brightness(1.2);
 }
 
+// Stands in for the global :focus-visible outline (see donut-chart.html).
+.segment-focus {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segment:focus-visible + .segment-focus {
+  opacity: 1;
+}
+
 .total-value {
   fill: var(--color-text);
   font-size: 26px;

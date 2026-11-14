@@ -1,0 +1,36 @@
+.back-to-top {
+  position: fixed;
+  right: calc(var(--spacing-md) + env(safe-area-inset-right));
+  bottom: calc(var(--spacing-md) + var(--tabbar-offset));
+  // Above page content, below the tab bar (50) and dialogs.
+  z-index: 40;
+  // A solid plate: the secondary button's own fill is translucent, which
+  // would let card art show through here.
+  background-color: var(--color-surface-solid);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  // Also takes the hidden button out of the tab order and the a11y tree.
+  visibility: hidden;
+  transform: translateY(8px);
+  transition:
+    opacity var(--dur-state) var(--ease-out),
+    transform var(--dur-state) var(--ease-out),
+    visibility 0s linear var(--dur-state);
+
+  &.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0s;
+  }
+
+  // The shared chevron, turned to point up.
+  svg {
+    transform: rotate(180deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transform: none;
+    transition: none;
+  }
+}

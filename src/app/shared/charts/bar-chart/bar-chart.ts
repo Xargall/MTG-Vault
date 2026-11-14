@@ -19,6 +19,7 @@ const BAR_RADIUS = 4;
 const PLOT_HEIGHT = 140;
 const TOP_PADDING = 24;
 const BOTTOM_PADDING = 30;
+const FOCUS_INSET = 2;
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,9 +30,13 @@ const BOTTOM_PADDING = 30;
 })
 export class BarChart {
   readonly data = input<BarChartDatum[]>([]);
+  /** Accessible name of the whole chart (its visible heading) - the bars announce their own label and value. */
+  readonly label = input<string>('');
 
   protected readonly hoveredIndex = signal<number | null>(null);
   protected readonly barRadius = BAR_RADIUS;
+  protected readonly bandWidth = BAND_WIDTH;
+  protected readonly focusInset = FOCUS_INSET;
 
   protected readonly viewBoxWidth = computed(() => Math.max(this.data().length * BAND_WIDTH, BAND_WIDTH));
   protected readonly viewBoxHeight = TOP_PADDING + PLOT_HEIGHT + BOTTOM_PADDING;

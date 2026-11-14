@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal, computed, effect } from '@angular/core';
+import { BackToTop } from '../../shared/layout/back-to-top/back-to-top';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 
 import { GameService } from '../../core/services/game.service';
@@ -29,7 +30,7 @@ function readStoredTrottelMode(): boolean {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-help',
-  imports: [TranslatePipe],
+  imports: [TranslatePipe, BackToTop],
   templateUrl: './help.html',
   styleUrl: './help.scss',
 })

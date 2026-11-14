@@ -71,7 +71,7 @@
     @if (isMtgDeck()) {
       <section class="analysis-section">
         <h3>{{ 'deckDetail.manaCurveHeading' | translate }}</h3>
-        <app-bar-chart [data]="manaCurve()" />
+        <app-bar-chart [data]="manaCurve()" [label]="'deckDetail.manaCurveHeading' | translate" />
 
         <h3>{{ 'deckDetail.tempoHeading' | translate }}</h3>
         <div class="tempo-chips">

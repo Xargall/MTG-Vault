@@ -1,5 +1,13 @@
+// Same 1100px container as dashboard and collection, so the page heading and
+// content edges stay put when switching between the main tabs.
 .decks {
+  max-width: 1100px;
+  margin: 0 auto;
   padding: var(--spacing-lg);
+
+  @media (max-width: 640px) {
+    padding: var(--spacing-md);
+  }
 }
 
 h1 {

@@ -25,6 +25,7 @@
         class="card-image"
         [class.skeleton-shimmer]="!imageLoaded()"
         [src]="url"
+        [attr.srcset]="srcset()"
         [alt]="card().name"
         loading="lazy"
         (load)="imageLoaded.set(true)"
